@@ -1,50 +1,46 @@
-name: FRF 2.0 形式化验证（权限修复版）
+name: FRF 2.0 全局形式化验证
 
 on:
   push:
-    branches: [ main, master, dev-frf-2.0 ]
+    branches: [ main, master, release/final ]
     paths: [ '**.v', 'CoqProject', 'Makefile', 'validate.sh' ]
   pull_request:
     branches: [ main, master ]
+  schedule:
+    - cron: '0 2 * * 0'  # 每周日凌晨2点自动验证
   workflow_dispatch:
-    inputs:
-      fullVerification:
-        type: boolean
-        default: false
 
 jobs:
-  formal-verification:
+  global-formal-verification:
     runs-on: ubuntu-latest
-    # 关键1：容器配置增加权限与环境变量传递
+    # 修复1：使用存在的Coq镜像版本（8.19.0为有效版本）
     container:
-      image: coqorg/coq:8.18.0
-      options: --user root  # 使用root用户避免容器内权限不足
-      env:
-        GITHUB_OUTPUT: /__w/_temp/_runner_file_commands/outputs  # 显式传递输出变量路径
-        GITHUB_STATE: /__w/_temp/_runner_file_commands/states    # 显式传递状态变量路径
+      image: coqorg/coq:8.19.0
+      options: --user root  # 保持root权限解决写入问题
 
-    timeout-minutes: 75
+    timeout-minutes: 90
     env:
-      MATHLIB_VERSION: "3.74.0"
-      COQPATH: "/app/src/SelfContainedLib:/app/src/theories:/app/src/CS_Null:/app/src/Quantum:/app/src/CategoryTheory"
-      TEMP_DIR: "/__w/_temp/_runner_file_commands"  # 统一临时目录变量
+      MATHLIB_VERSION: "4.0.0"
+      # 修复2：使用GitHub工作目录变量，避免硬编码路径
+      COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
+      GLOBAL_TARGET: "all"
+      REPORT_DIR: "${{ github.workspace }}/verification-reports"
+      TEMP_DIR: "/__w/_temp/_runner_file_commands"
 
     steps:
-      # 关键2：预处理临时目录权限
       - name: 修复临时目录权限
         run: |
           mkdir -p ${{ env.TEMP_DIR }}
-          chmod -R 777 /__w/_temp/  # 赋予临时目录完全读写权限
-          chown -R $(id -u):$(id -g) /__w/_temp/  # 对齐用户组权限
+          chmod -R 777 /__w/_temp/
           echo "✅ 临时目录权限修复完成"
 
-      # 关键3：使用checkout@v3规避v4的权限兼容问题
-      - name: 检出代码仓库
-        uses: actions/checkout@v3  # v3在容器环境中更稳定
+      # 修复3：使用默认工作目录，移除硬编码的/app/src
+      - name: 检出代码仓库（含子模块）
+        uses: actions/checkout@v3  # 保持v3兼容性
         with:
-          fetch-depth: 2
+          fetch-depth: 0
           submodules: 'recursive'
-          path: "/app/src"  # 显式指定工作目录
+          # 移除path参数，使用默认工作目录${{ github.workspace }}
 
       - name: 缓存依赖与编译产物
         uses: actions/cache@v3
@@ -54,68 +50,139 @@ jobs:
             _build
             **/*.vo
             **/*.glob
-          key: v2-opam-${{ env.MATHLIB_VERSION }}-${{ github.sha }}
-          restore-keys: v2-opam-${{ env.MATHLIB_VERSION }}-
+          key: ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-global-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-global-
 
-      - name: 安装依赖
+      - name: 安装依赖（Mathlib及工具链）
         run: |
-          cd /app/src
-          opam update -y
+          # 修复4：使用工作目录变量切换路径
+          cd ${{ github.workspace }}
+          
+          opam init --disable-sandboxing -y
+          eval $(opam env)
+          
           if ! opam list | grep -q "coq-mathlib.*${{ env.MATHLIB_VERSION }}"; then
+            echo "安装Mathlib ${{ env.MATHLIB_VERSION }}..."
             opam install -y coq-mathlib=${{ env.MATHLIB_VERSION }}
-          fi
-          pip3 install pyyaml==6.0.1 markdown==3.5 gitpython==3.1.40
-
-      - name: 生成Makefile
-        run: |
-          cd /app/src
-          [ -f "CoqProject" ] || (echo "❌ 缺失CoqProject" && exit 1)
-          coq_makefile -f CoqProject -o Makefile
-
-      # 关键4：正确使用$GITHUB_OUTPUT环境变量（带引号避免路径解析问题）
-      - name: 确定编译策略
-        id: compile-strategy
-        run: |
-          cd /app/src
-          if [ "${{ github.event.inputs.fullVerification }}" = "true" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "strategy=full" >> "$GITHUB_OUTPUT"  # 正确引用环境变量
           else
-            changed_v_files=$(git diff --name-only HEAD^ HEAD | grep -E '\.v$' || true)
-            if [ -z "$changed_v_files" ]; then
-              echo "strategy=none" >> "$GITHUB_OUTPUT"
-            else
-              echo "strategy=incremental" >> "$GITHUB_OUTPUT"
-            fi
+            echo "Mathlib ${{ env.MATHLIB_VERSION }} 已缓存，跳过安装"
+          fi
+          
+          opam install -y coq-equations coq-extraction
+          pip3 install --no-cache-dir coq-parser==0.1.5 reportlab==4.0.9
+
+          # 版本校验
+          echo "=== 依赖版本校验 ==="
+          coqc --version | grep "8.19.0" || (echo "❌ Coq版本不匹配" && exit 1)
+          opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
+
+      - name: 生成全局验证Makefile
+        run: |
+          # 修复5：使用工作目录变量定位配置文件
+          cd ${{ github.workspace }}
+          
+          if [ ! -f "CoqProject" ]; then
+            echo "❌ 未找到CoqProject，无法生成验证目标" && exit 1
+          fi
+          if [ ! -f "Makefile.template" ]; then
+            echo "⚠️ 未找到Makefile.template，使用默认模板"
+            coq_makefile -f CoqProject -o Makefile
+          else
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template
+          fi
+          
+          if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
+            echo "❌ Makefile中未定义全局验证目标 '${{ env.GLOBAL_TARGET }}'" && exit 1
           fi
 
-      - name: 全量编译
-        if: steps.compile-strategy.outputs.strategy == 'full'
+      - name: 执行全局形式化验证
         run: |
-          cd /app/src
-          mkdir -p compile-logs
-          make -j$(nproc) 2>&1 | tee compile-logs/compile-full.log
+          eval $(opam env)
+          cd ${{ github.workspace }}
+          mkdir -p ${{ env.REPORT_DIR }}
+          
+          echo "=== 开始全局形式化验证（$(nproc)核并行） ==="
+          make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
+          
+          # 验证编译完整性
+          echo "=== 验证编译完整性 ==="
+          failed_files=()
+          while IFS= read -r v_file; do
+            vo_file="${v_file%.v}.vo"
+            if [ ! -f "$vo_file" ]; then
+              failed_files+=("$vo_file")
+            fi
+          done < <(grep -E '^[^#].*\.v$' CoqProject)
+          
+          if [ ${#failed_files[@]} -ne 0 ]; then
+            echo "❌ 以下文件验证失败（未生成.vo）："
+            printf '%s\n' "${failed_files[@]}"
+            exit 1
+          fi
 
-      - name: 增量编译
-        if: steps.compile-strategy.outputs.strategy == 'incremental'
+      - name: 全局一致性校验（coqchk）
         run: |
-          cd /app/src
-          mkdir -p compile-logs
-          changed_v_files=$(git diff --name-only HEAD^ HEAD | grep -E '\.v$')
-          targets=$(echo "$changed_v_files" | sed 's/\.v$/.vo/g')
-          make -j$(nproc) $targets 2>&1 | tee compile-logs/compile-incremental.log
+          eval $(opam env)
+          cd ${{ github.workspace }}
+          echo "=== 执行全局一致性检查 ==="
+          coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
+          
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "❌ 全局一致性检查失败，存在逻辑错误"
+            exit 1
+          fi
 
-      - name: 一致性校验
-        if: steps.compile-strategy.outputs.strategy != 'none'
+      - name: 生成全局验证报告
         run: |
-          cd /app/src
-          chmod +x validate.sh
-          ./validate.sh 2>&1 | tee compile-logs/validate.log
+          cd ${{ github.workspace }}
+          mkdir -p ${{ env.REPORT_DIR }}
+          
+          echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "## 基本信息" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- 验证时间: $(date +'%Y-%m-%d %H:%M:%S')" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- 触发事件: ${{ github.event_name }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- 提交哈希: ${{ github.sha }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- Coq版本: $(coqc --version | head -n1)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- Mathlib版本: ${{ env.MATHLIB_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          
+          echo "## 验证范围" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- 总文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- 成功验证: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          
+          echo "## 关键模块状态" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          core_modules=(
+            "theories/FRF_MetaTheory.vo"
+            "theories/Equivalence.vo"
+            "lib/Algebra.vo"
+            "extensions/Quantum/QFT_FRF.vo"
+          )
+          for mod in "${core_modules[@]}"; do
+            if [ -f "$mod" ]; then
+              echo "- ✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            else
+              echo "- ❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            fi
+          done
+          
+          echo "## 详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- [编译日志](global-compile.log)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- [一致性检查日志](global-coqchk.log)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
 
-      - name: 归档产物
+      - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
-          name: verification-artifacts-${{ github.sha }}
+          name: frf-2.0-global-verification-${{ github.sha }}
           path: |
-            /app/src/compile-logs/
-            /app/src/**/*.vo
-          retention-days: 45
+            ${{ env.REPORT_DIR }}/**/*
+            **/*.vo
+            **/*.glob
+            Makefile
+            CoqProject
+          retention-days: 60
+
+      - name: 验证失败通知
+        if: failure()
+        run: |
+          echo "❌ FRF 2.0 全局形式化验证失败"
+          echo "详情请查看验证报告和编译日志"
