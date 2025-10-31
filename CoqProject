@@ -1,0 +1,46 @@
+# CoqProject for "数字'0'的多维分析: 一种基于内部视角的形式化框架"
+# 基础配置与模块路径（按层级结构优化）
+-R theories FRF
+-R theories/core FRF.Core
+-R theories/relations FRF.Relations
+-R theories/proofs FRF.Proofs
+-R theories/applications FRF.Applications  # 新增应用模块路径
+
+# 核心定义文件（按依赖优先级排序）
+theories/core/BaseDefinitions.v          # 0的通用元定义与公理系统
+theories/core/SetTheory0.v               # 集合论视角下0的定义（空集构造）
+theories/core/Algebra0.v                 # 代数视角下0的定义（加法单位元）
+theories/core/TypeTheory0.v              # 类型论视角下0的定义（空类型编码）
+theories/core/CategoryTheory0.v          # 范畴论视角下0的定义（始对象刻画）
+theories/core/Geometry0.v                # 新增：几何视角下0的定义（原点构造）
+
+# 关系与交互文件（扩展跨领域关联）
+theories/relations/0_Equivalence.v       # 不同视角下0的等价性证明
+theories/relations/0_Operational.v       # 0在跨领域运算中的一致性
+theories/relations/0_Generalization.v    # 0的抽象结构推广
+theories/relations/0_Interaction.v       # 新增：多视角0的动态交互关系
+
+# 证明文件（补充新视角性质证明）
+theories/proofs/Set0_Properties.v        # 集合论0的基本性质
+theories/proofs/Algebra0_Properties.v    # 代数0的运算性质
+theories/proofs/Type0_Properties.v       # 类型论0的类型安全性与规范化
+theories/proofs/Category0_Properties.v   # 范畴论0的泛性质证明
+theories/proofs/Geometry0_Properties.v   # 新增：几何0的度量性质证明
+theories/proofs/0_Unified_Theorems.v     # 0的统一理论综合证明
+
+# 应用实例文件（新增应用层模块）
+theories/applications/0_In_Computation.v # 计算理论中的0应用验证
+theories/applications/0_In_Physics.v     # 物理模型中的0概念形式化
+
+# 依赖管理（更新至兼容最新模块的版本）
+opam install coq=8.19.0                  # 升级至最新稳定版
+opam install coq-mathcomp-ssreflect=1.18.0  # 适配Coq 8.19.0
+opam install coq-unimath=20240201          # 更新基础库版本
+opam install coq-arith-extra=1.2.0          # 升级算术补充库
+opam install coq-geometry=1.0.0             # 新增：几何理论依赖
+
+# 编译参数（优化兼容性与验证效率）
+-arg -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated
+-arg -native-compiler yes                   # 启用原生编译加速验证（增加平台适配说明）
+-arg -q                                     # 保持安静模式
+-arg -async-proofs on                       # 启用异步证明检查提升效率
