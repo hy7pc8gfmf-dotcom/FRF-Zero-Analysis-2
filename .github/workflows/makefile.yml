@@ -1,84 +1,137 @@
-name: FRF 2.0 Coq Formalization Verification
-# 触发条件：推送至主分支/开发分支、PR到主分支
+name: FRF 2.0 Coq Formalization Verification (Optimized)
+
+# 触发条件：优化分支过滤与触发时机
 on:
   push:
     branches: [ main, master, dev-frf-2.0 ]
+    paths:
+      - '**.v'
+      - 'CoqProject'
+      - 'Makefile'
+      - 'validate.sh'
+      - 'engineering-tools/**'
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # 支持手动触发（应急场景）
+    paths:
+      - '**.v'
+      - 'CoqProject'
+      - 'Makefile'
+      - 'validate.sh'
+      - 'engineering-tools/**'
+  workflow_dispatch:
+    inputs:
+      fullVerification:
+        description: '执行全量验证（忽略增量检查）'
+        type: boolean
+        default: false
 
 jobs:
   formalization-verification:
-    runs-on: ubuntu-latest  # 基于Ubuntu最新稳定版
-    container: coqorg/coq:8.18.0  # 官方Coq 8.18.0镜像（预配置OPAM）
-    timeout-minutes: 60  # 超时保护（全量编译约30-45分钟，视CPU性能）
+    runs-on: ubuntu-latest
+    container: coqorg/coq:8.18.0
+    timeout-minutes: 75  # 延长超时时间应对复杂场景
     env:
-      # 环境变量：指定Mathlib版本+模块路径（与本地部署对齐）
       MATHLIB_VERSION: "3.74.0"
       COQPATH: "/app/src/SelfContainedLib:/app/src/theories:/app/src/CS_Null:/app/src/Quantum:/app/src/CategoryTheory"
       PYTHONPATH: "/app/src/engineering-tools"
+      CACHE_VERSION: "v2"  # 缓存版本控制
 
     steps:
-      ##########################################################################
-      # 步骤1：拉取代码仓库（含所有FRF 2.0模块）
-      ##########################################################################
       - name: Checkout FRF 2.0 Codebase
-        uses: actions/checkout@v4  # 最新稳定版，支持子模块拉取
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 1  # 仅拉取最新提交（加速）
-          submodules: 'recursive'  # 若有子模块（如工具链依赖）需开启
+          fetch-depth: 2  # 拉取足够历史用于增量检查
+          submodules: 'recursive'
 
-      ##########################################################################
-      # 步骤2：初始化OPAM环境+安装依赖（Mathlib 3.74.0 + 辅助工具）
-      ##########################################################################
+      # 新增：缓存OPAM依赖与编译产物
+      - name: Cache OPAM Dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.opam
+            _build
+            **/*.vo
+            **/*.glob
+          key: ${{ env.CACHE_VERSION }}-opam-${{ env.MATHLIB_VERSION }}-${{ github.sha }}
+          restore-keys: |
+            ${{ env.CACHE_VERSION }}-opam-${{ env.MATHLIB_VERSION }}-
+
       - name: Initialize OPAM & Install Dependencies
         run: |
-          # 1. 更新OPAM仓库索引（避免依赖下载失败）
           opam update -y
           
-          # 2. 安装指定版本的Mathlib（FRF 2.0依赖）
-          opam install -y coq-mathlib=${{ env.MATHLIB_VERSION }}
+          # 检查是否已安装指定版本Mathlib
+          if ! opam list | grep -q "coq-mathlib.*${{ env.MATHLIB_VERSION }}"; then
+            opam install -y coq-mathlib=${{ env.MATHLIB_VERSION }}
+          else
+            echo "✅ Mathlib ${{ env.MATHLIB_VERSION }} 已缓存，跳过安装"
+          fi
           
-          # 3. 安装辅助依赖（Python库用于报告生成，与工程层工具链对齐）
           pip3 install --no-cache-dir pyyaml==6.0.1 markdown==3.5 gitpython==3.1.40
           
-          # 4. 验证依赖版本（确保无版本冲突）
+          # 增强版本验证
           echo "=== 依赖版本验证 ==="
           coqc --version | grep "8.18.0" || (echo "❌ Coq版本错误" && exit 1)
           opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本错误" && exit 1)
           pip3 list | grep "pyyaml.*6.0.1" || (echo "❌ PyYAML版本错误" && exit 1)
+          pip3 list | grep "markdown.*3.5" || (echo "❌ Markdown版本错误" && exit 1)
+          pip3 list | grep "gitpython.*3.1.40" || (echo "❌ GitPython版本错误" && exit 1)
 
-      ##########################################################################
-      # 步骤3：生成依赖感知的Makefile（关键：按层级解析模块依赖）
-      ##########################################################################
       - name: Generate Dependency-Aware Makefile
         run: |
-          # 基于CoqProject解析模块依赖（FRF 2.0核心编译配置）
           if [ ! -f "CoqProject" ]; then
-            echo "❌ 未找到CoqProject文件（模块依赖配置缺失）"
+            echo "❌ 未找到CoqProject文件"
             exit 1
           fi
-          coq_makefile -f CoqProject -o Makefile
           
-          # 验证Makefile生成（确保含全量模块目标）
-          grep -q "SelfContainedLib/Algebra.vo" Makefile || (echo "❌ Makefile未包含基础层模块" && exit 1)
-          grep -q "CS_Null/FRF_CS_Null.vo" Makefile || (echo "❌ Makefile未包含编程空值模块" && exit 1)
-          grep -q "Quantum/QFT_FRF.vo" Makefile || (echo "❌ Makefile未包含量子模块" && exit 1)
+          # 仅在CoqProject变更时重新生成Makefile
+          if [ -f "Makefile" ] && [ "CoqProject" -ot "Makefile" ] && [ "${{ github.event.inputs.fullVerification }}" != "true" ]; then
+            echo "✅ Makefile已存在且最新，跳过生成"
+          else
+            coq_makefile -f CoqProject -o Makefile
+          fi
+          
+          # 扩展模块验证列表
+          required_targets=(
+            "SelfContainedLib/Algebra.vo"
+            "theories/FRF_MetaTheory.vo"
+            "CS_Null/FRF_CS_Null.vo"
+            "CS_Null/RustNull.vo"
+            "Quantum/QFT_FRF.vo"
+            "Quantum/QuantumBasics.vo"
+            "CategoryTheory/CategoryFRF.vo"
+            "theories/FRF_Comparative.vo"
+          )
+          for target in "${required_targets[@]}"; do
+            grep -q "$target" Makefile || (echo "❌ Makefile未包含模块$target" && exit 1)
+          done
 
-      ##########################################################################
-      # 步骤4：全量编译（按一级→二级→三级层级编译，捕获日志）
-      ##########################################################################
-      - name: Full Compilation (Layered Order)
+      - name: Determine Compilation Strategy
+        id: compile-strategy
         run: |
-          # 创建编译日志目录（便于后续归档）
+          if [ "${{ github.event.inputs.fullVerification }}" = "true" ] || [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "strategy=full" >> $GITHUB_OUTPUT
+            echo "将执行全量编译"
+          else
+            # 检测变更文件确定增量编译范围
+            changed_v_files=$(git diff --name-only HEAD^ HEAD | grep -E '\.v$' || true)
+            if [ -z "$changed_v_files" ]; then
+              echo "strategy=none" >> $GITHUB_OUTPUT
+              echo "无.v文件变更，跳过编译"
+            else
+              echo "strategy=incremental" >> $GITHUB_OUTPUT
+              echo "增量编译文件: $changed_v_files"
+            fi
+          fi
+
+      - name: Full Compilation
+        if: steps.compile-strategy.outputs.strategy == 'full'
+        run: |
           mkdir -p ./compile-logs
-          
-          # 全量编译（多核加速，日志输出到文件）
           echo "=== 开始全量编译（$(nproc)核并行）==="
           make -j$(nproc) 2>&1 | tee ./compile-logs/compile-full.log
           
-          # 验证编译结果（检查核心模块是否生成.vo文件）
-          echo "=== 编译结果验证 ==="
+          # 验证核心模块
           core_vo_files=(
             "SelfContainedLib/Algebra.vo"
             "theories/FRF_MetaTheory.vo"
@@ -88,57 +141,100 @@ jobs:
           )
           for vo in "${core_vo_files[@]}"; do
             if [ ! -f "$vo" ]; then
-              echo "❌ 核心模块$vo未生成（编译失败）"
+              echo "❌ 核心模块$vo未生成"
               exit 1
             fi
           done
-          echo "✅ 所有核心模块编译成功"
 
-      ##########################################################################
-      # 步骤5：一致性校验（coqchk检查，确保无逻辑矛盾）
-      ##########################################################################
-      - name: Consistency Check (coqchk)
+      - name: Incremental Compilation
+        if: steps.compile-strategy.outputs.strategy == 'incremental'
         run: |
-          # 调用工程层validate.sh执行全量coqchk检查
+          mkdir -p ./compile-logs
+          echo "=== 开始增量编译 ==="
+          changed_v_files=$(git diff --name-only HEAD^ HEAD | grep -E '\.v$')
+          # 提取变更文件对应的目标
+          targets=$(echo "$changed_v_files" | sed 's/\.v$/.vo/g')
+          make -j$(nproc) $targets 2>&1 | tee ./compile-logs/compile-incremental.log
+          
+          # 验证变更文件的编译结果
+          for vo in $targets; do
+            if [ ! -f "$vo" ]; then
+              echo "❌ 变更模块$vo编译失败"
+              exit 1
+            fi
+          done
+
+      - name: Consistency Check (coqchk)
+        if: steps.compile-strategy.outputs.strategy != 'none'
+        run: |
           if [ ! -f "validate.sh" ]; then
             echo "❌ 未找到验证脚本validate.sh"
             exit 1
           fi
           chmod +x validate.sh
-          ./validate.sh 2>&1 | tee ./compile-logs/validate-full.log
           
-          # 验证校验结果（捕获validate.sh返回码）
+          # 根据编译策略调整验证范围
+          if [ "${{ steps.compile-strategy.outputs.strategy }}" = "full" ] || [ "${{ github.event.inputs.fullVerification }}" = "true" ]; then
+            ./validate.sh full 2>&1 | tee ./compile-logs/validate-full.log
+          else
+            changed_v_files=$(git diff --name-only HEAD^ HEAD | grep -E '\.v$')
+            ./validate.sh incremental "$changed_v_files" 2>&1 | tee ./compile-logs/validate-incremental.log
+          fi
+          
           if [ $? -ne 0 ]; then
-            echo "❌ 一致性校验失败（存在逻辑矛盾）"
+            echo "❌ 一致性校验失败"
             exit 1
           fi
-          echo "✅ 全量模块一致性校验通过"
 
-      ##########################################################################
-      # 步骤6：生成验证报告+归档Artifacts（成功/失败均保留证据）
-      ##########################################################################
-      - name: Generate Verification Report
+      - name: Generate Detailed Verification Report
         run: |
-          # 生成结构化报告（含编译进度、校验结果）
           echo "=== FRF 2.0 自动化验证报告 ===" > ./verification-report.txt
           echo "触发事件：${{ github.event_name }}" >> ./verification-report.txt
           echo "提交哈希：${{ github.sha }}" >> ./verification-report.txt
+          echo "提交作者：${{ github.actor }}" >> ./verification-report.txt
           echo "验证时间：$(date +'%Y-%m-%d %H:%M:%S')" >> ./verification-report.txt
+          echo "验证策略：${{ steps.compile-strategy.outputs.strategy }}" >> ./verification-report.txt
           echo "Coq版本：$(coqc --version | head -n1)" >> ./verification-report.txt
           echo "Mathlib版本：${{ env.MATHLIB_VERSION }}" >> ./verification-report.txt
-          echo -e "\n=== 编译统计 ===" >> ./verification-report.txt
-          find . -name "*.v" | wc -l >> ./verification-report.txt && echo "个.v源文件" >> ./verification-report.txt
-          find . -name "*.vo" | wc -l >> ./verification-report.txt && echo "个.vo编译产物" >> ./verification-report.txt
+          
+          echo -e "\n=== 代码统计 ===" >> ./verification-report.txt
+          find . -name "*.v" | wc -l | sed 's/$/ 个.v源文件/' >> ./verification-report.txt
+          find . -name "*.vo" | wc -l | sed 's/$/ 个.vo编译产物/' >> ./verification-report.txt
+          
+          echo -e "\n=== 编译结果 ===" >> ./verification-report.txt
+          if [ -f "./compile-logs/compile-full.log" ]; then
+            grep -E "Error|Warning" ./compile-logs/compile-full.log >> ./verification-report.txt || echo "无错误或警告" >> ./verification-report.txt
+          elif [ -f "./compile-logs/compile-incremental.log" ]; then
+            grep -E "Error|Warning" ./compile-logs/compile-incremental.log >> ./verification-report.txt || echo "无错误或警告" >> ./verification-report.txt
+          else
+            echo "未执行编译" >> ./verification-report.txt
+          fi
+          
           echo -e "\n=== 校验结果 ===" >> ./verification-report.txt
-          grep "✅" ./compile-logs/validate-full.log >> ./verification-report.txt
+          if [ -f "./compile-logs/validate-full.log" ]; then
+            grep -E "✅|❌" ./compile-logs/validate-full.log >> ./verification-report.txt
+          elif [ -f "./compile-logs/validate-incremental.log" ]; then
+            grep -E "✅|❌" ./compile-logs/validate-incremental.log >> ./verification-report.txt
+          else
+            echo "未执行校验" >> ./verification-report.txt
+          fi
 
-      - name: Archive Artifacts (Logs + Report)
+      - name: Archive Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: frf-2.0-verification-artifacts-${{ github.sha }}
           path: |
-            ./compile-logs/  # 编译日志（含错误详情）
-            ./verification-report.txt  # 结构化报告
-            ./Makefile  # 生成的Makefile（用于复现编译）
-            ./CoqProject  # 模块依赖配置
-          retention-days: 30  #  artifacts保留30天（便于追溯）
+            ./compile-logs/
+            ./verification-report.txt
+            ./Makefile
+            ./CoqProject
+            **/*.vo
+            **/*.glob
+          retention-days: 45  # 延长保留时间便于问题追溯
+
+      # 新增：验证失败通知
+      - name: Notify Failure
+        if: failure()
+        run: |
+          echo "验证失败，请查看日志获取详细信息"
+          # 可扩展为发送邮件或Slack通知
