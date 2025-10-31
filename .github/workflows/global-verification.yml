@@ -1,5 +1,4 @@
 name: FRF 2.0 全局形式化验证
-
 on:
   push:
     branches: [ main, master, release/final ]
@@ -13,15 +12,14 @@ on:
 jobs:
   global-formal-verification:
     runs-on: ubuntu-latest
-    # 修复1：使用存在的Coq镜像版本（8.19.0为有效版本）
+    # 核心修复：使用存在的Coq镜像标签（官方标准标签格式）
     container:
-      image: coqorg/coq:8.19.0
-      options: --user root  # 保持root权限解决写入问题
-
+      image: coqorg/coq:8.19  # 修正为官方可用标签，避免manifest unknown错误
+      options: --user root  # 保持root权限解决临时目录写入问题
     timeout-minutes: 90
     env:
       MATHLIB_VERSION: "4.0.0"
-      # 修复2：使用GitHub工作目录变量，避免硬编码路径
+      # 保持工作目录变量，避免硬编码路径
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
@@ -34,13 +32,11 @@ jobs:
           chmod -R 777 /__w/_temp/
           echo "✅ 临时目录权限修复完成"
 
-      # 修复3：使用默认工作目录，移除硬编码的/app/src
       - name: 检出代码仓库（含子模块）
-        uses: actions/checkout@v3  # 保持v3兼容性
+        uses: actions/checkout@v3  # 保持v3兼容性，规避权限问题
         with:
           fetch-depth: 0
           submodules: 'recursive'
-          # 移除path参数，使用默认工作目录${{ github.workspace }}
 
       - name: 缓存依赖与编译产物
         uses: actions/cache@v3
@@ -56,7 +52,6 @@ jobs:
 
       - name: 安装依赖（Mathlib及工具链）
         run: |
-          # 修复4：使用工作目录变量切换路径
           cd ${{ github.workspace }}
           
           opam init --disable-sandboxing -y
@@ -72,14 +67,13 @@ jobs:
           opam install -y coq-equations coq-extraction
           pip3 install --no-cache-dir coq-parser==0.1.5 reportlab==4.0.9
 
-          # 版本校验
+          # 版本校验修正：匹配Coq 8.19.x系列版本，避免精确版本号不匹配
           echo "=== 依赖版本校验 ==="
-          coqc --version | grep "8.19.0" || (echo "❌ Coq版本不匹配" && exit 1)
+          coqc --version | grep "8.19" || (echo "❌ Coq版本不匹配（需8.19系列）" && exit 1)
           opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
 
       - name: 生成全局验证Makefile
         run: |
-          # 修复5：使用工作目录变量定位配置文件
           cd ${{ github.workspace }}
           
           if [ ! -f "CoqProject" ]; then
