@@ -1,0 +1,144 @@
+name: FRF 2.0 Coq Formalization Verification
+# 触发条件：推送至主分支/开发分支、PR到主分支
+on:
+  push:
+    branches: [ main, master, dev-frf-2.0 ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 支持手动触发（应急场景）
+
+jobs:
+  formalization-verification:
+    runs-on: ubuntu-latest  # 基于Ubuntu最新稳定版
+    container: coqorg/coq:8.18.0  # 官方Coq 8.18.0镜像（预配置OPAM）
+    timeout-minutes: 60  # 超时保护（全量编译约30-45分钟，视CPU性能）
+    env:
+      # 环境变量：指定Mathlib版本+模块路径（与本地部署对齐）
+      MATHLIB_VERSION: "3.74.0"
+      COQPATH: "/app/src/SelfContainedLib:/app/src/theories:/app/src/CS_Null:/app/src/Quantum:/app/src/CategoryTheory"
+      PYTHONPATH: "/app/src/engineering-tools"
+
+    steps:
+      ##########################################################################
+      # 步骤1：拉取代码仓库（含所有FRF 2.0模块）
+      ##########################################################################
+      - name: Checkout FRF 2.0 Codebase
+        uses: actions/checkout@v4  # 最新稳定版，支持子模块拉取
+        with:
+          fetch-depth: 1  # 仅拉取最新提交（加速）
+          submodules: 'recursive'  # 若有子模块（如工具链依赖）需开启
+
+      ##########################################################################
+      # 步骤2：初始化OPAM环境+安装依赖（Mathlib 3.74.0 + 辅助工具）
+      ##########################################################################
+      - name: Initialize OPAM & Install Dependencies
+        run: |
+          # 1. 更新OPAM仓库索引（避免依赖下载失败）
+          opam update -y
+          
+          # 2. 安装指定版本的Mathlib（FRF 2.0依赖）
+          opam install -y coq-mathlib=${{ env.MATHLIB_VERSION }}
+          
+          # 3. 安装辅助依赖（Python库用于报告生成，与工程层工具链对齐）
+          pip3 install --no-cache-dir pyyaml==6.0.1 markdown==3.5 gitpython==3.1.40
+          
+          # 4. 验证依赖版本（确保无版本冲突）
+          echo "=== 依赖版本验证 ==="
+          coqc --version | grep "8.18.0" || (echo "❌ Coq版本错误" && exit 1)
+          opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本错误" && exit 1)
+          pip3 list | grep "pyyaml.*6.0.1" || (echo "❌ PyYAML版本错误" && exit 1)
+
+      ##########################################################################
+      # 步骤3：生成依赖感知的Makefile（关键：按层级解析模块依赖）
+      ##########################################################################
+      - name: Generate Dependency-Aware Makefile
+        run: |
+          # 基于CoqProject解析模块依赖（FRF 2.0核心编译配置）
+          if [ ! -f "CoqProject" ]; then
+            echo "❌ 未找到CoqProject文件（模块依赖配置缺失）"
+            exit 1
+          fi
+          coq_makefile -f CoqProject -o Makefile
+          
+          # 验证Makefile生成（确保含全量模块目标）
+          grep -q "SelfContainedLib/Algebra.vo" Makefile || (echo "❌ Makefile未包含基础层模块" && exit 1)
+          grep -q "CS_Null/FRF_CS_Null.vo" Makefile || (echo "❌ Makefile未包含编程空值模块" && exit 1)
+          grep -q "Quantum/QFT_FRF.vo" Makefile || (echo "❌ Makefile未包含量子模块" && exit 1)
+
+      ##########################################################################
+      # 步骤4：全量编译（按一级→二级→三级层级编译，捕获日志）
+      ##########################################################################
+      - name: Full Compilation (Layered Order)
+        run: |
+          # 创建编译日志目录（便于后续归档）
+          mkdir -p ./compile-logs
+          
+          # 全量编译（多核加速，日志输出到文件）
+          echo "=== 开始全量编译（$(nproc)核并行）==="
+          make -j$(nproc) 2>&1 | tee ./compile-logs/compile-full.log
+          
+          # 验证编译结果（检查核心模块是否生成.vo文件）
+          echo "=== 编译结果验证 ==="
+          core_vo_files=(
+            "SelfContainedLib/Algebra.vo"
+            "theories/FRF_MetaTheory.vo"
+            "CS_Null/RustNull.vo"
+            "Quantum/QFT_FRF.vo"
+            "theories/FRF_Comparative.vo"
+          )
+          for vo in "${core_vo_files[@]}"; do
+            if [ ! -f "$vo" ]; then
+              echo "❌ 核心模块$vo未生成（编译失败）"
+              exit 1
+            fi
+          done
+          echo "✅ 所有核心模块编译成功"
+
+      ##########################################################################
+      # 步骤5：一致性校验（coqchk检查，确保无逻辑矛盾）
+      ##########################################################################
+      - name: Consistency Check (coqchk)
+        run: |
+          # 调用工程层validate.sh执行全量coqchk检查
+          if [ ! -f "validate.sh" ]; then
+            echo "❌ 未找到验证脚本validate.sh"
+            exit 1
+          fi
+          chmod +x validate.sh
+          ./validate.sh 2>&1 | tee ./compile-logs/validate-full.log
+          
+          # 验证校验结果（捕获validate.sh返回码）
+          if [ $? -ne 0 ]; then
+            echo "❌ 一致性校验失败（存在逻辑矛盾）"
+            exit 1
+          fi
+          echo "✅ 全量模块一致性校验通过"
+
+      ##########################################################################
+      # 步骤6：生成验证报告+归档Artifacts（成功/失败均保留证据）
+      ##########################################################################
+      - name: Generate Verification Report
+        run: |
+          # 生成结构化报告（含编译进度、校验结果）
+          echo "=== FRF 2.0 自动化验证报告 ===" > ./verification-report.txt
+          echo "触发事件：${{ github.event_name }}" >> ./verification-report.txt
+          echo "提交哈希：${{ github.sha }}" >> ./verification-report.txt
+          echo "验证时间：$(date +'%Y-%m-%d %H:%M:%S')" >> ./verification-report.txt
+          echo "Coq版本：$(coqc --version | head -n1)" >> ./verification-report.txt
+          echo "Mathlib版本：${{ env.MATHLIB_VERSION }}" >> ./verification-report.txt
+          echo -e "\n=== 编译统计 ===" >> ./verification-report.txt
+          find . -name "*.v" | wc -l >> ./verification-report.txt && echo "个.v源文件" >> ./verification-report.txt
+          find . -name "*.vo" | wc -l >> ./verification-report.txt && echo "个.vo编译产物" >> ./verification-report.txt
+          echo -e "\n=== 校验结果 ===" >> ./verification-report.txt
+          grep "✅" ./compile-logs/validate-full.log >> ./verification-report.txt
+
+      - name: Archive Artifacts (Logs + Report)
+        uses: actions/upload-artifact@v4
+        with:
+          name: frf-2.0-verification-artifacts-${{ github.sha }}
+          path: |
+            ./compile-logs/  # 编译日志（含错误详情）
+            ./verification-report.txt  # 结构化报告
+            ./Makefile  # 生成的Makefile（用于复现编译）
+            ./CoqProject  # 模块依赖配置
+          retention-days: 30  #  artifacts保留30天（便于追溯）
