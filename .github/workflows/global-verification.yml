@@ -12,17 +12,17 @@ on:
 jobs:
   global-formal-verification:
     runs-on: ubuntu-latest
-    # 核心修复：使用存在的Coq镜像标签（官方标准标签格式）
     container:
-      image: coqorg/coq:8.19  # 修正为官方可用标签，避免manifest unknown错误
-      options: --user root  # 保持root权限解决临时目录写入问题
+      image: coqorg/coq:8.19
+      options: --user root
     timeout-minutes: 90
     env:
       MATHLIB_VERSION: "4.0.0"
-      # 保持工作目录变量，避免硬编码路径
-      COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
+      # 修正工作目录变量，适应容器环境
+      WORKDIR: "/__w/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2"
+      COQPATH: "${{ env.WORKDIR }}/theories:${{ env.WORKDIR }}/lib:${{ env.WORKDIR }}/extensions"
       GLOBAL_TARGET: "all"
-      REPORT_DIR: "${{ github.workspace }}/verification-reports"
+      REPORT_DIR: "${{ env.WORKDIR }}/verification-reports"
       TEMP_DIR: "/__w/_temp/_runner_file_commands"
 
     steps:
@@ -33,7 +33,7 @@ jobs:
           echo "✅ 临时目录权限修复完成"
 
       - name: 检出代码仓库（含子模块）
-        uses: actions/checkout@v3  # 保持v3兼容性，规避权限问题
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: 'recursive'
@@ -52,7 +52,12 @@ jobs:
 
       - name: 安装依赖（Mathlib及工具链）
         run: |
-          cd ${{ github.workspace }}
+          # 验证工作目录存在性并进入
+          if [ ! -d "${{ env.WORKDIR }}" ]; then
+            echo "❌ 工作目录不存在: ${{ env.WORKDIR }}"
+            exit 1
+          fi
+          cd ${{ env.WORKDIR }}
           
           opam init --disable-sandboxing -y
           eval $(opam env)
@@ -67,14 +72,14 @@ jobs:
           opam install -y coq-equations coq-extraction
           pip3 install --no-cache-dir coq-parser==0.1.5 reportlab==4.0.9
 
-          # 版本校验修正：匹配Coq 8.19.x系列版本，避免精确版本号不匹配
+          # 版本校验
           echo "=== 依赖版本校验 ==="
           coqc --version | grep "8.19" || (echo "❌ Coq版本不匹配（需8.19系列）" && exit 1)
           opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
 
       - name: 生成全局验证Makefile
         run: |
-          cd ${{ github.workspace }}
+          cd ${{ env.WORKDIR }}
           
           if [ ! -f "CoqProject" ]; then
             echo "❌ 未找到CoqProject，无法生成验证目标" && exit 1
@@ -93,7 +98,7 @@ jobs:
       - name: 执行全局形式化验证
         run: |
           eval $(opam env)
-          cd ${{ github.workspace }}
+          cd ${{ env.WORKDIR }}
           mkdir -p ${{ env.REPORT_DIR }}
           
           echo "=== 开始全局形式化验证（$(nproc)核并行） ==="
@@ -118,7 +123,7 @@ jobs:
       - name: 全局一致性校验（coqchk）
         run: |
           eval $(opam env)
-          cd ${{ github.workspace }}
+          cd ${{ env.WORKDIR }}
           echo "=== 执行全局一致性检查 ==="
           coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
           
@@ -129,7 +134,7 @@ jobs:
 
       - name: 生成全局验证报告
         run: |
-          cd ${{ github.workspace }}
+          cd ${{ env.WORKDIR }}
           mkdir -p ${{ env.REPORT_DIR }}
           
           echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/SUMMARY.md
