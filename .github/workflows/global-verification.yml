@@ -14,7 +14,6 @@ jobs:
     container:
       image: coqorg/coq:8.19.2
       options: --user root
-      working-directory: /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}
     timeout-minutes: 90
     env:
       MATHLIB_VERSION: "4.0.0"
@@ -22,12 +21,12 @@ jobs:
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
-      TEMP_DIR: "${{ github.workspace }}/_temp"
+      TEMP_DIR: "/__w/_temp/_runner_file_commands"
     steps:
       - name: 修复临时目录权限
         run: |
           mkdir -p ${{ env.TEMP_DIR }}
-          chmod -R 777 ${{ github.workspace }}/_temp
+          chmod -R 777 /__w/_temp/
           echo "✅ 临时目录权限修复完成"
       - name: 检出代码仓库
         uses: actions/checkout@v3
@@ -42,9 +41,9 @@ jobs:
             _build
             **/*.vo
             **/*.glob
-          key: ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-${{ env.COQ_EXTRA_OPAM }}-global-${{ github.sha }}
+          key: ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-global-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-${{ env.COQ_EXTRA_OPAM }}-global-
+            ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-global-
       - name: 安装依赖
         run: |
           cd ${{ github.workspace }}
@@ -61,7 +60,6 @@ jobs:
           echo "=== 依赖版本校验 ==="
           coqc --version | grep "8.19.2" || (echo "❌ Coq版本不匹配（需8.19.2）" && exit 1)
           opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
-          opam list | grep "${{ env.COQ_EXTRA_OPAM }}" || (echo "❌ ${{ env.COQ_EXTRA_OPAM }}未安装" && exit 1)
       - name: 生成全局验证Makefile
         run: |
           cd ${{ github.workspace }}
@@ -118,7 +116,6 @@ jobs:
           echo "- 提交哈希: ${{ github.sha }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- Coq版本: $(coqc --version | head -n1)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- Mathlib版本: ${{ env.MATHLIB_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
-          echo "- 额外依赖: ${{ env.COQ_EXTRA_OPAM }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "## 验证范围" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 总文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 成功验证: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
