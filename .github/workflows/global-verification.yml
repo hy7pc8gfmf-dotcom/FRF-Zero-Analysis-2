@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "1.18.0"
+      COQ_VERSION: "8.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
@@ -38,7 +38,6 @@ jobs:
           submodules: 'recursive'
       - name: 修复工作目录权限+初始化opam环境
         run: |
-          mkdir -p ${{ github.workspace }}
           chmod -R 777 ${{ github.workspace }}
           opam init --disable-sandboxing -y --no-setup
           eval $(opam env --switch=default)
@@ -64,11 +63,11 @@ jobs:
           eval $(opam env --switch=default)
           opam repo remove coq-released || true
           opam repo remove default || true
-          opam repo add default ${{ env.OPAM_MIRROR }} --all-switches --allow-root
-          opam repo add coq-released ${{ env.COQ_RELEASED_MIRROR }} --all-switches --allow-root
-          opam update -y --allow-root --retry 8
+          opam repo add default ${{ env.OPAM_MIRROR }} --all-switches
+          opam repo add coq-released ${{ env.COQ_RELEASED_MIRROR }} --all-switches
+          opam update -y --retry 8
           echo "=== 🔍 检测已安装依赖 ==="
-          installed_pkgs=$(opam list --short --allow-root)
+          installed_pkgs=$(opam list --short)
           required_pkgs=(
             "coq=${{ env.COQ_VERSION }}"
             "coq-stdlib=${{ env.COQ_VERSION }}"
@@ -91,7 +90,7 @@ jobs:
           done
           if [ ${#to_install[@]} -gt 0 ]; then
             echo "=== 🚀 开始安装依赖 ==="
-            opam install -y --allow-root --retry 10 --jobs 2 "${to_install[@]}"
+            opam install -y --retry 10 --jobs 2 "${to_install[@]}"
           else
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
