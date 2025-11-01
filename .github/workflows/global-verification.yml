@@ -1,3 +1,4 @@
+```yaml
 name: FRF 2.0 全局形式化验证
 on:
   push:
@@ -51,9 +52,9 @@ jobs:
           eval $(opam env)
           opam repo add coq-released https://coq.inria.fr/opam/released
           opam update
-          if ! opam list | grep -q "coq-mathlib.*${{ env.MATHLIB_VERSION }}"; then
+          if ! opam list | grep -q "coq-mathlib4.*${{ env.MATHLIB_VERSION }}"; then
             echo "安装Mathlib ${{ env.MATHLIB_VERSION }}..."
-            opam install -y coq-mathlib=${{ env.MATHLIB_VERSION }}
+            opam install -y coq-mathlib4=${{ env.MATHLIB_VERSION }}
           else
             echo "Mathlib ${{ env.MATHLIB_VERSION }} 已缓存，跳过安装"
           fi
@@ -61,7 +62,7 @@ jobs:
           pip3 install --no-cache-dir coq-parser==0.1.5 reportlab==4.0.9
           echo "=== 依赖版本校验 ==="
           coqc --version | grep "8.19.2" || (echo "❌ Coq版本不匹配（需8.19.2）" && exit 1)
-          opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
+          opam list | grep "coq-mathlib4.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
       - name: 生成全局验证Makefile
         working-directory: ${{ github.workspace }}
         run: |
@@ -154,3 +155,4 @@ jobs:
         run: |
           echo "❌ FRF 2.0 全局形式化验证失败"
           echo "详情请查看验证报告和编译日志"
+```
