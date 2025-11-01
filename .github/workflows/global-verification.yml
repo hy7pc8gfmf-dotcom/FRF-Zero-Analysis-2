@@ -12,23 +12,25 @@ jobs:
   global-formal-verification:
     runs-on: ubuntu-latest
     container:
-      image: coqorg/coq:8.19.2
+      image: coqorg/coq:8.18.0
       options: --user root
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
-      # 修正：使用Coq的mathcomp库及其版本
       MATHCOMP_VERSION: "1.18.0"
+      COQ_VERSION: "8.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
       TEMP_DIR: "/__w/_temp/_runner_file_commands"
+      OPAM_MIRROR: "https://mirrors.ustc.edu.cn/opam/"
     steps:
-      - name: 修复临时目录权限
+      - name: 修复目录权限+加载opam环境
         run: |
           mkdir -p ${{ env.TEMP_DIR }}
           chmod -R 777 /__w/_temp/
-          echo "✅ 临时目录权限修复完成"
+          source ~/.profile
+          echo "✅ 目录权限修复+opam环境加载完成"
       - name: 检出代码仓库
         uses: actions/checkout@v3
         with:
@@ -39,38 +41,68 @@ jobs:
         with:
           path: |
             ~/.opam
+            ~/.cache/opam
             _build
             **/*.vo
             **/*.glob
-          # 缓存键更新为mathcomp版本
-          key: ${{ runner.os }}-coq-${{ env.MATHCOMP_VERSION }}-global-${{ github.sha }}
+          key: ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-global-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-coq-${{ env.MATHCOMP_VERSION }}-global-
-      - name: 安装依赖
+            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-global-
+            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-global-
+      - name: 切换opam镜像源+安装依赖（移除错误包名）
         working-directory: ${{ github.workspace }}
         run: |
-          opam init --disable-sandboxing -y
-          eval $(opam env)
-          opam repo add coq-released https://coq.inria.fr/opam/released --all-switches
-          opam update -y
-          # 修正：安装Coq的mathcomp库（替代错误的mathlib4）
-          if ! opam list | grep -q "coq-mathcomp-ssreflect.*${{ env.MATHCOMP_VERSION }}"; then
-            echo "安装MathComp ${{ env.MATHCOMP_VERSION }}..."
-            opam install -y coq-mathcomp-ssreflect=${{ env.MATHCOMP_VERSION }} \
-                             coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }} \
-                             coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}
+          source ~/.profile
+          # 保留镜像源配置（有效解决网络拥堵）
+          opam repo remove coq-released || true
+          opam repo remove default || true
+          opam repo add default ${{ env.OPAM_MIRROR }} --all-switches --allow-root
+          opam repo add coq-released https://mirrors.ustc.edu.cn/coq-opam/released --all-switches --allow-root
+          
+          opam update -y --allow-root --retry 5
+          
+          echo "=== 检测已安装包，断点续装 ==="
+          installed_pkgs=$(opam list --short --allow-root)
+          
+          # 核心修改：移除不存在的"coq-extraction"包（内置在coq-core中）
+          required_pkgs=(
+            "coq=${{ env.COQ_VERSION }}"
+            "coq-stdlib=${{ env.COQ_VERSION }}"
+            "coq-mathcomp-ssreflect=${{ env.MATHCOMP_VERSION }}"
+            "coq-mathcomp-fingroup=${{ env.MATHCOMP_VERSION }}"
+            "coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }}"
+            "coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}"
+            "coq-equations"
+            "${{ env.COQ_EXTRA_OPAM }}"
+          )
+          
+          to_install=()
+          for pkg in "${required_pkgs[@]}"; do
+            pkg_name=$(echo $pkg | cut -d'=' -f1)
+            if ! echo "$installed_pkgs" | grep -q "^$pkg_name$"; then
+              to_install+=("$pkg")
+            else
+              echo "✅ 已安装：$pkg，跳过"
+            fi
+          done
+          
+          if [ ${#to_install[@]} -gt 0 ]; then
+            echo "=== 开始安装未完成包：${to_install[*]} ==="
+            opam install -y --allow-root --retry 10 --jobs 2 "${to_install[@]}"
           else
-            echo "MathComp ${{ env.MATHCOMP_VERSION }} 已缓存，跳过安装"
+            echo "✅ 所有依赖已安装完成！"
           fi
-          opam install -y coq-equations coq-extraction ${{ env.COQ_EXTRA_OPAM }}
-          pip3 install --no-cache-dir coq-parser==0.1.5 reportlab==4.0.9
-          echo "=== 依赖版本校验 ==="
-          coqc --version | grep "8.19.2" || (echo "❌ Coq版本不匹配（需8.19.2）" && exit 1)
-          # 修正：校验mathcomp版本
+          
+          pip3 install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
+          
+          echo "=== 依赖版本最终校验 ==="
+          coqc --version | grep "${{ env.COQ_VERSION }}" || (echo "❌ Coq版本不匹配（需${{ env.COQ_VERSION }}）" && exit 1)
           opam list | grep "coq-mathcomp-ssreflect.*${{ env.MATHCOMP_VERSION }}" || (echo "❌ MathComp版本不匹配" && exit 1)
+          echo "✅ 依赖安装+校验完成，准备进入验证阶段！"
       - name: 生成全局验证Makefile
         working-directory: ${{ github.workspace }}
         run: |
+          source ~/.profile
           if [ ! -f "CoqProject" ]; then
             echo "❌ 未找到CoqProject，无法生成验证目标" && exit 1
           fi
@@ -86,7 +118,7 @@ jobs:
       - name: 执行全局形式化验证
         working-directory: ${{ github.workspace }}
         run: |
-          eval $(opam env)
+          source ~/.profile
           mkdir -p ${{ env.REPORT_DIR }}
           echo "=== 开始全局形式化验证（$(nproc)核并行） ==="
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
@@ -106,7 +138,7 @@ jobs:
       - name: 全局一致性校验
         working-directory: ${{ github.workspace }}
         run: |
-          eval $(opam env)
+          source ~/.profile
           echo "=== 执行全局一致性检查 ==="
           coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
@@ -116,14 +148,14 @@ jobs:
       - name: 生成全局验证报告
         working-directory: ${{ github.workspace }}
         run: |
-          mkdir -p ${{ env.REPORT_DIR }}
+          source ~/.profile
+          mkdir -p ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "## 基本信息" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 验证时间: $(date +'%Y-%m-%d %H:%M:%S')" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 触发事件: ${{ github.event_name }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 提交哈希: ${{ github.sha }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- Coq版本: $(coqc --version | head -n1)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
-          # 报告中更新为mathcomp版本
           echo "- MathComp版本: ${{ env.MATHCOMP_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "## 验证范围" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 总文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
