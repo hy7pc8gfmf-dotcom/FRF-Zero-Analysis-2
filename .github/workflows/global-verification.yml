@@ -66,10 +66,16 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
-          opam repo remove coq-released || true
-          opam repo remove default || true
-          opam repo add default ${{ env.OPAM_MIRROR }} --all-switches
-          opam repo add coq-released ${{ env.COQ_RELEASED_MIRROR }} --all-switches
+          if opam repo list | grep -q "default"; then
+            opam repo set-url default ${{ env.OPAM_MIRROR }}
+          else
+            opam repo add default ${{ env.OPAM_MIRROR }} --all-switches
+          fi
+          if opam repo list | grep -q "coq-released"; then
+            opam repo set-url coq-released ${{ env.COQ_RELEASED_MIRROR }}
+          else
+            opam repo add coq-released ${{ env.COQ_RELEASED_MIRROR }} --all-switches
+          fi
           opam update -y --retry 8
           echo "=== 🔍 检测已安装依赖 ==="
           installed_pkgs=$(opam list --short)
@@ -195,7 +201,7 @@ jobs:
             "extensions/Quantum/QFT_FRF.vo"
           )
           for mod in "${core_modules[@]}"; do
-            if [ ${#failed_files[@]} -ne 0 ]; then
+            if [ -f "$mod" ]; then
               echo "✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             else
               echo "❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
