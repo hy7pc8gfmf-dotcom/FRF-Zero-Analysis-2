@@ -12,41 +12,42 @@ jobs:
   global-formal-verification:
     runs-on: ubuntu-latest
     container:
-      image: coqorg/coq:8.19
+      image: coqorg/coq:8.19.2
       options: --user root
+      working-directory: /__w/${{ github.event.repository.name }}/${{ github.event.repository.name }}
     timeout-minutes: 90
     env:
       MATHLIB_VERSION: "4.0.0"
-      COQPATH: "/github/workspace/theories:/github/workspace/lib:/github/workspace/extensions"
+      COQ_EXTRA_OPAM: "coq-bignums"
+      COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
-      REPORT_DIR: "/github/workspace/verification-reports"
-      TEMP_DIR: "/github/workspace/_temp"
+      REPORT_DIR: "${{ github.workspace }}/verification-reports"
+      TEMP_DIR: "${{ github.workspace }}/_temp"
     steps:
       - name: 修复临时目录权限
         run: |
           mkdir -p ${{ env.TEMP_DIR }}
-          chmod -R 777 /github/workspace/_temp
+          chmod -R 777 ${{ github.workspace }}/_temp
           echo "✅ 临时目录权限修复完成"
       - name: 检出代码仓库
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
           submodules: 'recursive'
-          path: "/github/workspace"
       - name: 缓存依赖与编译产物
         uses: actions/cache@v3
         with:
           path: |
             ~/.opam
-            /github/workspace/_build
-            /github/workspace/**/*.vo
-            /github/workspace/**/*.glob
-          key: ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-global-${{ github.sha }}
+            _build
+            **/*.vo
+            **/*.glob
+          key: ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-${{ env.COQ_EXTRA_OPAM }}-global-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-global-
+            ${{ runner.os }}-coq-${{ env.MATHLIB_VERSION }}-${{ env.COQ_EXTRA_OPAM }}-global-
       - name: 安装依赖
         run: |
-          cd /github/workspace
+          cd ${{ github.workspace }}
           opam init --disable-sandboxing -y
           eval $(opam env)
           if ! opam list | grep -q "coq-mathlib.*${{ env.MATHLIB_VERSION }}"; then
@@ -55,14 +56,15 @@ jobs:
           else
             echo "Mathlib ${{ env.MATHLIB_VERSION }} 已缓存，跳过安装"
           fi
-          opam install -y coq-equations coq-extraction
+          opam install -y coq-equations coq-extraction ${{ env.COQ_EXTRA_OPAM }}
           pip3 install --no-cache-dir coq-parser==0.1.5 reportlab==4.0.9
           echo "=== 依赖版本校验 ==="
-          coqc --version | grep "8.19" || (echo "❌ Coq版本不匹配（需8.19系列）" && exit 1)
+          coqc --version | grep "8.19.2" || (echo "❌ Coq版本不匹配（需8.19.2）" && exit 1)
           opam list | grep "coq-mathlib.*${{ env.MATHLIB_VERSION }}" || (echo "❌ Mathlib版本不匹配" && exit 1)
+          opam list | grep "${{ env.COQ_EXTRA_OPAM }}" || (echo "❌ ${{ env.COQ_EXTRA_OPAM }}未安装" && exit 1)
       - name: 生成全局验证Makefile
         run: |
-          cd /github/workspace
+          cd ${{ github.workspace }}
           if [ ! -f "CoqProject" ]; then
             echo "❌ 未找到CoqProject，无法生成验证目标" && exit 1
           fi
@@ -78,7 +80,7 @@ jobs:
       - name: 执行全局形式化验证
         run: |
           eval $(opam env)
-          cd /github/workspace
+          cd ${{ github.workspace }}
           mkdir -p ${{ env.REPORT_DIR }}
           echo "=== 开始全局形式化验证（$(nproc)核并行） ==="
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
@@ -98,7 +100,7 @@ jobs:
       - name: 全局一致性校验
         run: |
           eval $(opam env)
-          cd /github/workspace
+          cd ${{ github.workspace }}
           echo "=== 执行全局一致性检查 ==="
           coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
@@ -107,7 +109,7 @@ jobs:
           fi
       - name: 生成全局验证报告
         run: |
-          cd /github/workspace
+          cd ${{ github.workspace }}
           mkdir -p ${{ env.REPORT_DIR }}
           echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "## 基本信息" >> ${{ env.REPORT_DIR }}/SUMMARY.md
@@ -116,6 +118,7 @@ jobs:
           echo "- 提交哈希: ${{ github.sha }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- Coq版本: $(coqc --version | head -n1)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- Mathlib版本: ${{ env.MATHLIB_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- 额外依赖: ${{ env.COQ_EXTRA_OPAM }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "## 验证范围" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 总文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- 成功验证: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
@@ -141,11 +144,11 @@ jobs:
         with:
           name: frf-2.0-global-verification-${{ github.sha }}
           path: |
-            /github/workspace/verification-reports/**/*
-            /github/workspace/**/*.vo
-            /github/workspace/**/*.glob
-            /github/workspace/Makefile
-            /github/workspace/CoqProject
+            ${{ env.REPORT_DIR }}/**/*
+            **/*.vo
+            **/*.glob
+            Makefile
+            CoqProject
           retention-days: 60
       - name: 验证失败通知
         if: failure()
