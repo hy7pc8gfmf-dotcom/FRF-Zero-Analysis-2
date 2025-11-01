@@ -49,6 +49,8 @@ jobs:
         run: |
           opam init --disable-sandboxing -y
           eval $(opam env)
+          opam repo add coq-released https://coq.inria.fr/opam/released
+          opam update
           if ! opam list | grep -q "coq-mathlib.*${{ env.MATHLIB_VERSION }}"; then
             echo "安装Mathlib ${{ env.MATHLIB_VERSION }}..."
             opam install -y coq-mathlib=${{ env.MATHLIB_VERSION }}
