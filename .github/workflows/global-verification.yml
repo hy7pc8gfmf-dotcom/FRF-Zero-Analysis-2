@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "8.18.0"
+      COQ_VERSION: "1.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
@@ -38,6 +38,7 @@ jobs:
           submodules: 'recursive'
       - name: 修复工作目录权限+初始化opam环境
         run: |
+          mkdir -p ${{ github.workspace }}
           chmod -R 777 ${{ github.workspace }}
           opam init --disable-sandboxing -y --no-setup
           eval $(opam env --switch=default)
@@ -213,4 +214,4 @@ jobs:
         run: |
           echo "❌ FRF 2.0 全局形式化验证失败"
           echo "📌 失败原因：请查看「归档产物」中的编译日志和一致性检查日志"
-          echo "📌 关键排查点：1. 依赖安装是否完整 2. 单个.v文件编译错误 3. 逻辑一致性冲突" 
+          echo "📌 关键排查点：1. 依赖安装是否完整 2. 单个.v文件编译错误 3. 逻辑一致性冲突"
