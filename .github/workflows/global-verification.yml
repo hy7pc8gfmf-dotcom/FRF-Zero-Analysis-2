@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "1.18.0"
+      COQ_VERSION: "8.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
@@ -44,7 +44,11 @@ jobs:
           eval $(opam env --switch=default)
           echo "✅ 目录权限修复+opam环境初始化完成"
           echo "📌 当前opam版本：$(opam --version)"
-          echo "📌 当前Coq版本：$(coqc --version | head -n1)"
+          if command -v coqc &> /dev/null; then
+            echo "📌 当前Coq版本：$(coqc --version | head -n1)"
+          else
+            echo "⚠️  初始Coq未找到，将通过opam安装"
+          fi
       - name: 缓存优化（断点续装核心）
         uses: actions/cache@v3
         with:
@@ -64,11 +68,11 @@ jobs:
           eval $(opam env --switch=default)
           opam repo remove coq-released || true
           opam repo remove default || true
-          opam repo add default ${{ env.OPAM_MIRROR }} --all-switches --allow-root
-          opam repo add coq-released ${{ env.COQ_RELEASED_MIRROR }} --all-switches --allow-root
-          opam update -y --allow-root --retry 8
+          opam repo add default ${{ env.OPAM_MIRROR }} --all-switches
+          opam repo add coq-released ${{ env.COQ_RELEASED_MIRROR }} --all-switches
+          opam update -y --retry 8
           echo "=== 🔍 检测已安装依赖 ==="
-          installed_pkgs=$(opam list --short --allow-root)
+          installed_pkgs=$(opam list --short)
           required_pkgs=(
             "coq=${{ env.COQ_VERSION }}"
             "coq-stdlib=${{ env.COQ_VERSION }}"
@@ -91,12 +95,17 @@ jobs:
           done
           if [ ${#to_install[@]} -gt 0 ]; then
             echo "=== 🚀 开始安装依赖 ==="
-            opam install -y --allow-root --retry 10 --jobs 2 "${to_install[@]}"
+            opam install -y --retry 10 --jobs 2 "${to_install[@]}"
           else
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
+          eval $(opam env --switch=default)
           pip3 install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
           echo "=== 📋 依赖版本最终校验 ==="
+          if ! command -v coqc &> /dev/null; then
+            echo "❌ Coq未安装成功"
+            exit 1
+          fi
           if ! coqc --version | grep -q "${{ env.COQ_VERSION }}"; then
             echo "❌ Coq版本不匹配（需${{ env.COQ_VERSION }}，当前：$(coqc --version | head -n1)）"
             exit 1
@@ -186,10 +195,10 @@ jobs:
             "extensions/Quantum/QFT_FRF.vo"
           )
           for mod in "${core_modules[@]}"; do
-            if [ -f "$mod" ]; then
-              echo "- ✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            if [ ${#failed_files[@]} -ne 0 ]; then
+              echo "✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             else
-              echo "- ❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+              echo "❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             fi
           done
           echo -e "\n## 📋 详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
