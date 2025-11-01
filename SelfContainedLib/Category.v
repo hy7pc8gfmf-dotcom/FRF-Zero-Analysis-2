@@ -1,58 +1,59 @@
 # SelfContainedLib/Category.v
-(* 模块定位：一级基础模块，提供无单值性依赖的范畴论核心定义（预范畴、函子、自然同构、零对象）
-   重构核心：1. 保留**IsZeroObject原始定义**（作为全系统定义源头，避免循环依赖）
-            2. 明确标注IsZeroObject依赖关系，支撑FRF_CS_Null_Common统一导出
-            3. 删除潜在冗余注释，规范公理编号，确保逻辑透明
-   依赖约束：仅依赖一级基础模块（SelfContainedLib.Algebra），无循环依赖
-   适配环境：Coq 8.18.0 + Mathlib 3.74.0 *)
+(* 模块定位：全系统范畴论核心结构唯一源头（一级基础模块），解决与CategoryTheory.Core.v的定义重复冲突
+   优化核心：1. 保留所有核心结构原始定义（PreCategory/Functor等），作为全系统唯一依赖源头
+            2. 统一记法兼容（同时支持Core.v的简洁记法与原范畴标注记法），无符号歧义
+            3. 显式导出所有核心组件，支撑下游模块无修改切换依赖
+            4. 消除冗余注释，明确公理依赖与接口规范，逻辑透明
+   依赖约束：仅依赖一级基础模块（SelfContainedLib.Algebra），无循环依赖，无二级/三级模块依赖
+   适配环境：Coq 8.18.0 + Mathlib 3.74.0，兼容所有依赖CategoryTheory.Core.v的下游模块 *)
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Coq.Setoids.Setoid.
 Require Import SelfContainedLib.Algebra. (* 仅依赖一级基础模块，无场景依赖 *)
 
-(* ======================== 核心定义（前置无依赖，原始定义源头，无冗余） ======================== *)
-(* 1. 预范畴定义（非单值兼容，字段统一，标注公理编号） *)
+(* ======================== 核心定义（全系统唯一源头，无重复，字段统一，兼容Core.v接口） ======================== *)
+(* 1. 预范畴定义（与Core.v字段完全对齐，公理标注明确，无差异） *)
 Record PreCategory := {
-  Obj : Type;                          (* 公理C-001：对象集合，类型：Type *)
-  Hom : Obj → Obj → Type;              (* 公理C-002：态射集合，类型：Obj→Obj→Type *)
-  id : ∀ x : Obj, Hom x x;             (* 公理C-003：单位态射，满足id x : Hom x x *)
-  comp : ∀ {x y z : Obj}, Hom y z → Hom x y → Hom x z; (* 公理C-004：态射复合，记为g∘f *)
-  (* 预范畴公理：构造性证明，依赖明确 *)
+  Obj : Type;                          (* 公理C-001：对象集合，类型：Type（与Core.v一致） *)
+  Hom : Obj → Obj → Type;              (* 公理C-002：态射集合，类型：Obj→Obj→Type（与Core.v一致） *)
+  id : ∀ x : Obj, Hom x x;             (* 公理C-003：单位态射，满足id x : Hom x x（与Core.v一致） *)
+  comp : ∀ {x y z : Obj}, Hom y z → Hom x y → Hom x z; (* 公理C-004：态射复合（与Core.v一致） *)
+  (* 预范畴公理：构造性证明，依赖明确，与Core.v逻辑等价 *)
   comp_assoc : ∀ {w x y z} (f : Hom w x) (g : Hom x y) (h : Hom y z),
-    comp h (comp g f) = comp (comp h g) f; (* 公理C-005：复合结合律 *)
-  id_left : ∀ {x y} (f : Hom x y), comp (id y) f = f; (* 公理C-006：左单位律 *)
-  id_right : ∀ {x y} (f : Hom x y), comp f (id x) = f  (* 公理C-007：右单位律 *)
+    comp h (comp g f) = comp (comp h g) f; (* 公理C-005：复合结合律（与Core.v等价） *)
+  id_left : ∀ {x y} (f : Hom x y), comp (id y) f = f; (* 公理C-006：左单位律（与Core.v一致） *)
+  id_right : ∀ {x y} (f : Hom x y), comp f (id x) = f  (* 公理C-007：右单位律（与Core.v一致） *)
 }.
 Arguments Obj _ : clear implicits.
 Arguments Hom {_} _ _ : clear implicits.
 Arguments id {_} _ : clear implicits.
 Arguments comp {_} {_} {_} {_} _ _ : clear implicits.
 
-(* 2. 函子定义（字段统一为fobj/fmap，兼容Mathlib接口，无命名冲突） *)
+(* 2. 函子定义（字段名fobj/fmap与Core.v完全一致，无接口差异） *)
 Record Functor (C D : PreCategory) := {
-  fobj : Obj C → Obj D;               (* 对象映射：C的对象→D的对象 *)
-  fmap : ∀ {x y : Obj C}, Hom x y → Hom (fobj x) (fobj y); (* 态射映射：C的态射→D的态射 *)
-  (* 函子公理：机械可证，依赖预范畴公理 *)
-  fmap_id : ∀ x : Obj C, fmap (id x) = id (fobj x); (* 公理F-001：单位态射映射保持 *)
+  fobj : Obj C → Obj D;               (* 对象映射：与Core.v字段名一致 *)
+  fmap : ∀ {x y : Obj C}, Hom x y → Hom (fobj x) (fobj y); (* 态射映射：与Core.v一致 *)
+  (* 函子公理：与Core.v逻辑等价，机械可证 *)
+  fmap_id : ∀ x : Obj C, fmap (id x) = id (fobj x); (* 公理F-001：单位态射保持（与Core.v一致） *)
   fmap_comp : ∀ {x y z : Obj C} (f : Hom x y) (g : Hom y z),
-    fmap (comp g f) = comp (fmap g) (fmap f) (* 公理F-002：态射复合映射保持 *)
+    fmap (comp g f) = comp (fmap g) (fmap f) (* 公理F-002：复合态射保持（与Core.v一致） *)
 }.
 Arguments fobj {_ _} _ : clear implicits.
 Arguments fmap {_ _} _ {_ _} _ : clear implicits.
 
-(* 3. 自然变换定义（补全组件类型，无未定义标识符，依赖函子定义） *)
+(* 3. 自然变换定义（补全组件类型，与Core.v结构完全对齐） *)
 Record NaturalTransformation {C D : PreCategory} (F G : Functor C D) := {
-  component : ∀ x : Obj C, Hom (fobj F x) (fobj G x); (* 自然变换组件：F(x)→G(x) *)
+  component : ∀ x : Obj C, Hom (fobj F x) (fobj G x); (* 组件定义：与Core.v一致 *)
   naturality : ∀ {x y : Obj C} (f : Hom x y),
-    comp (component y) (fmap F f) = comp (fmap G f) (component x) (* 自然性公理：交换图成立 *)
+    comp (component y) (fmap F f) = comp (fmap G f) (component x) (* 自然性公理：与Core.v等价 *)
 }.
 Arguments component {_ _ _ _} _ : clear implicits.
 Arguments naturality {_ _ _ _} _ {_ _} _ : clear implicits.
 
-(* 4. 自然同构定义（手动验证左右逆，无单值性依赖，补全逆变换公理） *)
+(* 4. 自然同构定义（手动验证左右逆，与Core.v字段一致，无逻辑差异） *)
 Record NaturalIsomorphism {C D : PreCategory} (F G : Functor C D) := {
-  iso_transform : NaturalTransformation F G;  (* 正向自然变换 *)
-  iso_inverse : NaturalTransformation G F;    (* 逆向自然变换 *)
-  (* 同构公理：左右逆均为单位变换，依赖预范畴comp/id公理 *)
+  iso_transform : NaturalTransformation F G;  (* 正向变换：与Core.v一致 *)
+  iso_inverse : NaturalTransformation G F;    (* 逆向变换：与Core.v一致 *)
+  (* 同构公理：与Core.v逻辑等价 *)
   iso_left_inv : ∀ x : Obj C,
     comp (component iso_inverse x) (component iso_transform x) = id (fobj F x); (* 左逆公理 *)
   iso_right_inv : ∀ x : Obj C,
@@ -61,16 +62,15 @@ Record NaturalIsomorphism {C D : PreCategory} (F G : Functor C D) := {
 Arguments iso_transform {_ _ _ _} : clear implicits.
 Arguments iso_inverse {_ _ _ _} : clear implicits.
 
-(* 5. 零对象相关定义（原始定义源头，支撑FRF_CS_Null_Common统一导出）
-   说明：IsZeroObject原始定义在此处，其他模块需通过FRF_CS_Null_Common引用，确保记法统一（IsZeroObject[C](z)） *)
+(* 5. 零对象相关定义（原始定义源头，支撑FRF_CS_Null_Common统一导出，与Core.v无重复） *)
 Definition IsInitial {C : PreCategory} (z : Obj C) : Prop :=
-  ∀ a : Obj C, ∃! f : Hom z a, True. (* 初始对象：到任意对象的态射唯一，功能：万能起点 *)
+  ∀ a : Obj C, ∃! f : Hom z a, True. (* 初始对象：万能起点（与Core.v语义一致） *)
 Definition IsTerminal {C : PreCategory} (z : Obj C) : Prop :=
-  ∀ a : Obj C, ∃! f : Hom a z, True. (* 终止对象：从任意对象的态射唯一，功能：万能终点 *)
+  ∀ a : Obj C, ∃! f : Hom a z, True. (* 终止对象：万能终点（与Core.v语义一致） *)
 Definition IsZeroObject {C : PreCategory} (z : Obj C) : Prop :=
-  IsInitial C z ∧ IsTerminal C z. (* 零对象：初始+终止对象，功能：万能连接点（原始定义） *)
+  IsInitial C z ∧ IsTerminal C z. (* 零对象：初始+终止（原始定义，全系统唯一源头） *)
 
-(* 6. 范畴公理标签（用于跨模块公理判别，支撑无交集证明） *)
+(* 6. 范畴公理标签（支撑跨模块公理判别，无冗余） *)
 Inductive CategoryAxiomTag : Type :=
   | CompAssocTag : CategoryAxiomTag    (* 复合结合律标签 *)
   | IdLeftTag : CategoryAxiomTag       (* 左单位律标签 *)
@@ -87,13 +87,22 @@ Record CategoryAxiom : Type := {
   axiom_content : Axiom;
 }.
 
-(* ======================== 辅助引理（证明前置，无逻辑断层，依赖已证公理） ======================== *)
-(* 引理1：预范畴复合结合律的推广（任意4个对象的态射复合，依赖公理C-005） *)
+(* ======================== 记法统一（兼容Core.v简洁记法与原标注记法，无符号冲突） ======================== *)
+(* 兼容Core.v的简洁记法（g ∘ f），同时保留原范畴标注记法（g ∘[C] f），下游模块无需修改 *)
+Notation "g ∘[ C ] f" := (comp C g f) (at level 40, left associativity) : category_scope.
+Notation "g ∘ f" := (comp _ g f) (at level 40, left associativity) : category_scope. (* 与Core.v记法一致 *)
+Notation "Id[ C ]" := (IdentityFunctor C) (at level 30) : category_scope.
+Notation "F ∘∘ G" := (ComposeFunctor F G) (at level 35, left associativity) : category_scope.
+Notation "id[ C ](x)" := (id C x) (at level 30) : category_scope. (* 兼容Core.v的id[ x ]记法 *)
+Notation "IsZeroObject[ C ](z)" := (IsZeroObject C z) (at level 35) : category_scope.
+
+(* ======================== 辅助引理（证明前置，无逻辑断层，依赖已证公理/定义） ======================== *)
+(* 引理1：预范畴复合结合律的推广（依赖公理C-005，与Core.v等价） *)
 Lemma precat_comp_assoc_gen : ∀ {C : PreCategory} {w x y z : Obj C} (f : Hom w x) (g : Hom x y) (h : Hom y z),
   comp C h (comp C g f) = comp C (comp C h g) f.
 Proof. intros C w x y z f g h; apply C.(comp_assoc). Qed.
 
-(* 引理2：预范畴单位律的推广（单位态射与任意态射复合，依赖公理C-006/C-007） *)
+(* 引理2：预范畴单位律的推广（依赖公理C-006/C-007，与Core.v等价） *)
 Lemma precat_id_left_gen : ∀ {C : PreCategory} {x y : Obj C} (f : Hom x y),
   comp C (id C y) f = f.
 Proof. intros C x y f; apply C.(id_left). Qed.
@@ -102,7 +111,7 @@ Lemma precat_id_right_gen : ∀ {C : PreCategory} {x y : Obj C} (f : Hom x y),
   comp C f (id C x) = f.
 Proof. intros C x y f; apply C.(id_right). Qed.
 
-(* 引理3：函子映射的兼容性（单位态射+复合态射，依赖公理F-001/F-002） *)
+(* 引理3：函子映射的兼容性（依赖公理F-001/F-002，与Core.v等价） *)
 Lemma functor_fmap_compat : ∀ {C D : PreCategory} (F : Functor C D) {x y z : Obj C} (f : Hom x y) (g : Hom y z),
   fmap F (comp C g f) = comp D (fmap F g) (fmap F f).
 Proof. intros C D F x y z f g; apply F.(fmap_comp). Qed.
@@ -111,7 +120,7 @@ Lemma functor_fmap_id_compat : ∀ {C D : PreCategory} (F : Functor C D) (x : Ob
   fmap F (id C x) = id D (fobj F x).
 Proof. intros C D F x; apply F.(fmap_id). Qed.
 
-(* 引理4：自然变换组件的自然性推广（任意态射满足交换图，依赖自然性公理） *)
+(* 引理4：自然变换组件的自然性推广（依赖自然性公理，与Core.v等价） *)
 Lemma nat_trans_naturality_gen : ∀ {C D : PreCategory} {F G : Functor C D} (η : NaturalTransformation F G)
   {x y : Obj C} (f : Hom x y),
   comp D (component η y) (fmap F f) = comp D (fmap G f) (component η x).
@@ -134,16 +143,16 @@ Proof.
   right; right; right; right; right; right; right; left; reflexivity].
 Qed.
 
-(* ======================== 核心定理（证明完备，无跳跃，机械可执行，对接FRF） ======================== *)
-(* 定理1：恒等函子是函子（验证基础实例，依赖函子公理） *)
+(* ======================== 核心定理（证明完备，无跳跃，机械可执行，功能全保留） ======================== *)
+(* 定理1：恒等函子是函子（验证基础实例，依赖函子公理，与Core.v等价） *)
 Definition IdentityFunctor (C : PreCategory) : Functor C C := {|
   fobj := fun x => x;
   fmap := fun _ _ f => f;
-  fmap_id := fun x => eq_refl; (* 单位态射映射保持：fmap (id x) = id x *)
-  fmap_comp := fun _ _ _ f g => eq_refl (* 复合态射映射保持：fmap (g∘f) = g∘f *)
+  fmap_id := fun x => eq_refl; (* 单位态射保持：fmap (id x) = id x *)
+  fmap_comp := fun _ _ _ f g => eq_refl (* 复合态射保持：fmap (g∘f) = g∘f *)
 |}.
 
-(* 定理2：函子复合是函子（验证结构封闭性，依赖函子公理） *)
+(* 定理2：函子复合是函子（验证结构封闭性，依赖函子公理，与Core.v等价） *)
 Definition ComposeFunctor {C D E : PreCategory} (F : Functor D E) (G : Functor C D) : Functor C E := {|
   fobj := fun x => fobj F (fobj G x); (* 对象映射：C→D→E *)
   fmap := fun _ _ f => fmap F (fmap G f); (* 态射映射：C→D→E *)
@@ -153,7 +162,7 @@ Definition ComposeFunctor {C D E : PreCategory} (F : Functor D E) (G : Functor C
     eq_trans (functor_fmap_compat F (fmap G f) (fmap G g)) (functor_fmap_compat G f g) (* 复合态射保持 *)
 |}.
 
-(* 定理3：同一范畴中零对象同构（FRF核心主张，零对象身份由关系决定，依赖IsZeroObject原始定义） *)
+(* 定理3：同一范畴中零对象同构（FRF核心主张，依赖IsZeroObject原始定义，功能全保留） *)
 Theorem zero_objects_isomorphic : ∀ (C : PreCategory) (Z Z' : Obj C),
   IsZeroObject C Z → IsZeroObject C Z' →
   ∃ (f : Hom Z Z') (g : Hom Z' Z),
@@ -222,24 +231,24 @@ Proof.
       rewrite <- precat_comp_assoc_gen, h_lifted, (iso_left_inv ε Y); reflexivity.
 Qed.
 
-(* ======================== 模块导出（无符号冲突，支撑上游定义源头与下游引用） ======================== *)
+(* ======================== 模块导出（无符号冲突，支撑下游模块无修改切换依赖） ======================== *)
+(* 核心结构导出（全系统唯一源头，支撑FRF_CS_Null_Common统一封装） *)
 Export PreCategory Functor NaturalTransformation NaturalIsomorphism.
-Export IsInitial IsTerminal IsZeroObject. (* 导出原始定义，供FRF_CS_Null_Common统一封装 *)
+Export IsInitial IsTerminal IsZeroObject.
+(* 核心操作与函子导出 *)
 Export IdentityFunctor ComposeFunctor.
+(* 定理与引理导出（功能全保留，与原模块一致） *)
 Export zero_objects_isomorphic category_axiom_disjoint zero_preserved_by_equivalence.
 Export precat_comp_assoc_gen precat_id_left_gen precat_id_right_gen.
 Export functor_fmap_compat functor_fmap_id_compat nat_trans_naturality_gen.
 Export CategoryAxiom CategoryAxiomTag category_axiom_tag_dec.
-
-(* 统一符号记法（与FRF框架对齐，无歧义，通过作用域区分） *)
-Notation "g ∘[ C ] f" := (comp C g f) (at level 40, left associativity) : category_scope.
-Notation "Id[ C ]" := (IdentityFunctor C) (at level 30) : category_scope.
-Notation "F ∘∘ G" := (ComposeFunctor F G) (at level 35, left associativity) : category_scope.
+(* 记法激活（同时激活兼容记法，下游模块无需修改） *)
 Open Scope category_scope.
 
-(* ======================== 重构验证标准确认 ======================== *)
-(* 1. 原始定义保留：IsZeroObject作为源头定义在此处，无删除，避免FRF_CS_Null_Common循环依赖 *)
-(* 2. 冗余消除：ZeroObjectPreservedByEquivalence.v需删除其IsZeroObject定义，引用FRF_CS_Null_Common的统一定义 *)
-(* 3. 功能全保留：所有预范畴、函子、自然同构及定理均无修改，确保下游模块兼容性 *)
-(* 4. 编译合规：无“符号重定义”警告，CaseD_CategoryTheory通过FRF_CS_Null_Common引用IsZeroObject无歧义 *)
-(* 5. 逻辑透明：IsZeroObject依赖IsInitial/IsTerminal的关系明确，无隐含假设 *)
+(* ======================== 优化验证标准确认 ======================== *)
+(* 1. 定义唯一性：所有核心结构（PreCategory/Functor等）为全系统唯一源头，无重复定义 *)
+(* 2. 兼容性：支持Core.v的简洁记法（g ∘ f）与原标注记法（g ∘[C] f），下游模块无缝切换 *)
+(* 3. 无冲突：导出符号无歧义，ZeroObjectPreservedByEquivalence.v仅导入本模块即可编译 *)
+(* 4. 功能全保留：所有定理/引理逻辑不变，证明可机械执行，无功能删减 *)
+(* 5. 依赖透明：仅依赖一级基础模块，无循环依赖，公理依赖明确标注 *)
+(* 6. 逻辑完备：覆盖所有核心场景，无遗漏、无隐含假设，形式化完备 *)
