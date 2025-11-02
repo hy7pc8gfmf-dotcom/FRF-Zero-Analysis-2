@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "8.18.0"
+      COQ_VERSION: "1.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
@@ -99,13 +99,33 @@ jobs:
               opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
             fi
           fi
-          echo "=== 🔧 执行仓库更新 ==="
-          opam update -y --retry 5 || {
-            echo "=== ⚠️ 更新失败，重试兜底镜像 ==="
+          echo "=== 🔧 执行仓库更新（带重试机制） ==="
+          update_success=0
+          for i in {1..3}; do
+            echo "=== 第 $i 次尝试更新仓库 ==="
+            if opam update -y; then
+              update_success=1
+              break
+            fi
+            sleep 2
+          done
+          if [ $update_success -eq 0 ]; then
+            echo "=== ⚠️ 更新失败，切换到兜底镜像重试 ==="
             opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
             opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
-            opam update -y --retry 5 || { echo "❌ 兜底镜像更新也失败"; exit 1; }
-          }
+            for i in {1..3}; do
+              echo "=== 第 $i 次尝试兜底镜像更新 ==="
+              if opam update -y; then
+                update_success=1
+                break
+              fi
+              sleep 2
+            done
+          fi
+          if [ $update_success -eq 0 ]; then
+            echo "❌ 所有更新尝试均失败"
+            exit 1
+          fi
           installed_pkgs=$(opam list --short)
           required_pkgs=(
             "coq=${{ env.COQ_VERSION }}"
@@ -129,7 +149,7 @@ jobs:
           done
           if [ ${#to_install[@]} -gt 0 ]; then
             echo "=== 🚀 开始安装依赖 ==="
-            opam install -y --retry 5 --jobs 2 "${to_install[@]}"
+            opam install -y --retry 3 --jobs 2 "${to_install[@]}"
           else
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
