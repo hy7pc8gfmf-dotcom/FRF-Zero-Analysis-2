@@ -158,6 +158,16 @@ jobs:
           if ! command -v python &> /dev/null; then
             exit 1
           fi
+      - name: 预处理CoqProject文件
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ -f "CoqProject" ]; then
+            echo "清理CoqProject文件中的无效选项..."
+            grep -v "coq=8.19.0" CoqProject > CoqProject.clean
+            mv CoqProject.clean CoqProject
+            echo "CoqProject文件预处理完成"
+          fi
       - name: 生成全局验证Makefile
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -165,16 +175,28 @@ jobs:
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           if [ ! -f "CoqProject" ]; then
+            echo "错误：未找到CoqProject文件"
             exit 1
           fi
+          echo "CoqProject文件内容："
+          cat CoqProject
+          echo "开始生成Makefile..."
           if [ -f "Makefile.template" ]; then
+            echo "使用Makefile.template生成Makefile"
             coq_makefile -f CoqProject -o Makefile -extra Makefile.template
           else
+            echo "直接生成Makefile"
             coq_makefile -f CoqProject -o Makefile
           fi
-          if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
+          if [ $? -ne 0 ]; then
+            echo "coq_makefile执行失败"
             exit 1
           fi
+          if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
+            echo "错误：Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'"
+            exit 1
+          fi
+          echo "Makefile生成成功"
       - name: 执行全局形式化验证
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -182,7 +204,9 @@ jobs:
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
+          echo "开始并行编译验证..."
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
+          echo "检查编译产物..."
           failed_files=()
           while IFS= read -r v_file; do
             vo_file="${v_file%.v}.vo"
@@ -191,19 +215,24 @@ jobs:
             fi
           done < <(grep -E '^[^#].*\.v$' CoqProject)
           if [ ${#failed_files[@]} -ne 0 ]; then
+            echo "以下文件验证失败："
             printf '%s\n' "${failed_files[@]}"
             exit 1
           fi
+          echo "所有文件编译验证完成"
       - name: 全局逻辑一致性校验
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
+          echo "开始逻辑一致性检查..."
           coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "逻辑一致性检查失败"
             exit 1
           fi
+          echo "逻辑一致性检查通过"
       - name: 生成结构化验证报告
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -212,7 +241,6 @@ jobs:
           source ${{ env.VENV_PATH }}/bin/activate
           cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
           # FRF 2.0 全局形式化验证报告
-          
           验证时间: $(date +'%Y-%m-%d %H:%M:%S')
           触发事件: ${{ github.event_name }}
           提交哈希: ${{ github.sha }}
@@ -220,7 +248,6 @@ jobs:
           Coq版本: $(coqc --version | head -n1)
           MathComp版本: ${{ env.MATHCOMP_VERSION }}
           编译核心数: $(nproc)
-          
           总待验证文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)
           成功验证文件数: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)
           逻辑一致性: 校验通过
