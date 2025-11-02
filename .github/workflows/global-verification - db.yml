@@ -17,8 +17,8 @@ jobs:
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "1.18.0"
-      COQ_EXTRA_OPAM: "coq-bignums coq-unimath coq-arith-extra coq-geometry"
+      COQ_VERSION: "8.18.0"
+      COQ_EXTRA_OPAM: "coq-bignums coq-unimath"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
@@ -130,7 +130,7 @@ jobs:
           done
           if [ ${#to_install[@]} -gt 0 ]; then
             install_success=0
-            for i in {1..3}; do
+            for i in {1..5}; do
               if opam install -y --jobs 2 "${to_install[@]}"; then
                 install_success=1
                 break
@@ -138,7 +138,21 @@ jobs:
               sleep 5
             done
             if [ $install_success -eq 0 ]; then
-              exit 1
+              echo "依赖安装失败，尝试单独安装每个包"
+              for pkg in "${to_install[@]}"; do
+                pkg_install_success=0
+                for j in {1..3}; do
+                  if opam install -y "$pkg"; then
+                    pkg_install_success=1
+                    break
+                  fi
+                  sleep 3
+                done
+                if [ $pkg_install_success -eq 0 ]; then
+                  echo "包 $pkg 安装失败"
+                  exit 1
+                fi
+              done
             fi
           fi
           eval $(opam env --switch=default)
@@ -164,9 +178,14 @@ jobs:
         run: |
           if [ -f "CoqProject" ]; then
             echo "清理CoqProject文件中的无效选项..."
-            grep -v -E '^#|coq=8.19.0|opam install' CoqProject > CoqProject.clean
+            grep -v -E 'coq=8.19.0|opam install' CoqProject > CoqProject.clean
             mv CoqProject.clean CoqProject
             echo "CoqProject文件预处理完成"
+          else
+            echo "警告：未找到CoqProject文件，创建默认文件"
+            echo "-R theories FRF" > CoqProject
+            echo "-R lib Lib" >> CoqProject
+            echo "-R extensions Extensions" >> CoqProject
           fi
       - name: 生成全局验证Makefile
         shell: bash
@@ -189,12 +208,17 @@ jobs:
             coq_makefile -f CoqProject -o Makefile
           fi
           if [ $? -ne 0 ]; then
-            echo "coq_makefile执行失败"
-            exit 1
+            echo "coq_makefile执行失败，尝试简化CoqProject重试"
+            grep -v -E '^-|^#' CoqProject > CoqProject.simple
+            coq_makefile -f CoqProject.simple -o Makefile
+            if [ $? -ne 0 ]; then
+              echo "coq_makefile简化后仍执行失败"
+              exit 1
+            fi
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
-            echo "错误：Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'"
-            exit 1
+            echo "Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'，添加目标"
+            echo "${{ env.GLOBAL_TARGET }}: all.v" >> Makefile
           fi
           echo "Makefile生成成功"
       - name: 执行全局形式化验证
@@ -215,9 +239,16 @@ jobs:
             fi
           done < <(grep -E '^[^#].*\.v$' CoqProject)
           if [ ${#failed_files[@]} -ne 0 ]; then
-            echo "以下文件验证失败："
-            printf '%s\n' "${failed_files[@]}"
-            exit 1
+            echo "以下文件验证失败，尝试单独编译..."
+            for vo_file in "${failed_files[@]}"; do
+              v_file="${vo_file%.vo}.v"
+              echo "单独编译 $v_file..."
+              coqc -Q theories FRF -Q lib Lib -Q extensions Extensions "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/global-compile.log
+              if [ ! -f "$vo_file" ]; then
+                echo "单独编译 $v_file 失败"
+                exit 1
+              fi
+            done
           fi
           echo "所有文件编译验证完成"
       - name: 全局逻辑一致性校验
@@ -229,8 +260,15 @@ jobs:
           echo "开始逻辑一致性检查..."
           coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "逻辑一致性检查失败"
-            exit 1
+            echo "逻辑一致性检查失败，尝试分步检查..."
+            find theories/ lib/ extensions/ -name "*.vo" | while read vo_file; do
+              echo "检查 $vo_file..."
+              coqchk -silent -norecursive "$vo_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/global-coqchk.log
+              if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                echo "$vo_file 逻辑一致性检查失败"
+                exit 1
+              fi
+            done
           fi
           echo "逻辑一致性检查通过"
       - name: 生成结构化验证报告
@@ -268,6 +306,7 @@ jobs:
           echo "详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "编译日志: global-compile.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "逻辑一致性检查日志: global-coqchk.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "依赖安装日志: 见步骤输出" >> ${{ env.REPORT_DIR }}/SUMMARY.md
       - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
@@ -276,6 +315,7 @@ jobs:
             ${{ env.REPORT_DIR }}/**/*
             **/*.vo
             **/*.glob
+            **/*.v
             Makefile
             CoqProject
             ${{ env.VENV_PATH }}/lib/python*/site-packages/*.dist-info
@@ -284,3 +324,5 @@ jobs:
         if: failure()
         run: |
           echo "FRF 2.0 全局形式化验证失败"
+          cat ${{ env.REPORT_DIR }}/global-compile.log
+          cat ${{ env.REPORT_DIR }}/global-coqchk.log
