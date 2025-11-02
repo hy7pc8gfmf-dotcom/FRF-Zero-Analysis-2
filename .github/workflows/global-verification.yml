@@ -238,7 +238,7 @@ EOF
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
             echo "all: Makefile.coq" >> Makefile
-            echo "	\$(MAKE) -f Makefile.coq all" >> Makefile
+            echo -e "\t\$(MAKE) -f Makefile.coq all" >> Makefile
           fi
           echo "✅ Makefile生成完成，验证目标就绪"
           echo "=== 编译命令示例（前10行） ==="
@@ -294,25 +294,25 @@ EOF
           total_files=$(grep -E '^[^#-].*\.v$' "$COQ_PROJECT_FILE" | wc -l)
           success_files=$(find theories/ lib/ extensions/ -name "*.vo" | wc -l)
           cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
-          # FRF 2.0 全局形式化验证报告（最终版）
-          
-          ## 🔧 验证环境信息
-          - 验证时间: $(date +'%Y-%m-%d %H:%M:%S')
-          - 触发事件: ${{ github.event_name }}
-          - 提交哈希: ${{ github.sha }}
-          - 运行容器: coqorg/coq:${{ env.COQ_VERSION }}
-          - Coq版本: $(coqc --version | head -n1)
-          - MathComp版本: ${{ env.MATHCOMP_VERSION }}
-          - 编译核心数: $(nproc)
-          - 逻辑根路径: ${{ env.COQ_LOGICAL_ROOT }}
-          
-          ## 📊 验证范围统计
-          - 总待验证文件数: $total_files
-          - 成功验证文件数: $success_files
-          - 逻辑一致性: ✅ 校验通过
-          
-          ## 🎯 核心模块验证状态
-          EOF
+# FRF 2.0 全局形式化验证报告（最终版）
+
+## 🔧 验证环境信息
+- 验证时间: $(date +'%Y-%m-%d %H:%M:%S')
+- 触发事件: ${{ github.event_name }}
+- 提交哈希: ${{ github.sha }}
+- 运行容器: coqorg/coq:${{ env.COQ_VERSION }}
+- Coq版本: $(coqc --version | head -n1)
+- MathComp版本: ${{ env.MATHCOMP_VERSION }}
+- 编译核心数: $(nproc)
+- 逻辑根路径: ${{ env.COQ_LOGICAL_ROOT }}
+
+## 📊 验证范围统计
+- 总待验证文件数: $total_files
+- 成功验证文件数: $success_files
+- 逻辑一致性: ✅ 校验通过
+
+## 🎯 核心模块验证状态
+EOF
           core_modules=(
             "theories/FRF_MetaTheory.vo"
             "theories/Equivalence.vo"
