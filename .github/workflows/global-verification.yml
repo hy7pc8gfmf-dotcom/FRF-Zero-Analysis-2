@@ -23,7 +23,6 @@ jobs:
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
       TEMP_DIR: "/__w/_temp/_runner_file_commands"
-      # 修正清华镜像正确路径，避免404
       OPAM_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/opam/"
       COQ_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/"
       OPAM_FALLBACK_MIRROR: "https://opam.ocaml.org/"
@@ -43,7 +42,7 @@ jobs:
         run: |
           mkdir -p ${{ github.workspace }}
           chmod -R 777 ${{ github.workspace }}
-          opam init --disable-sandboxing -y --no-setup
+          opam init --disable-sandboxing -y --no-setup --reinit
           eval $(opam env --switch=default)
           echo "✅ 目录权限修复+opam环境初始化完成"
           echo "📌 当前opam版本：$(opam --version)"
@@ -69,24 +68,30 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
-          # 先移除所有现有仓库，避免"已设置"冲突
-          opam repo remove default || true
-          opam repo remove coq-released || true
-          # 尝试添加主镜像并更新
-          echo "=== 🔧 尝试使用主镜像源：${{ env.OPAM_MAIN_MIRROR }} ==="
-          opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
-          opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+          opam repo list --all-switches
+          echo "=== 🔧 尝试直接更新默认仓库URL ==="
+          if opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches; then
+            echo "=== ✅ 主镜像源URL更新成功 ==="
+          else
+            echo "=== ⚠️  更新失败，尝试移除后重新添加 ==="
+            opam repo remove default --all-switches || true
+            opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
+          fi
+          echo "=== 🔧 配置Coq仓库 ==="
+          if opam repo list | grep -q "coq-released"; then
+            opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+          else
+            opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+          fi
+          echo "=== 🔧 尝试更新仓库 ==="
           if opam update -y --retry 10; then
             echo "=== ✅ 主镜像源更新成功 ==="
           else
             echo "=== ⚠️  主镜像源失败，切换到兜底镜像源 ==="
-            opam repo remove default || true
-            opam repo remove coq-released || true
-            opam repo add default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
-            opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
+            opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
             opam update -y --retry 10 || { echo "❌ 兜底镜像源也失败"; exit 1; }
           fi
-          # 检查并安装依赖
           installed_pkgs=$(opam list --short)
           required_pkgs=(
             "coq=${{ env.COQ_VERSION }}"
@@ -114,7 +119,6 @@ jobs:
           else
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
-          # 校验环境
           eval $(opam env --switch=default)
           pip3 install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
           echo "=== 📋 依赖版本最终校验 ==="
@@ -231,12 +235,9 @@ jobs:
             **/*.glob
             Makefile
             CoqProject
-            global-compile.log
-            global-coqchk.log
           retention-days: 90
       - name: 验证失败紧急通知
         if: failure()
         run: |
           echo "❌ FRF 2.0 全局形式化验证失败"
           echo "📌 失败原因：请查看「归档产物」中的编译日志和一致性检查日志"
-          echo "📌 关键排查点：1. 依赖安装是否完整 2. 单个.v文件编译错误 3. 逻辑一致性冲突"
