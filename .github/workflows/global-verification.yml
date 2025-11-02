@@ -150,7 +150,19 @@ jobs:
           done
           if [ ${#to_install[@]} -gt 0 ]; then
             echo "=== 🚀 开始安装依赖 ==="
-            opam install -y --retry 3 --jobs 2 "${to_install[@]}"
+            install_success=0
+            for i in {1..3}; do
+              echo "=== 第 $i 次尝试安装依赖 ==="
+              if opam install -y --jobs 2 "${to_install[@]}"; then
+                install_success=1
+                break
+              fi
+              sleep 5
+            done
+            if [ $install_success -eq 0 ]; then
+              echo "❌ 所有依赖安装尝试均失败"
+              exit 1
+            fi
           else
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
@@ -189,7 +201,6 @@ jobs:
           fi
           echo "✅ Makefile生成完成，验证目标就绪"
       - name: 执行全局形式化验证（并行编译）
-        shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
