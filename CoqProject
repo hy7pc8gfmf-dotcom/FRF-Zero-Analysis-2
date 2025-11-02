@@ -1,36 +1,78 @@
-# CoqProject for "数字'0'的多维分析: 一种基于内部视角的形式化框架"
-# 基础配置与模块路径（按层级结构优化）
--R theories FRF
--R theories/core FRF.Core
--R theories/relations FRF.Relations
--R theories/proofs FRF.Proofs
--R theories/applications FRF.Applications  # 新增应用模块路径
+# FRF 2.0 项目 CoqProject 配置文件
+# 功能：声明Coq模块路径映射、依赖解析规则，为`coq_makefile`提供编译依据，适配全量模块验证
+# 适配版本：Coq 8.18.0（与Dockerfile、Makefile版本一致）
+# 层级规则：按「基础层→核心层→扩展层→工程层→测试层」顺序声明，确保依赖解析无歧义
 
-# 核心定义文件（按依赖优先级排序）
-theories/core/BaseDefinitions.v          # 0的通用元定义与公理系统
-theories/core/SetTheory0.v               # 集合论视角下0的定义（空集构造）
-theories/core/Algebra0.v                 # 代数视角下0的定义（加法单位元）
-theories/core/TypeTheory0.v              # 类型论视角下0的定义（空类型编码）
-theories/core/CategoryTheory0.v          # 范畴论视角下0的定义（始对象刻画）
-theories/core/Geometry0.v                # 新增：几何视角下0的定义（原点构造）
+##############################################################################
+# 1. 基础层模块：无外部依赖，为全项目提供基础定义（SelfContainedLib + FRF元理论）
+##############################################################################
+# SelfContainedLib：自包含基础库（代数/范畴/几何），无Mathlib依赖
+-Q SelfContainedLib SelfContainedLib
+# theories/FRF_MetaTheory：FRF核心元理论（FunctionalRole/DefinitiveRelation/ConceptIdentity）
+-Q theories FRF
+# CaseA_SetTheory：集合论基础（冯·诺依曼自然数/空集公理），支撑跨领域零概念映射
+-Q theories CaseA_SetTheory
 
-# 关系与交互文件（扩展跨领域关联）
-theories/relations/0_Equivalence.v       # 不同视角下0的等价性证明
-theories/relations/0_Operational.v       # 0在跨领域运算中的一致性
-theories/relations/0_Generalization.v    # 0的抽象结构推广
-theories/relations/0_Interaction.v       # 新增：多视角0的动态交互关系
+##############################################################################
+# 2. 核心层模块：数学基础+多语言空值+量子真空，对接FRF元理论
+##############################################################################
+# 数学基础模块（代数/类型论/范畴论）
+-Q theories CaseB_Algebra          # 代数零元（加法单位元唯一性）
+-Q theories CaseC_TypeTheory        # 类型论空类型（初始对象性质）
+-Q theories CaseD_CategoryTheory    # 范畴论零对象（同构唯一性）
+-Q CategoryTheory CategoryTheory    # 范畴论工具（等价函子/零对象保持定理）
+# 多语言空值模块（CS_Null系列，依赖FRF_CS_Null_Common）
+-Q CS_Null CS_Null                  # 公共空值基础（NullType/CS_FormalSystem）
+-Q CS_Null RustNull                 # Rust安全空值（Option::None）
+-Q CS_Null CxxNull                  # C++空指针（NULL/nullptr）
+-Q CS_Null JavaNull                 # Java引用空值（null）
+-Q CS_Null PythonNull               # Python动态空值（None）
+-Q CS_Null MathNull                 # 数学空值（空集/零元）
+# 量子真空模块（CaseE_QuantumVacuum + QFT_FRF，依赖基础层代数/几何）
+-Q Quantum QFT_FRF                 # 平坦时空QFT（真空态/哈密顿量）
+-Q Quantum CaseE_QuantumVacuum      # 量子真空统一分析（平坦/弯曲时空）
+-Q Quantum CurvedSpacetimeQFT       # 弯曲时空QFT（曲率耦合/真空能量）
 
-# 证明文件（补充新视角性质证明）
-theories/proofs/Set0_Properties.v        # 集合论0的基本性质
-theories/proofs/Algebra0_Properties.v    # 代数0的运算性质
-theories/proofs/Type0_Properties.v       # 类型论0的类型安全性与规范化
-theories/proofs/Category0_Properties.v   # 范畴论0的泛性质证明
-theories/proofs/Geometry0_Properties.v   # 新增：几何0的度量性质证明
-theories/proofs/0_Unified_Theorems.v     # 0的统一理论综合证明
+##############################################################################
+# 3. 扩展层模块：动态系统+跨工具链翻译+工程方法论，支撑FRF工程落地
+##############################################################################
+# 动态系统模块（区块链/控制系统/分布式系统）
+-Q DynamicSystem BlockchainSystem    # 区块链创世块（动态零态）
+-Q DynamicSystem ControlSystem       # 控制系统零平衡点（李雅普诺夫稳定）
+-Q DynamicSystem DistributedSystem   # 分布式系统初始态（ID冲突处理）
+# 跨工具链翻译模块（Coq→Agda/Isabelle/Lean，保逻辑等价）
+-Q Toolchain FRF_to_Agda            # Coq→Agda翻译（嵌套量化命题适配）
+-Q Toolchain FRF_to_Isabelle        # Coq→Isabelle翻译（未知类型追溯）
+-Q Toolchain FRF_to_Lean            # Coq→Lean 4翻译（符号统一）
+# 工程方法论模块（ZDD零概念驱动设计，支撑工程案例）
+-Q Engineering ZDD_Methodology       # ZDD方法论（需求→零概念映射）
+-Q Engineering DB_ZeroDesign         # 分布式数据库空值设计（ZDD案例）
 
-# 应用实例文件（新增应用层模块）
-theories/applications/0_In_Computation.v # 计算理论中的0应用验证
-theories/applications/0_In_Physics.v     # 物理模型中的0概念形式化
+##############################################################################
+# 4. 测试层模块：自包含验证+跨模块兼容性测试，确保全量模块正确性
+##############################################################################
+-Q Test SelfContainedVerification   # 自包含模块独立验证（无外部依赖）
+-Q Test TestEquivalence             # 范畴等价性测试（零对象保持定理）
+-Q Test TestFRF_CS_Null              # 多语言空值跨系统测试（相似度验证）
+
+##############################################################################
+# 5. 全局配置：编译参数+排除目录，避免冗余编译
+##############################################################################
+# 编译参数：抑制冗余警告，启用严格类型检查
+-arg -w -warn-error no              # 不将警告视为错误（适配Mathlib兼容）
+-arg -Q . FRF_Global                # 全局模块前缀（避免符号冲突）
+# 排除非Coq源码目录（不参与编译验证）
+-exclude paper/                     # 论文文档目录（纯文本，无需编译）
+-exclude docs/                      # 说明文档目录（HTML/PDF，无需编译）
+-exclude scripts/                   # 辅助脚本目录（Shell/Python，非Coq文件）
+
+##############################################################################
+# 使用说明：
+# 1. 生成Makefile：coq_makefile -f CoqProject -o Makefile
+# 2. 全量编译：make -j$(nproc)
+# 3. 分层验证：make test-base（基础层）/ make test-scene（核心层）/ make test-integration（扩展层）
+# 4. 单独验证某模块：make CS_Null/RustNull.vo（验证Rust空值模块）
+##############################################################################
 
 # 依赖管理（更新至兼容最新模块的版本）
 opam install coq=8.18.0                  # 升级至最新稳定版
