@@ -14,11 +14,11 @@ jobs:
     container:
       image: coqorg/coq:8.18.0
       options: --user root
-    timeout-minutes: 120
+    timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
       COQ_VERSION: "8.18.0"
-      COQ_EXTRA_OPAM: "coq-bignums coq-unimath"
+      COQ_EXTRA_OPAM: "coq-bignums"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
@@ -30,6 +30,7 @@ jobs:
       VENV_PATH: "${{ github.workspace }}/.venv"
     steps:
       - name: 修复临时目录权限
+        shell: bash
         run: |
           mkdir -p ${{ env.TEMP_DIR }} ~/.opam ~/.cache/opam
           chmod -R 777 /__w/_temp/ ~/.opam ~/.cache/opam
@@ -39,6 +40,7 @@ jobs:
           fetch-depth: 0
           submodules: 'recursive'
       - name: 修复工作目录权限+初始化opam环境
+        shell: bash
         run: |
           mkdir -p ${{ github.workspace }}
           chmod -R 777 ${{ github.workspace }}
@@ -59,27 +61,57 @@ jobs:
             ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-venv-
             ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-venv-
       - name: 配置镜像源+安装依赖
-        shell: bash -x
+        shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           opam repo list --all-switches
-          # 镜像源配置（简化重试）
           if curl --head --silent --fail ${{ env.OPAM_MAIN_MIRROR }}index.tar.gz > /dev/null; then
-            opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches || opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
+            opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches || {
+              opam repo remove default --all-switches || true
+              opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
+            }
           else
-            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches || opam repo add default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
+            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches || {
+              opam repo remove default --all-switches || true
+              opam repo add default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
+            }
           fi
           if curl --head --silent --fail ${{ env.COQ_MAIN_MIRROR }}index.tar.gz > /dev/null; then
-            opam repo list | grep -q "coq-released" && opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches || opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+            if opam repo list | grep -q "coq-released"; then
+              opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+            else
+              opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+            fi
           else
-            opam repo list | grep -q "coq-released" && opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches || opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            if opam repo list | grep -q "coq-released"; then
+              opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            else
+              opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            fi
           fi
-          # 精简更新重试
-          for i in {1..2}; do
-            opam update -y && break || sleep 2
+          update_success=0
+          for i in {1..3}; do
+            if opam update -y; then
+              update_success=1
+              break
+            fi
+            sleep 2
           done
-          # 依赖安装（减少重试和等待）
+          if [ $update_success -eq 0 ]; then
+            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
+            opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            for i in {1..3}; do
+              if opam update -y; then
+                update_success=1
+                break
+              fi
+              sleep 2
+            done
+          fi
+          if [ $update_success -eq 0 ]; then
+            exit 1
+          fi
           installed_pkgs=$(opam list --short)
           required_pkgs=(
             "coq=${{ env.COQ_VERSION }}"
@@ -89,60 +121,88 @@ jobs:
             "coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }}"
             "coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}"
             "coq-equations=1.3+8.18"
-            ${{ env.COQ_EXTRA_OPAM }}
+            "${{ env.COQ_EXTRA_OPAM }}"
           )
           to_install=()
           for pkg in "${required_pkgs[@]}"; do
             pkg_name=$(echo "$pkg" | cut -d'=' -f1)
-            echo "$installed_pkgs" | grep -q "^$pkg_name$" || to_install+=("$pkg")
+            if ! echo "$installed_pkgs" | grep -q "^$pkg_name$"; then
+              to_install+=("$pkg")
+            fi
           done
           if [ ${#to_install[@]} -gt 0 ]; then
-            # 主安装（最多2次重试，间隔2秒）
-            for i in {1..2}; do
-              opam install -y --jobs 4 "${to_install[@]}" && break || sleep 2
-            done
-            # 检查未安装包，单独快速重试
-            for pkg in "${to_install[@]}"; do
-              pkg_name=$(echo "$pkg" | cut -d'=' -f1)
-              if ! opam list --short | grep -q "^$pkg_name$"; then
-                opam install -y "$pkg" || { echo "包 $pkg 安装失败"; exit 1; }
+            install_success=0
+            for i in {1..3}; do
+              if opam install -y --jobs 2 "${to_install[@]}"; then
+                install_success=1
+                break
               fi
+              sleep 5
             done
+            if [ $install_success -eq 0 ]; then
+              exit 1
+            fi
           fi
-          # 快速验证依赖
           eval $(opam env --switch=default)
-          coqc --version | grep -q "${{ env.COQ_VERSION }}" || exit 1
-          opam list | grep -q "coq-mathcomp-ssreflect.*${{ env.MATHCOMP_VERSION }}" || exit 1
-          # 简化Python环境配置
-          apt-get update && apt-get install -y python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
+          apt-get update && apt-get install -y --no-install-recommends python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
           python3 -m venv ${{ env.VENV_PATH }}
           source ${{ env.VENV_PATH }}/bin/activate
-          pip install --no-cache-dir reportlab==4.0.9
+          pip install --no-cache-dir --timeout 60 reportlab==4.0.9
+          if ! command -v coqc &> /dev/null; then
+            exit 1
+          fi
+          if ! coqc --version | grep -q "${{ env.COQ_VERSION }}"; then
+            exit 1
+          fi
+          if ! opam list | grep -q "coq-mathcomp-ssreflect.*${{ env.MATHCOMP_VERSION }}"; then
+            exit 1
+          fi
+          if ! command -v python &> /dev/null; then
+            exit 1
+          fi
       - name: 预处理CoqProject文件
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           if [ -f "CoqProject" ]; then
-            grep -v -E 'coq=8.19.0|opam install' CoqProject > CoqProject.clean
+            grep -v "coq=8.19.0" CoqProject > CoqProject.clean
             mv CoqProject.clean CoqProject
-          else
-            echo "-R theories FRF" > CoqProject
-            echo "-R lib Lib" >> CoqProject
           fi
-      - name: 生成全局验证Makefile
+      - name: 生成全局验证Makefile（增强版）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          [ -f "CoqProject" ] || { echo "未找到CoqProject"; exit 1; }
-          cat CoqProject
-          if [ -f "Makefile.template" ]; then
-            coq_makefile -f CoqProject -o Makefile -extra Makefile.template
-          else
-            coq_makefile -f CoqProject -o Makefile
+          if [ ! -f "CoqProject" ]; then
+            echo "错误：未找到CoqProject文件"
+            exit 1
           fi
-          grep -q "${{ env.GLOBAL_TARGET }}" Makefile || echo "${{ env.GLOBAL_TARGET }}: all.v" >> Makefile
+          echo "CoqProject文件内容："
+          cat CoqProject
+          echo "开始生成Makefile..."
+          makefile_success=0
+          if [ -f "Makefile.template" ]; then
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template && makefile_success=1
+          else
+            coq_makefile -f CoqProject -o Makefile && makefile_success=1
+          fi
+          if [ $makefile_success -eq 0 ]; then
+            echo "coq_makefile直接调用失败，尝试手动提取参数和文件..."
+            sed 's/#.*$//' CoqProject | grep -v '^$' > CoqProject.tmp
+            ARGS=$(grep -E '^-' CoqProject.tmp)
+            FILES=$(grep -E '^[^-].*.v$' CoqProject.tmp)
+            coq_makefile $ARGS $FILES -o Makefile && makefile_success=1
+          fi
+          if [ $makefile_success -eq 0 ]; then
+            echo "coq_makefile执行失败"
+            exit 1
+          fi
+          if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
+            echo "错误：Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'"
+            exit 1
+          fi
+          echo "Makefile生成成功"
       - name: 执行全局形式化验证
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -150,29 +210,84 @@ jobs:
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
+          echo "开始并行编译验证..."
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
+          echo "检查编译产物..."
+          failed_files=()
+          while IFS= read -r v_file; do
+            vo_file="${v_file%.v}.vo"
+            if [ ! -f "$vo_file" ]; then
+              failed_files+=("$vo_file")
+            fi
+          done < <(grep -E '^[^#].*\.v$' CoqProject)
+          if [ ${#failed_files[@]} -ne 0 ]; then
+            echo "以下文件验证失败："
+            printf '%s\n' "${failed_files[@]}"
+            exit 1
+          fi
+          echo "所有文件编译验证完成"
       - name: 全局逻辑一致性校验
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
-          coqchk -silent -norecursive $(find theories/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
-      - name: 生成验证报告
+          source ${{ env.VENV_PATH }}/bin/activate
+          echo "开始逻辑一致性检查..."
+          coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
+          if [ ${PIPESTATUS[0]} -ne 0 ]; then
+            echo "逻辑一致性检查失败"
+            exit 1
+          fi
+          echo "逻辑一致性检查通过"
+      - name: 生成结构化验证报告
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
+          eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
-          # 验证报告
-          时间: $(date)
+          # FRF 2.0 全局形式化验证报告
+          验证时间: $(date +'%Y-%m-%d %H:%M:%S')
+          触发事件: ${{ github.event_name }}
+          提交哈希: ${{ github.sha }}
+          运行容器: coqorg/coq:${{ env.COQ_VERSION }}
           Coq版本: $(coqc --version | head -n1)
-          成功文件数: $(find theories/ -name "*.vo" | wc -l)
+          MathComp版本: ${{ env.MATHCOMP_VERSION }}
+          编译核心数: $(nproc)
+          总待验证文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)
+          成功验证文件数: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)
+          逻辑一致性: 校验通过
           EOF
-      - name: 归档结果
+          core_modules=(
+            "theories/FRF_MetaTheory.vo"
+            "theories/Equivalence.vo"
+            "lib/Algebra.vo"
+            "extensions/Quantum/QFT_FRF.vo"
+          )
+          for mod in "${core_modules[@]}"; do
+            if [ -f "$mod" ]; then
+              echo "核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            else
+              echo "核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            fi
+          done
+          echo "详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "编译日志: global-compile.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "逻辑一致性检查日志: global-coqchk.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+      - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
-          name: verification-results
+          name: frf-2.0-verification-results-${{ github.sha }}
           path: |
-            ${{ env.REPORT_DIR }}
+            ${{ env.REPORT_DIR }}/**/*
             **/*.vo
+            **/*.glob
             Makefile
+            CoqProject
+            ${{ env.VENV_PATH }}/lib/python*/site-packages/*.dist-info
+          retention-days: 90
+      - name: 验证失败紧急通知
+        shell: bash
+        if: failure()
+        run: |
+          echo "FRF 2.0 全局形式化验证失败"
