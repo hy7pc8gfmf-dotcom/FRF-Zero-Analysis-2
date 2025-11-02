@@ -181,6 +181,7 @@ jobs:
             exit 1
           fi
           echo "开始生成Makefile..."
+          echo "使用原版方法生成Makefile..."
           if [ -f "Makefile.template" ]; then
             echo "使用Makefile.template生成Makefile"
             coq_makefile -f CoqProject -o Makefile -extra Makefile.template
@@ -189,25 +190,31 @@ jobs:
             coq_makefile -f CoqProject -o Makefile
           fi
           if [ $? -ne 0 ]; then
-            echo "coq_makefile执行失败，尝试备用方案..."
-            valid_args=""
-            while IFS= read -r line; do
-              if [[ $line == -R* ]] || [[ $line == -Q* ]] || [[ $line == -I* ]]; then
-                valid_args="$valid_args $line"
-              elif [[ $line == *.v ]]; then
-                valid_args="$valid_args $line"
-              elif [[ $line == -arg* ]]; then
-                clean_arg=$(echo "$line" | sed 's/#.*$//' | xargs)
-                if [[ $clean_arg == -arg*-w* ]] || [[ $clean_arg == -arg*-native-compiler* ]] || [[ $clean_arg == -arg*-q* ]] || [[ $clean_arg == -arg*-async-proofs* ]]; then
-                  valid_args="$valid_args $clean_arg"
-                fi
-              fi
-            done < CoqProject
-            echo "备用方案参数: $valid_args"
-            coq_makefile $valid_args -o Makefile
+            echo "原版方法失败，尝试简化CoqProject..."
+            grep -E '^[^#].*\.v$' CoqProject > CoqProject.simple
+            echo "简化后文件列表："
+            cat CoqProject.simple
+            if [ -f "Makefile.template" ]; then
+              coq_makefile -f CoqProject.simple -o Makefile -extra Makefile.template
+            else
+              coq_makefile -f CoqProject.simple -o Makefile
+            fi
           fi
           if [ $? -ne 0 ]; then
-            echo "coq_makefile执行失败"
+            echo "简化方法失败，尝试仅使用.v文件..."
+            find theories -name "*.v" > CoqProject.minimal
+            find lib -name "*.v" >> CoqProject.minimal
+            find extensions -name "*.v" >> CoqProject.minimal
+            echo "最小文件列表："
+            cat CoqProject.minimal
+            if [ -f "Makefile.template" ]; then
+              coq_makefile -f CoqProject.minimal -o Makefile -extra Makefile.template
+            else
+              coq_makefile -f CoqProject.minimal -o Makefile
+            fi
+          fi
+          if [ $? -ne 0 ]; then
+            echo "所有Makefile生成方法都失败"
             exit 1
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
@@ -333,6 +340,8 @@ jobs:
             **/*.glob
             Makefile
             CoqProject
+            CoqProject.simple
+            CoqProject.minimal
             vo_files.list
             ${{ env.VENV_PATH }}/lib/python*/site-packages/*.dist-info
           retention-days: 90
