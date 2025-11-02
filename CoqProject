@@ -33,8 +33,8 @@ theories/applications/0_In_Computation.v # 计算理论中的0应用验证
 theories/applications/0_In_Physics.v     # 物理模型中的0概念形式化
 
 # 依赖管理（更新至兼容最新模块的版本）
-opam install coq=8.19.0                  # 升级至最新稳定版
-opam install coq-mathcomp-ssreflect=1.18.0  # 适配Coq 8.19.0
+opam install coq=8.18.0                  # 升级至最新稳定版
+opam install coq-mathcomp-ssreflect=1.18.0  # 适配Coq 8.18.0
 opam install coq-unimath=20240201          # 更新基础库版本
 opam install coq-arith-extra=1.2.0          # 升级算术补充库
 opam install coq-geometry=1.0.0             # 新增：几何理论依赖
