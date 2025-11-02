@@ -17,7 +17,7 @@ jobs:
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "8.18.0"
+      COQ_VERSION: "1.18.0"
       COQ_EXTRA_OPAM: "coq-bignums coq-unimath coq-arith-extra coq-geometry"
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
@@ -119,10 +119,7 @@ jobs:
             "coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }}"
             "coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}"
             "coq-equations=1.3+8.18"
-            "coq-unimath=20240201"
-            "coq-arith-extra=1.2.0"
-            "coq-geometry=1.0.0"
-            "${{ env.COQ_EXTRA_OPAM }}"
+            ${{ env.COQ_EXTRA_OPAM }}
           )
           to_install=()
           for pkg in "${required_pkgs[@]}"; do
