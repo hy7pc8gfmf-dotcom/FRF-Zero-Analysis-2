@@ -52,7 +52,7 @@ jobs:
           else
             echo "⚠️  初始Coq未找到，将通过opam安装"
           fi
-      - name: 缓存优化（断点续装核心）
+      - name: 缓存优化
         uses: actions/cache@v3
         with:
           path: |
@@ -66,13 +66,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-venv-
             ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-venv-
-      - name: 配置镜像源+安装依赖（稳定无错版）
+      - name: 配置镜像源+安装依赖
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           opam repo list --all-switches
-          echo "=== 🔧 验证主镜像URL有效性 ==="
           if curl --head --silent --fail ${{ env.OPAM_MAIN_MIRROR }}index.tar.gz > /dev/null; then
             echo "=== ✅ 主镜像URL可访问 ==="
             opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches || {
@@ -87,7 +86,6 @@ jobs:
               opam repo add default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
             }
           fi
-          echo "=== 🔧 配置Coq仓库 ==="
           if curl --head --silent --fail ${{ env.COQ_MAIN_MIRROR }}index.tar.gz > /dev/null; then
             if opam repo list | grep -q "coq-released"; then
               opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
@@ -102,7 +100,6 @@ jobs:
               opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
             fi
           fi
-          echo "=== 🔧 执行仓库更新（带重试机制） ==="
           update_success=0
           for i in {1..3}; do
             echo "=== 第 $i 次尝试更新仓库 ==="
@@ -169,14 +166,10 @@ jobs:
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
           eval $(opam env --switch=default)
-          echo "=== 🔧 安装pip3与虚拟环境依赖 ==="
           apt-get update && apt-get install -y --no-install-recommends python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
-          echo "=== 🔧 创建并激活Python虚拟环境 ==="
           python3 -m venv ${{ env.VENV_PATH }}
           source ${{ env.VENV_PATH }}/bin/activate
-          echo "=== 🚀 安装Python依赖 ==="
           pip install --no-cache-dir --timeout 60 reportlab==4.0.9
-          echo "=== 📋 依赖版本最终校验 ==="
           if ! command -v coqc &> /dev/null; then
             echo "❌ Coq未安装成功"
             exit 1
@@ -194,7 +187,7 @@ jobs:
             exit 1
           fi
           echo "=== ✅ 依赖安装+校验全量完成，准备进入验证阶段 ==="
-      - name: 校验CoqProject格式（排查根源问题）
+      - name: 校验CoqProject格式
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
@@ -207,13 +200,12 @@ jobs:
           echo "=== 📋 CoqProject文件内容（前20行） ==="
           head -n 20 CoqProject
           echo "=== ✅ CoqProject文件存在且格式初步正常 ==="
-      - name: 生成全局验证Makefile（极简无冗余版）
+      - name: 生成全局验证Makefile
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          # 仅保留官方必需参数，杜绝任何额外变量干扰
           if [ -f "Makefile.template" ]; then
             coq_makefile -f CoqProject -o Makefile -extra Makefile.template
           else
@@ -228,7 +220,7 @@ jobs:
             exit 1
           fi
           echo "✅ Makefile生成完成，验证目标就绪"
-      - name: 执行全局形式化验证（并行编译）
+      - name: 执行全局形式化验证
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
@@ -251,7 +243,7 @@ jobs:
             exit 1
           fi
           echo "✅ 所有文件编译验证完成，无缺失产物"
-      - name: 全局逻辑一致性校验（coqchk）
+      - name: 全局逻辑一致性校验
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
