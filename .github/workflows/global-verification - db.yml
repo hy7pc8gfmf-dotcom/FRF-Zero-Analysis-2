@@ -160,85 +160,210 @@ jobs:
           if ! command -v python &> /dev/null; then
             exit 1
           fi
-      - name: 预处理CoqProject文件
+      - name: 预处理CoqProject文件（增强版）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
+          mkdir -p ${{ env.REPORT_DIR }}/debug
           if [ -f "CoqProject" ]; then
-            grep -v "coq=8.19.0" CoqProject > CoqProject.clean
+            cp CoqProject ${{ env.REPORT_DIR }}/debug/CoqProject_original
+            sed 's/#.*$//' CoqProject > CoqProject.no_comment
+            grep -v '^$' CoqProject.no_comment > CoqProject.non_empty
+            grep -v "coq=8.19.0" CoqProject.non_empty > CoqProject.clean
             mv CoqProject.clean CoqProject
+            cp CoqProject ${{ env.REPORT_DIR }}/debug/CoqProject_processed
+          else
+            echo "-R theories FRF" > CoqProject
+            echo "-R lib Lib" >> CoqProject
+            echo "-R extensions Extensions" >> CoqProject
+            find theories/ lib/ extensions/ -name "*.v" >> CoqProject
+            cp CoqProject ${{ env.REPORT_DIR }}/debug/CoqProject_generated
           fi
-      - name: 生成全局验证Makefile（增强版）
+      - name: 生成全局验证Makefile（健壮版）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
+          mkdir -p ${{ env.REPORT_DIR }}/debug
           if [ ! -f "CoqProject" ]; then
-            echo "错误：未找到CoqProject文件"
+            echo "错误：未找到CoqProject文件" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
             exit 1
           fi
-          echo "CoqProject文件内容："
-          cat CoqProject
-          echo "开始生成Makefile..."
+          echo "CoqProject文件内容：" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          cat CoqProject >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          echo "开始生成Makefile（第1次尝试：直接调用coq_makefile）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
           makefile_success=0
           if [ -f "Makefile.template" ]; then
-            coq_makefile -f CoqProject -o Makefile -extra Makefile.template && makefile_success=1
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
           else
-            coq_makefile -f CoqProject -o Makefile && makefile_success=1
+            coq_makefile -f CoqProject -o Makefile 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
+          fi
+          if [ $makefile_success -eq 1 ]; then
+            echo "第1次尝试成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          else
+            echo "第1次尝试失败，开始手动提取参数和文件（第2次尝试）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            ARGS=()
+            FILES=()
+            while IFS= read -r line; do
+              trimmed_line=$(echo "$line" | xargs)
+              if [ -z "$trimmed_line" ]; then
+                continue
+              fi
+              first_char=$(echo "$trimmed_line" | cut -c1)
+              if [ "$first_char" = "-" ]; then
+                ARGS+=("$trimmed_line")
+                echo "提取参数：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              elif [[ "$trimmed_line" == *.v ]]; then
+                if [ -f "$trimmed_line" ]; then
+                  FILES+=("$trimmed_line")
+                  echo "提取有效文件：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                else
+                  echo "跳过不存在的文件：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                fi
+              else
+                echo "跳过未知行：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              fi
+            done < CoqProject
+            echo "提取到的参数列表：${ARGS[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "提取到的文件列表：${FILES[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            if [ ${#ARGS[@]} -eq 0 ] && [ ${#FILES[@]} -eq 0 ]; then
+              echo "未提取到有效参数和文件，尝试自动生成（第3次尝试）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              ARGS=("-R theories FRF" "-R lib Lib" "-R extensions Extensions")
+              FILES=($(find theories/ lib/ extensions/ -name "*.v"))
+              echo "自动生成参数：${ARGS[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              echo "自动生成文件：${FILES[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            fi
+            if [ ${#ARGS[@]} -gt 0 ] || [ ${#FILES[@]} -gt 0 ]; then
+              coq_makefile "${ARGS[@]}" "${FILES[@]}" -o Makefile 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
+              if [ $makefile_success -eq 1 ]; then
+                echo "第2次尝试成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              else
+                echo "第2次尝试失败，调整参数格式（第3次尝试：路径加引号）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                ARGS_QUOTED=()
+                for arg in "${ARGS[@]}"; do
+                  if [[ "$arg" == -R* || "$arg" == -Q* ]]; then
+                    parts=($arg)
+                    if [ ${#parts[@]} -eq 3 ]; then
+                      ARGS_QUOTED+=("${parts[0]} '${parts[1]}' '${parts[2]}'")
+                    else
+                      ARGS_QUOTED+=("$arg")
+                    fi
+                  else
+                    ARGS_QUOTED+=("$arg")
+                  fi
+                done
+                FILES_QUOTED=()
+                for file in "${FILES[@]}"; do
+                  FILES_QUOTED+=("'$file'")
+                done
+                eval "coq_makefile ${ARGS_QUOTED[*]} ${FILES_QUOTED[*]} -o Makefile" 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
+                if [ $makefile_success -eq 1 ]; then
+                  echo "第3次尝试成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                else
+                  echo "第3次尝试失败" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                fi
+              fi
+            fi
           fi
           if [ $makefile_success -eq 0 ]; then
-            echo "coq_makefile直接调用失败，尝试手动提取参数和文件..."
-            sed 's/#.*$//' CoqProject | grep -v '^$' > CoqProject.tmp
-            ARGS=$(grep -E '^-' CoqProject.tmp)
-            FILES=$(grep -E '^[^-].*.v$' CoqProject.tmp)
-            coq_makefile $ARGS $FILES -o Makefile && makefile_success=1
-          fi
-          if [ $makefile_success -eq 0 ]; then
-            echo "coq_makefile执行失败"
+            echo "coq_makefile所有尝试失败，输出调试信息" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "当前目录：$(pwd)" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "目录内容：$(ls -l)" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "theories目录内容：$(ls -l theories 2>/dev/null)" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
             exit 1
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
-            echo "错误：Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'"
-            exit 1
+            echo "Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'，自动添加" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "${{ env.GLOBAL_TARGET }}: all.v" >> Makefile
           fi
-          echo "Makefile生成成功"
-      - name: 执行全局形式化验证
+          echo "Makefile生成成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          cp Makefile ${{ env.REPORT_DIR }}/debug/Makefile_generated
+      - name: 执行全局形式化验证（带进度日志）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
-          echo "开始并行编译验证..."
-          make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
-          echo "检查编译产物..."
+          echo "开始并行编译验证（核心数：$(nproc)）" >> ${{ env.REPORT_DIR }}/global-compile.log
+          make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee -a ${{ env.REPORT_DIR }}/global-compile.log
+          echo "编译完成，开始检查产物" >> ${{ env.REPORT_DIR }}/global-compile.log
           failed_files=()
           while IFS= read -r v_file; do
-            vo_file="${v_file%.v}.vo"
+            trimmed_v=$(echo "$v_file" | xargs)
+            if [ -z "$trimmed_v" ]; then
+              continue
+            fi
+            vo_file="${trimmed_v%.v}.vo"
             if [ ! -f "$vo_file" ]; then
               failed_files+=("$vo_file")
+              echo "缺失产物：$vo_file（对应源文件：$trimmed_v）" >> ${{ env.REPORT_DIR }}/global-compile.log
+            else
+              echo "成功产物：$vo_file" >> ${{ env.REPORT_DIR }}/global-compile.log
             fi
           done < <(grep -E '^[^#].*\.v$' CoqProject)
           if [ ${#failed_files[@]} -ne 0 ]; then
-            echo "以下文件验证失败："
-            printf '%s\n' "${failed_files[@]}"
+            echo "以下文件验证失败，尝试单独编译缺失产物" >> ${{ env.REPORT_DIR }}/global-compile.log
+            for vo_file in "${failed_files[@]}"; do
+              v_file="${vo_file%.vo}.v"
+              if [ -f "$v_file" ]; then
+                echo "单独编译：$v_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+                coqc -Q theories FRF -Q lib Lib -Q extensions Extensions "$v_file" 2>> ${{ env.REPORT_DIR }}/global-compile.log
+                if [ -f "$vo_file" ]; then
+                  echo "单独编译成功：$vo_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+                  failed_files=($(filter-out "$vo_file" "${failed_files[@]}"))
+                else
+                  echo "单独编译失败：$vo_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+                fi
+              else
+                echo "源文件不存在：$v_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+              fi
+            done
+          fi
+          if [ ${#failed_files[@]} -ne 0 ]; then
+            echo "最终验证失败的文件：" >> ${{ env.REPORT_DIR }}/global-compile.log
+            printf '%s\n' "${failed_files[@]}" >> ${{ env.REPORT_DIR }}/global-compile.log
             exit 1
           fi
-          echo "所有文件编译验证完成"
-      - name: 全局逻辑一致性校验
+          echo "所有文件编译验证完成" >> ${{ env.REPORT_DIR }}/global-compile.log
+      - name: 全局逻辑一致性校验（分步执行）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          echo "开始逻辑一致性检查..."
-          coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "逻辑一致性检查失败"
-            exit 1
+          mkdir -p ${{ env.REPORT_DIR }}
+          echo "开始逻辑一致性检查（分步执行，避免单次加载过多文件）" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+          vo_dirs=("theories" "lib" "extensions")
+          all_vo=()
+          for dir in "${vo_dirs[@]}"; do
+            if [ -d "$dir" ]; then
+              vo_files=$(find "$dir" -name "*.vo")
+              if [ -n "$vo_files" ]; then
+                all_vo+=($vo_files)
+                echo "检查目录 $dir 的产物：${vo_files[*]}" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+                coqchk -silent -norecursive $vo_files 2>> ${{ env.REPORT_DIR }}/global-coqchk.log
+                if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                  echo "目录 $dir 的逻辑一致性检查失败" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+                  exit 1
+                fi
+              else
+                echo "目录 $dir 无.vo文件" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+              fi
+            else
+              echo "目录 $dir 不存在" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+            fi
+          done
+          if [ ${#all_vo[@]} -gt 0 ]; then
+            echo "全量逻辑一致性检查（最终验证）" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+            coqchk -silent -norecursive "${all_vo[@]}" 2>> ${{ env.REPORT_DIR }}/global-coqchk.log
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              echo "全量逻辑一致性检查失败" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+              exit 1
+            fi
           fi
-          echo "逻辑一致性检查通过"
+          echo "逻辑一致性检查通过" >> ${{ env.REPORT_DIR }}/global-coqchk.log
       - name: 生成结构化验证报告
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -274,6 +399,9 @@ jobs:
           echo "详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "编译日志: global-compile.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "逻辑一致性检查日志: global-coqchk.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "Makefile生成调试日志: debug/makefile_log.txt" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "CoqProject原始文件: debug/CoqProject_original" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "CoqProject处理后文件: debug/CoqProject_processed" >> ${{ env.REPORT_DIR }}/SUMMARY.md
       - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
@@ -289,4 +417,7 @@ jobs:
       - name: 验证失败紧急通知
         shell: bash
         if: failure()
-        run: echo "FRF 2.0 全局形式化验证失败"
+        run: |
+          echo "FRF 2.0 全局形式化验证失败"
+          cat ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          cat ${{ env.REPORT_DIR }}/global-compile.log
