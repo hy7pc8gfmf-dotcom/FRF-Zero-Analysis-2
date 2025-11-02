@@ -1,331 +1,56 @@
-name: FRF 2.0 全局形式化验证
-on:
-  push:
-    branches: [main, master, release/final]
-    paths: ['**.v', 'CoqProject', 'Makefile', 'validate.sh']
-  pull_request:
-    branches: [main, master]
-  schedule:
-    - cron: '0 2 * * 0'
-  workflow_dispatch:
-jobs:
-  global-formal-verification:
-    runs-on: ubuntu-latest
-    container:
-      image: coqorg/coq:8.18.0
-      options: --user root
-    timeout-minutes: 180
-    env:
-      MATHCOMP_VERSION: "1.18.0"
-      COQ_VERSION: "8.18.0"
-      COQ_EXTRA_OPAM: "coq-bignums"
-      COQPATH: "${{ github.workspace }}"
-      GLOBAL_TARGET: "all"
-      REPORT_DIR: "${{ github.workspace }}/verification-reports"
-      TEMP_DIR: "/__w/_temp/_runner_file_commands"
-      OPAM_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/opam-repository/"
-      COQ_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/"
-      OPAM_FALLBACK_MIRROR: "https://opam.ocaml.org/"
-      COQ_FALLBACK_MIRROR: "https://coq.inria.fr/opam/released/"
-      VENV_PATH: "${{ github.workspace }}/.venv"
-    steps:
-      - name: 修复临时目录权限
-        run: |
-          mkdir -p ${{ env.TEMP_DIR }} ~/.opam ~/.cache/opam
-          chmod -R 777 /__w/_temp/ ~/.opam ~/.cache/opam
-      - name: 检出代码仓库
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          submodules: 'recursive'
-      - name: 修复工作目录权限+初始化opam环境
-        run: |
-          mkdir -p ${{ github.workspace }}
-          chmod -R 777 ${{ github.workspace }}
-          opam init --disable-sandboxing -y --no-setup --reinit
-          eval $(opam env --switch=default)
-      - name: 缓存优化
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.opam
-            ~/.cache/opam
-            _build
-            **/*.vo
-            **/*.glob
-            ${{ env.VENV_PATH }}
-          key: ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-venv-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-venv-
-            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-venv-
-      - name: 配置镜像源+安装依赖
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          eval $(opam env --switch=default)
-          opam repo list --all-switches
-          if curl --head --silent --fail ${{ env.OPAM_MAIN_MIRROR }}index.tar.gz > /dev/null; then
-            opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches || {
-              opam repo remove default --all-switches || true
-              opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
-            }
-          else
-            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches || {
-              opam repo remove default --all-switches || true
-              opam repo add default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
-            }
-          fi
-          if curl --head --silent --fail ${{ env.COQ_MAIN_MIRROR }}index.tar.gz > /dev/null; then
-            if opam repo list | grep -q "coq-released"; then
-              opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
-            else
-              opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
-            fi
-          else
-            if opam repo list | grep -q "coq-released"; then
-              opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
-            else
-              opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
-            fi
-          fi
-          update_success=0
-          for i in {1..3}; do
-            if opam update -y; then
-              update_success=1
-              break
-            fi
-            sleep 2
-          done
-          if [ $update_success -eq 0 ]; then
-            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
-            opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
-            for i in {1..3}; do
-              if opam update -y; then
-                update_success=1
-                break
-              fi
-              sleep 2
-            done
-          fi
-          if [ $update_success -eq 0 ]; then
-            exit 1
-          fi
-          installed_pkgs=$(opam list --short)
-          required_pkgs=(
-            "coq=${{ env.COQ_VERSION }}"
-            "coq-stdlib=${{ env.COQ_VERSION }}"
-            "coq-mathcomp-ssreflect=${{ env.MATHCOMP_VERSION }}"
-            "coq-mathcomp-fingroup=${{ env.MATHCOMP_VERSION }}"
-            "coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }}"
-            "coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}"
-            "coq-equations=1.3+8.18"
-            "coq-unimath=20240201"
-            "coq-arith-extra=1.2.0"
-            "coq-geometry=1.0.0"
-            "${{ env.COQ_EXTRA_OPAM }}"
-          )
-          to_install=()
-          for pkg in "${required_pkgs[@]}"; do
-            pkg_name=$(echo "$pkg" | cut -d'=' -f1)
-            if ! echo "$installed_pkgs" | grep -q "^$pkg_name$"; then
-              to_install+=("$pkg")
-            fi
-          done
-          if [ ${#to_install[@]} -gt 0 ]; then
-            install_success=0
-            for i in {1..3}; do
-              if opam install -y --jobs 2 "${to_install[@]}"; then
-                install_success=1
-                break
-              fi
-              sleep 5
-            done
-            if [ $install_success -eq 0 ]; then
-              exit 1
-            fi
-          fi
-          eval $(opam env --switch=default)
-          apt-get update && apt-get install -y --no-install-recommends python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
-          python3 -m venv ${{ env.VENV_PATH }}
-          source ${{ env.VENV_PATH }}/bin/activate
-          pip install --no-cache-dir --timeout 60 reportlab==4.0.9
-          if ! command -v coqc &> /dev/null; then
-            exit 1
-          fi
-          if ! coqc --version | grep -q "${{ env.COQ_VERSION }}"; then
-            exit 1
-          fi
-          if ! opam list | grep -q "coq-mathcomp-ssreflect.*${{ env.MATHCOMP_VERSION }}"; then
-            exit 1
-          fi
-          if ! command -v python &> /dev/null; then
-            exit 1
-          fi
-      - name: 扫描项目结构
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          echo "=== 项目结构扫描 ==="
-          find . -type d -name ".*" -prune -o -type d -print | sort
-          echo "=== 所有.v文件 ==="
-          find . -name "*.v" -type f | head -30
-          echo "=== 检查关键目录 ==="
-          for dir in SelfContainedLib theories CaseA_SetTheory CS_Null Quantum DynamicSystem Toolchain Engineering Test; do
-            if [ -d "$dir" ]; then
-              echo "✓ 目录存在: $dir"
-              find "$dir" -name "*.v" | head -5
-            else
-              echo "✗ 目录缺失: $dir"
-            fi
-          done
-      - name: 优化CoqProject配置
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          echo "优化CoqProject配置..."
-          if [ -f "CoqProject" ]; then
-            echo "原始CoqProject内容:"
-            cat CoqProject
-            echo "提取有效编译指令..."
-            grep -E "^-R|^-Q|^-I|^[a-zA-Z].*\.v$" CoqProject | grep -v "^#" > CoqProject.clean
-            echo "添加编译参数..."
-            echo "-arg -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated" >> CoqProject.clean
-            echo "-arg -native-compiler yes" >> CoqProject.clean
-            echo "-arg -q" >> CoqProject.clean
-            echo "-arg -async-proofs on" >> CoqProject.clean
-            mv CoqProject.clean CoqProject
-            echo "优化后的CoqProject:"
-            cat CoqProject
-          else
-            echo "未找到CoqProject，创建基础配置"
-            echo "-R . FRF" > CoqProject
-            find . -name "*.v" -type f >> CoqProject
-          fi
-      - name: 生成验证Makefile
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
-          echo "生成Makefile..."
-          if [ -f "CoqProject" ]; then
-            echo "使用CoqProject生成Makefile"
-            coq_makefile -f CoqProject -o Makefile
-          fi
-          if [ $? -ne 0 ] || [ ! -f "Makefile" ]; then
-            echo "CoqProject方法失败，创建通用Makefile"
-            cat > Makefile << 'EOF'
-all:
-	find . -name "*.v" -type f -exec coqc -q -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated -async-proofs on {} \;
+-R . FRF
+-R SelfContainedLib FRF.SelfContainedLib
+-R theories FRF.Theories
+-R CaseA_SetTheory FRF.CaseA_SetTheory
+-R CS_Null FRF.CS_Null
+-R Quantum FRF.Quantum
+-R DynamicSystem FRF.DynamicSystem
+-R Toolchain FRF.Toolchain
+-R Test FRF.Test
 
-clean:
-	find . -name "*.vo" -delete
-	find . -name "*.glob" -delete
-EOF
-          fi
-          echo "Makefile内容:"
-          cat Makefile
-      - name: 执行分层验证
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
-          mkdir -p ${{ env.REPORT_DIR }}
-          echo "开始分层验证..."
-          export COQPATH="${{ github.workspace }}"
-          compile_success=0
-          total_files=0
-          compiled_files=0
-          echo "=== 验证基础层 ===" > ${{ env.REPORT_DIR }}/verification.log
-          for dir in SelfContainedLib theories CaseA_SetTheory; do
-            if [ -d "$dir" ]; then
-              echo "验证目录: $dir"
-              for v_file in $(find "$dir" -name "*.v" -type f); do
-                total_files=$((total_files + 1))
-                echo "编译: $v_file"
-                if coqc -q -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated -async-proofs on "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/compile.log; then
-                  compiled_files=$((compiled_files + 1))
-                  echo "✓ $v_file" >> ${{ env.REPORT_DIR }}/verification.log
-                else
-                  echo "✗ $v_file" >> ${{ env.REPORT_DIR }}/verification.log
-                fi
-              done
-            fi
-          done
-          echo "=== 验证核心层 ===" >> ${{ env.REPORT_DIR }}/verification.log
-          for dir in CS_Null Quantum; do
-            if [ -d "$dir" ]; then
-              echo "验证目录: $dir"
-              for v_file in $(find "$dir" -name "*.v" -type f); do
-                total_files=$((total_files + 1))
-                echo "编译: $v_file"
-                if coqc -q -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated -async-proofs on "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/compile.log; then
-                  compiled_files=$((compiled_files + 1))
-                  echo "✓ $v_file" >> ${{ env.REPORT_DIR }}/verification.log
-                else
-                  echo "✗ $v_file" >> ${{ env.REPORT_DIR }}/verification.log
-                fi
-              done
-            fi
-          done
-          echo "=== 验证扩展层 ===" >> ${{ env.REPORT_DIR }}/verification.log
-          for dir in DynamicSystem Toolchain Engineering Test; do
-            if [ -d "$dir" ]; then
-              echo "验证目录: $dir"
-              for v_file in $(find "$dir" -name "*.v" -type f); do
-                total_files=$((total_files + 1))
-                echo "编译: $v_file"
-                if coqc -q -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated -async-proofs on "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/compile.log; then
-                  compiled_files=$((compiled_files + 1))
-                  echo "✓ $v_file" >> ${{ env.REPORT_DIR }}/verification.log
-                else
-                  echo "✗ $v_file" >> ${{ env.REPORT_DIR }}/verification.log
-                fi
-              done
-            fi
-          done
-          echo "总文件数: $total_files, 成功编译: $compiled_files"
-          if [ $compiled_files -eq 0 ]; then
-            echo "没有文件成功编译"
-            exit 1
-          fi
-          if [ $compiled_files -lt $((total_files / 2)) ]; then
-            echo "编译成功率低于50%"
-            exit 1
-          fi
-      - name: 生成验证报告
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
-          total_files=$(find . -name "*.v" | wc -l)
-          success_files=$(find . -name "*.vo" | wc -l)
-          echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/report.md
-          echo "验证时间: $(date)" >> ${{ env.REPORT_DIR }}/report.md
-          echo "Coq版本: $(coqc --version | head -1)" >> ${{ env.REPORT_DIR }}/report.md
-          echo "总文件数: $total_files" >> ${{ env.REPORT_DIR }}/report.md
-          echo "成功验证: $success_files" >> ${{ env.REPORT_DIR }}/report.md
-          echo "验证率: $((success_files * 100 / total_files))%" >> ${{ env.REPORT_DIR }}/report.md
-          echo "## 已验证模块" >> ${{ env.REPORT_DIR }}/report.md
-          find . -name "*.vo" -type f >> ${{ env.REPORT_DIR }}/report.md
-          echo "## 详细日志" >> ${{ env.REPORT_DIR }}/report.md
-          cat ${{ env.REPORT_DIR }}/verification.log >> ${{ env.REPORT_DIR }}/report.md
-      - name: 归档验证结果
-        uses: actions/upload-artifact@v4
-        with:
-          name: frf-verification-${{ github.sha }}
-          path: |
-            ${{ env.REPORT_DIR }}/*
-            **/*.vo
-            **/*.glob
-            Makefile
-            CoqProject
-          retention-days: 30
-      - name: 验证成功
-        if: success()
-        run: echo "FRF 2.0 验证成功完成"
-      - name: 验证失败
-        if: failure()
-        run: echo "FRF 2.0 验证失败"
+-arg -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated
+-arg -native-compiler yes
+-arg -q
+-arg -async-proofs on
+
+SelfContainedLib/Algebra.v
+SelfContainedLib/Category.v
+SelfContainedLib/Geometry.v
+
+theories/FRF_MetaTheory.v
+theories/FRF_Comparative.v
+theories/FRF_PhilosophicalValidation.v
+theories/ChurchZero.v
+theories/ChurchNumerals.v
+theories/CaseA_SetTheory.v
+theories/CaseB_Algebra.v
+theories/CaseB_Algebra_SelfContained.v
+theories/CaseC_TypeTheory.v
+theories/CaseD_CategoryTheory.v
+theories/CaseD_Category_SelfContained.v
+theories/CaseF_Logic.v
+
+CS_Null/RustNull.v
+CS_Null/CxxNull.v
+CS_Null/JavaNull.v
+CS_Null/PythonNull.v
+CS_Null/MathNull.v
+CS_Null/FRF_CS_Null.v
+
+Quantum/QFT_FRF.v
+Quantum/CaseE_QuantumVacuum.v
+Quantum/CurvedSpacetimeQFT.v
+
+DynamicSystem/TimeVaryingSystem.v
+DynamicSystem/Utils/Serialization.v
+DynamicSystem/BlockchainSystem.v
+DynamicSystem/ControlSystem.v
+DynamicSystem/DistributedSystem.v
+
+Toolchain/FRF_to_Agda.v
+Toolchain/FRF_to_Isabelle.v
+Toolchain/FRF_to_Lean.v
+
+Test/Test_FRF_MetaTheory.v
+Test/Test_QuantumVacuum.v
+Test/Test_BlockchainSystem.v
