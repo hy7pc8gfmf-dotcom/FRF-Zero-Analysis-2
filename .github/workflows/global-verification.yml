@@ -13,13 +13,12 @@ on:
         description: '启用调试模式（增加日志详情）'
         type: boolean
         default: false
-
 jobs:
   global-formal-verification:
     runs-on: ubuntu-latest
     container:
       image: coqorg/coq:8.18.0
-      options: --user root --network-alias coq-env
+      options: --network-alias coq-env  # 移除--user root，使用镜像默认opam用户
     timeout-minutes: 180
     env:
       MATHCOMP_VERSION: "1.18.0"
@@ -28,38 +27,25 @@ jobs:
       COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
-      TEMP_DIR: "/__w/_temp/_runner_file_commands"
-      OPAM_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/opam-repository/"
-      COQ_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/"
-      OPAM_FALLBACK_MIRROR: "https://opam.ocaml.org/"
-      COQ_FALLBACK_MIRROR: "https://coq.inria.fr/opam/released/"
       VENV_PATH: "${{ github.workspace }}/.venv"
       DEBUG_MODE: ${{ github.event.inputs.debug_mode || 'false' }}
-
     steps:
-      - name: 环境预检查
+      - name: 环境预检查（适配默认用户）
         run: |
           echo "📊 系统信息：$(uname -a)"
           echo "📦 容器镜像：$(cat /etc/issue)"
-          echo "💾 磁盘空间：$(df -h /__w)"
-          echo "🔧 内核版本：$(uname -r)"
+          echo "💾 磁盘空间：$(df -h ${{ github.workspace }})"
+          echo "🔧 当前用户：$(whoami) (UID: $(id -u), GID: $(id -g))"
           echo "✅ 环境预检查完成"
 
-      - name: 修复目录权限（安全模式）
-        run: |
-          # 仅对必要目录设置最小权限
-          mkdir -p ${{ env.TEMP_DIR }} ~/.opam ~/.cache/opam ${{ github.workspace }}
-          chown -R $(id -u):$(id -g) /__w/_temp/ ~/.opam ~/.cache/opam ${{ github.workspace }}
-          chmod -R 755 /__w/_temp/ ~/.opam ~/.cache/opam ${{ github.workspace }}
-          echo "✅ 目录权限修复完成"
-
-      - name: 检出代码仓库（增强版）
-        uses: actions/checkout@v4  # 升级到最新版checkout
+      - name: 检出代码仓库（解决权限冲突）
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: 'recursive'
-          lfs: true  # 支持LFS文件
-          persist-credentials: false
+          lfs: true
+          # 移除persist-credentials=false，使用默认配置避免权限冲突
+          show-progress: ${{ env.DEBUG_MODE == 'true' && 'true' || 'false' }}
 
       - name: 子模块完整性校验
         run: |
@@ -69,13 +55,19 @@ jobs:
           fi
           echo "✅ 子模块完整性校验通过"
 
-      - name: 初始化opam环境（增强版）
+      - name: 初始化基础目录（避免权限问题）
         run: |
-          opam --version || echo "⚠️ opam未预装"
-          opam init --disable-sandboxing -y --no-setup --reinit || {
-            echo "❌ opam初始化失败"
-            exit 1
-          }
+          # 仅创建当前用户有权限的目录，不操作runner临时目录
+          mkdir -p ${{ env.REPORT_DIR }} ${{ env.VENV_PATH }}
+          # 确保工作目录可写
+          chmod -R 755 ${{ github.workspace }}
+          echo "✅ 基础目录初始化完成"
+
+      - name: 初始化opam环境（适配默认用户）
+        run: |
+          opam --version
+          # 非root用户无需--disable-sandboxing，使用默认配置
+          opam init -y --no-setup --reinit
           eval $(opam env --switch=default)
           echo "✅ opam环境初始化完成"
           echo "📌 当前opam版本：$(opam --version)"
@@ -215,7 +207,7 @@ jobs:
               local attempt=1
               while [ $attempt -le $max_attempts ]; do
                 echo "🔧 第$attempt次尝试安装依赖..."
-                if timeout 900 opam install -y --jobs 2 --no-depexts "${to_install[@]}"; then  # 15分钟超时
+                if timeout 900 opam install -y --jobs 2 "${to_install[@]}"; then  # 15分钟超时
                   return 0
                 fi
                 attempt=$((attempt + 1))
@@ -236,7 +228,7 @@ jobs:
           fi
 
           # 验证Python环境
-          apt-get update && apt-get install -y --no-install-recommends python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pip python3-venv && sudo rm -rf /var/lib/apt/lists/*
           python3 -m venv ${{ env.VENV_PATH }}
           source ${{ env.VENV_PATH }}/bin/activate
           pip install --no-cache-dir --timeout 60 reportlab==4.0.9
@@ -257,7 +249,7 @@ jobs:
           
           [ -f "CoqProject" ] || { echo "❌ 缺少CoqProject"; exit 1; }
           
-          # 生成Makefile（带调试日志）
+          # 生成Makefile（不带多余变量，避免解析错误）
           if [ -f "Makefile.template" ]; then
             coq_makefile -f CoqProject -o Makefile -extra Makefile.template COQC=coqc || {
               echo "❌ 生成Makefile失败（带模板）"
@@ -283,7 +275,6 @@ jobs:
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          mkdir -p ${{ env.REPORT_DIR }}
           
           # 动态调整并行数（避免资源耗尽）
           cpu_cores=$(nproc)
@@ -337,7 +328,6 @@ jobs:
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          mkdir -p ${{ env.REPORT_DIR }}
           
           # 生成详细报告
           cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
