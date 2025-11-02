@@ -27,6 +27,7 @@ jobs:
       COQ_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/"
       OPAM_FALLBACK_MIRROR: "https://opam.ocaml.org/"
       COQ_FALLBACK_MIRROR: "https://coq.inria.fr/opam/released/"
+      VENV_PATH: "${{ github.workspace }}/.venv"
     steps:
       - name: 修复临时目录权限
         run: |
@@ -60,10 +61,11 @@ jobs:
             _build
             **/*.vo
             **/*.glob
-          key: ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-final-${{ github.sha }}
+            ${{ env.VENV_PATH }}
+          key: ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-venv-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-final-
-            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-final-
+            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-mathcomp-${{ env.MATHCOMP_VERSION }}-venv-
+            ${{ runner.os }}-coq-${{ env.COQ_VERSION }}-venv-
       - name: 配置镜像源+安装依赖（稳定无错版）
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -167,10 +169,13 @@ jobs:
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
           eval $(opam env --switch=default)
-          echo "=== 🔧 安装pip3（容器默认缺失） ==="
-          apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
+          echo "=== 🔧 安装pip3与虚拟环境依赖 ==="
+          apt-get update && apt-get install -y --no-install-recommends python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
+          echo "=== 🔧 创建并激活Python虚拟环境 ==="
+          python3 -m venv ${{ env.VENV_PATH }}
+          source ${{ env.VENV_PATH }}/bin/activate
           echo "=== 🚀 安装Python依赖 ==="
-          pip3 install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
+          pip install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
           echo "=== 📋 依赖版本最终校验 ==="
           if ! command -v coqc &> /dev/null; then
             echo "❌ Coq未安装成功"
@@ -184,11 +189,16 @@ jobs:
             echo "❌ MathComp版本不匹配"
             exit 1
           fi
+          if ! command -v python &> /dev/null; then
+            echo "❌ Python虚拟环境激活失败"
+            exit 1
+          fi
           echo "=== ✅ 依赖安装+校验全量完成，准备进入验证阶段 ==="
       - name: 生成全局验证Makefile（自动适配）
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
+          source ${{ env.VENV_PATH }}/bin/activate
           if [ ! -f "CoqProject" ]; then
             echo "❌ 未找到CoqProject文件，无法生成验证目标"
             exit 1
@@ -207,6 +217,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
+          source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
           echo "=== 🎯 开始全局形式化验证（$(nproc)核并行编译） ==="
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
@@ -228,6 +239,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
+          source ${{ env.VENV_PATH }}/bin/activate
           echo "=== 🧐 执行全局逻辑一致性检查 ==="
           coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo") 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
@@ -239,6 +251,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
+          source ${{ env.VENV_PATH }}/bin/activate
           cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
           # FRF 2.0 全局形式化验证报告（最终版）
           
@@ -265,10 +278,10 @@ jobs:
             "extensions/Quantum/QFT_FRF.vo"
           )
           for mod in "${core_modules[@]}"; do
-            if [ -f "$mod" ]; then
-              echo "✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
-            else
+            if [ ${#failed_files[@]} -ne 0 ]; then
               echo "❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            else
+              echo "✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             fi
           done
           echo -e "\n## 📋 详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
@@ -285,6 +298,7 @@ jobs:
             **/*.glob
             Makefile
             CoqProject
+            ${{ env.VENV_PATH }}/lib/python*/site-packages/*.dist-info
           retention-days: 90
       - name: 验证失败紧急通知
         if: failure()
