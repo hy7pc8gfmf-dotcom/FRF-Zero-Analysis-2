@@ -236,9 +236,10 @@ EOF
             echo "❌ Makefile生成失败，未找到输出文件"
             exit 1
           fi
+          # 补全all目标（用4个空格代替\t，避免YAML转义错误；\$转义为\\$）
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
             echo "all: Makefile.coq" >> Makefile
-            echo -e "\t\$(MAKE) -f Makefile.coq all" >> Makefile
+            echo "    \\$(MAKE) -f Makefile.coq all" >> Makefile
           fi
           echo "✅ Makefile生成完成，验证目标就绪"
           echo "=== 编译命令示例（前10行） ==="
