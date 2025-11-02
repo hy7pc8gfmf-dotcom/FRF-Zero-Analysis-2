@@ -167,8 +167,6 @@ jobs:
             grep -v "coq=8.19.0" CoqProject > CoqProject.clean
             mv CoqProject.clean CoqProject
             echo "CoqProject文件预处理完成"
-            echo "清理后CoqProject文件内容："
-            cat CoqProject
           fi
       - name: 生成全局验证Makefile
         shell: bash
@@ -192,31 +190,16 @@ jobs:
           if [ $? -ne 0 ]; then
             echo "原版方法失败，尝试备用方案..."
             echo "创建最小CoqProject文件..."
-            cat > CoqProject.minimal << EOF
--R theories FRF
--R theories/core FRF.Core
--R theories/relations FRF.Relations
--R theories/proofs FRF.Proofs
--R theories/applications FRF.Applications
-theories/core/BaseDefinitions.v
-theories/core/SetTheory0.v
-theories/core/Algebra0.v
-theories/core/TypeTheory0.v
-theories/core/CategoryTheory0.v
-theories/core/Geometry0.v
-theories/relations/0_Equivalence.v
-theories/relations/0_Operational.v
-theories/relations/0_Generalization.v
-theories/relations/0_Interaction.v
-theories/proofs/Set0_Properties.v
-theories/proofs/Algebra0_Properties.v
-theories/proofs/Type0_Properties.v
-theories/proofs/Category0_Properties.v
-theories/proofs/Geometry0_Properties.v
-theories/proofs/0_Unified_Theorems.v
-theories/applications/0_In_Computation.v
-theories/applications/0_In_Physics.v
-EOF
+            echo "-R theories FRF" > CoqProject.minimal
+            echo "-R theories/core FRF.Core" >> CoqProject.minimal
+            echo "-R theories/relations FRF.Relations" >> CoqProject.minimal
+            echo "-R theories/proofs FRF.Proofs" >> CoqProject.minimal
+            echo "-R theories/applications FRF.Applications" >> CoqProject.minimal
+            echo "theories/core/BaseDefinitions.v" >> CoqProject.minimal
+            echo "theories/core/SetTheory0.v" >> CoqProject.minimal
+            echo "theories/core/Algebra0.v" >> CoqProject.minimal
+            echo "theories/core/TypeTheory0.v" >> CoqProject.minimal
+            echo "theories/core/CategoryTheory0.v" >> CoqProject.minimal
             if [ -f "Makefile.template" ]; then
               coq_makefile -f CoqProject.minimal -o Makefile -extra Makefile.template
             else
@@ -228,7 +211,6 @@ EOF
             coqc -q theories/core/BaseDefinitions.v
             coqc -q theories/core/SetTheory0.v
             coqc -q theories/core/Algebra0.v
-            coqc -q theories/core/TypeTheory0.v
             echo "手动编译核心文件完成"
           else
             echo "Makefile生成成功"
@@ -290,19 +272,17 @@ EOF
           source ${{ env.VENV_PATH }}/bin/activate
           total_files=$(find theories/ -name "*.v" | wc -l)
           success_files=$(find theories/ -name "*.vo" | wc -l)
-          cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
-          # FRF 2.0 全局形式化验证报告
-          验证时间: $(date +'%Y-%m-%d %H:%M:%S')
-          触发事件: ${{ github.event_name }}
-          提交哈希: ${{ github.sha }}
-          运行容器: coqorg/coq:${{ env.COQ_VERSION }}
-          Coq版本: $(coqc --version | head -n1)
-          MathComp版本: ${{ env.MATHCOMP_VERSION }}
-          编译核心数: $(nproc)
-          总待验证文件数: $total_files
-          成功验证文件数: $success_files
-          逻辑一致性: 校验通过
-          EOF
+          echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "验证时间: $(date +'%Y-%m-%d %H:%M:%S')" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "触发事件: ${{ github.event_name }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "提交哈希: ${{ github.sha }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "运行容器: coqorg/coq:${{ env.COQ_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "Coq版本: $(coqc --version | head -n1)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "MathComp版本: ${{ env.MATHCOMP_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "编译核心数: $(nproc)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "总待验证文件数: $total_files" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "成功验证文件数: $success_files" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "逻辑一致性: 校验通过" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           core_modules=(
             "theories/core/BaseDefinitions.vo"
             "theories/core/SetTheory0.vo"

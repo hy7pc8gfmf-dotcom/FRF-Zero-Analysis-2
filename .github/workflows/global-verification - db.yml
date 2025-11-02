@@ -289,5 +289,4 @@ jobs:
       - name: 验证失败紧急通知
         shell: bash
         if: failure()
-        run: |
-          echo "FRF 2.0 全局形式化验证失败"
+        run: echo "FRF 2.0 全局形式化验证失败"
