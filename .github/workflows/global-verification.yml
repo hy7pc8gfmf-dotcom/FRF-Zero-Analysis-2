@@ -194,21 +194,34 @@ jobs:
             exit 1
           fi
           echo "=== ✅ 依赖安装+校验全量完成，准备进入验证阶段 ==="
-      - name: 生成全局验证Makefile（自动适配）
+      - name: 校验CoqProject格式（排查根源问题）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           if [ ! -f "CoqProject" ]; then
-            echo "❌ 未找到CoqProject文件，无法生成验证目标"
+            echo "❌ 未找到CoqProject文件"
             exit 1
           fi
-          # 仅保留必要参数，避免多余变量引发解析错误
+          echo "=== 📋 CoqProject文件内容（前20行） ==="
+          head -n 20 CoqProject
+          echo "=== ✅ CoqProject文件存在且格式初步正常 ==="
+      - name: 生成全局验证Makefile（极简无冗余版）
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          eval $(opam env --switch=default)
+          source ${{ env.VENV_PATH }}/bin/activate
+          # 仅保留官方必需参数，杜绝任何额外变量干扰
           if [ -f "Makefile.template" ]; then
             coq_makefile -f CoqProject -o Makefile -extra Makefile.template
           else
             coq_makefile -f CoqProject -o Makefile
+          fi
+          if [ ! -f "Makefile" ]; then
+            echo "❌ Makefile生成失败，未找到输出文件"
+            exit 1
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
             echo "❌ Makefile中未定义全局验证目标 '${{ env.GLOBAL_TARGET }}'"
@@ -309,4 +322,4 @@ jobs:
         if: failure()
         run: |
           echo "❌ FRF 2.0 全局形式化验证失败"
-          echo "📌 失败原因：请查看「归档产物」中的编译日志和一致性检查日志"
+          echo "📌 失败原因：请查看「归档产物」中的编译日志和CoqProject内容"
