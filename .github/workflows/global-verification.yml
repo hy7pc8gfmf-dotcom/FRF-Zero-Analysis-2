@@ -207,10 +207,8 @@ jobs:
           fi
           if [ $? -ne 0 ]; then
             echo "方法3失败，直接创建简单Makefile"
-            cat > Makefile << 'ENDMAKEFILE'
-all:
-	find theories -name "*.v" -exec coqc -q {} \;
-ENDMAKEFILE
+            echo 'all:' > Makefile
+            echo '	find theories -name "*.v" -exec coqc -q {} \;' >> Makefile
             echo "使用简单Makefile"
           else
             echo "Makefile生成成功"
