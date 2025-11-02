@@ -6,45 +6,77 @@ on:
     branches: [ main ]
 
 jobs:
-  global-verification:
+  verify:
     runs-on: ubuntu-latest
     container: coqorg/coq:8.18.0
+    env:
+      COQ_VERSION: 8.18.0
+      MATHCOMP_VERSION: 1.18.0
+      COQ_EXTRA_OPAM: coq-bignums
+      COQPATH: /home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/theories:/home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/lib:/home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/extensions
+      GLOBAL_TARGET: all
+      REPORT_DIR: /home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/verification-reports
+      TEMP_DIR: /__w/_temp/_runner_file_commands
+      OPAM_MAIN_MIRROR: https://mirrors.tuna.tsinghua.edu.cn/opam-repository/
+      COQ_MAIN_MIRROR: https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/
+      OPAM_FALLBACK_MIRROR: https://opam.ocaml.org/
+      COQ_FALLBACK_MIRROR: https://coq.inria.fr/opam/released/
+
     steps:
       - uses: actions/checkout@v4
-      - name: Check Coq Version
+
+      - name: Check Coq version
         run: |
-          if ! coqc --version | grep -q "8.18.0"; then
-            echo "❌ Coq版本不匹配（需8.18.0，当前：$(coqc --version | head -n1)）"
+          if ! coqc --version | grep -q "$COQ_VERSION"; then
+            echo "❌ Coq版本不匹配（需$COQ_VERSION，当前：$(coqc --version | head -n1)）"
             exit 1
           fi
-      - name: Check MathComp Version
+
+      - name: Check MathComp version
         run: |
-          if ! opam list | grep -q "coq-mathcomp-ssreflect.*1.18.0"; then
-            echo "❌ MathComp版本不匹配"
+          if ! opam list | grep -q "coq-mathcomp-ssreflect.*$MATHCOMP_VERSION"; then
+            echo "❌ MathComp版本不匹配（需$MATHCOMP_VERSION）"
             exit 1
           fi
-      - name: Configure OPAM Mirrors
+
+      - name: Validate and set OPAM mirror
         run: |
-          opam repo set-url default https://mirrors.tuna.tsinghua.edu.cn/opam-repository/ || opam repo set-url default https://opam.ocaml.org/
-          opam repo add coq-released https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/ || opam repo add coq-released https://coq.inria.fr/opam/released/
+          if curl --output /dev/null --silent --head --fail "$OPAM_MAIN_MIRROR"; then
+            opam repo set-url default "$OPAM_MAIN_MIRROR"
+          else
+            echo "⚠️ 主镜像不可访问，切换到兜底镜像"
+            opam repo set-url default "$OPAM_FALLBACK_MIRROR"
+          fi
+
+      - name: Validate and set Coq mirror
+        run: |
+          if curl --output /dev/null --silent --head --fail "$COQ_MAIN_MIRROR"; then
+            opam repo add coq-released "$COQ_MAIN_MIRROR" || true
+          else
+            echo "⚠️ Coq主镜像不可访问，切换到兜底镜像"
+            opam repo add coq-released "$COQ_FALLBACK_MIRROR" || true
+          fi
+
       - name: Initialize OPAM
         run: |
-          opam init --disable-sandboxing --bare
+          opam init --disable-sandboxing --no-setup
           opam update -y || (sleep 5 && opam update -y) || (sleep 10 && opam update -y)
-      - name: Install Dependencies
+
+      - name: Install dependencies
         run: |
-          opam install -y coq-mathcomp-ssreflect.1.18.0 coq-bignums
-      - name: Set COQPATH
+          opam install -y "$COQ_EXTRA_OPAM" coq-mathcomp-ssreflect."$MATHCOMP_VERSION"
+          opam env
+
+      - name: Prepare report directory
         run: |
-          echo "COQPATH=/home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/theories:/home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/lib:/home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/extensions" >> $GITHUB_ENV
-      - name: Execute Global Verification
+          mkdir -p "$REPORT_DIR"
+
+      - name: Run global verification
         run: |
-          mkdir -p ${{ env.REPORT_DIR }}
-          coqc -R theories FRF theories/*.v
-          coqchk -Q theories FRF -o ${{ env.REPORT_DIR }}/consistency.check FRF
-        env:
-          REPORT_DIR: /home/runner/work/FRF-Zero-Analysis-2/FRF-Zero-Analysis-2/verification-reports
-      - name: Archive Reports
+          find theories -name "*.v" -print0 | xargs -0 -n1 coqc -R theories FRF
+          coqchk -Q theories FRF -o "$REPORT_DIR/consistency.log" FRF
+
+      - name: Archive verification reports
         uses: actions/upload-artifact@v4
         with:
           name: verification-reports
