@@ -207,10 +207,10 @@ jobs:
           fi
           if [ $? -ne 0 ]; then
             echo "方法3失败，直接创建简单Makefile"
-            cat > Makefile << 'EOF'
+            cat > Makefile << 'ENDMAKEFILE'
 all:
 	find theories -name "*.v" -exec coqc -q {} \;
-EOF
+ENDMAKEFILE
             echo "使用简单Makefile"
           else
             echo "Makefile生成成功"
@@ -328,9 +328,7 @@ EOF
           retention-days: 90
       - name: 验证成功通知
         if: success()
-        run: |
-          echo "FRF 2.0 全局形式化验证成功完成"
+        run: echo "FRF 2.0 全局形式化验证成功完成"
       - name: 验证失败紧急通知
         if: failure()
-        run: |
-          echo "FRF 2.0 全局形式化验证失败"
+        run: echo "FRF 2.0 全局形式化验证失败"
