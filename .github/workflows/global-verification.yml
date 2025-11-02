@@ -170,7 +170,7 @@ jobs:
             if ! grep -q "\-R" CoqProject.fixed; then
               echo "添加必要的路径设置..."
               echo "-R theories FRF" >> CoqProject.fixed
-              echo "-R lib Lib" >> CoqProject.fixed  
+              echo "-R lib Lib" >> CoqProject.fixed
               echo "-R extensions Extensions" >> CoqProject.fixed
             fi
             mv CoqProject.fixed CoqProject
@@ -201,7 +201,7 @@ EOF
           cp CoqProject CoqProject.backup
           echo "尝试使用coq_makefile生成Makefile..."
           if coq_makefile -f CoqProject -o Makefile 2>&1 | tee makefile_gen.log; then
-            echo "✅ coq_makefile成功生成Makefile"
+            echo "coq_makefile成功生成Makefile"
           else
             echo "coq_makefile失败，分析原因..."
             if grep -q "Unknown option" makefile_gen.log; then
@@ -219,36 +219,28 @@ EOF
               mv CoqProject.clean CoqProject
               echo "重新尝试coq_makefile..."
               if coq_makefile -f CoqProject -o Makefile; then
-                echo "✅ 清理后coq_makefile成功"
+                echo "清理后coq_makefile成功"
               else
                 echo "创建备用Makefile..."
                 cat > Makefile << 'MAKEFILE_EOF'
-# 备用Makefile for FRF 2.0 全局验证
 COQC := coqc
 COQDOC := coqdoc
 COQDEBUG := coqchk
-
 COQFLAGS := -R theories FRF -R lib Lib -R extensions Extensions \
             -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated \
             -native-compiler yes \
             -q \
             -async-proofs on
-
 VFILES := $(shell find theories lib extensions -name "*.v")
 VOFILES := $(VFILES:.v=.vo)
 GLOBFILES := $(VFILES:.v=.glob)
-
 all: $(VOFILES)
-
 %.vo: %.v
 	$(COQC) $(COQFLAGS) $<
-
 clean:
 	rm -f $(VOFILES) $(GLOBFILES)
-
 validate: all
 	$(COQDEBUG) -silent -norecursive $(VOFILES)
-
 .PHONY: all clean validate
 MAKEFILE_EOF
                 echo "备用Makefile创建完成"
@@ -256,32 +248,24 @@ MAKEFILE_EOF
             else
               echo "创建备用Makefile..."
               cat > Makefile << 'MAKEFILE_EOF'
-# 备用Makefile for FRF 2.0 全局验证
 COQC := coqc
 COQDOC := coqdoc
 COQDEBUG := coqchk
-
 COQFLAGS := -R theories FRF -R lib Lib -R extensions Extensions \
             -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated \
             -native-compiler yes \
             -q \
             -async-proofs on
-
 VFILES := $(shell find theories lib extensions -name "*.v")
 VOFILES := $(VFILES:.v=.vo)
 GLOBFILES := $(VFILES:.v=.glob)
-
 all: $(VOFILES)
-
 %.vo: %.v
 	$(COQC) $(COQFLAGS) $<
-
 clean:
 	rm -f $(VOFILES) $(GLOBFILES)
-
 validate: all
 	$(COQDEBUG) -silent -norecursive $(VOFILES)
-
 .PHONY: all clean validate
 MAKEFILE_EOF
               echo "备用Makefile创建完成"
@@ -291,9 +275,9 @@ MAKEFILE_EOF
             echo "Makefile生成成功"
             echo "验证Makefile基本结构..."
             if grep -q "all:" Makefile && grep -q "%.vo:" Makefile; then
-              echo "✅ Makefile结构完整"
+              echo "Makefile结构完整"
             else
-              echo "❌ Makefile结构不完整"
+              echo "Makefile结构不完整"
               exit 1
             fi
           else
@@ -311,13 +295,13 @@ MAKEFILE_EOF
           echo "可用Makefile目标："
           make -n | head -20
           if make -j$(nproc) 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log; then
-            echo "✅ 编译成功完成"
+            echo "编译成功完成"
           else
             echo "编译失败，尝试单线程编译..."
             if make 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile-single.log; then
-              echo "✅ 单线程编译成功"
+              echo "单线程编译成功"
             else
-              echo "❌ 编译完全失败"
+              echo "编译完全失败"
               echo "前20个错误："
               grep -i error ${{ env.REPORT_DIR }}/global-compile-single.log | head -20
               exit 1
@@ -328,11 +312,11 @@ MAKEFILE_EOF
           vofiles_count=$(find theories lib extensions -name "*.vo" | wc -l)
           echo "源文件数: $vfiles_count, 编译文件数: $vofiles_count"
           if [ $vfiles_count -gt 0 ] && [ $vofiles_count -eq $vfiles_count ]; then
-            echo "✅ 所有文件编译成功"
+            echo "所有文件编译成功"
           elif [ $vofiles_count -gt 0 ]; then
-            echo "⚠️  部分文件编译成功 ($vofiles_count/$vfiles_count)"
+            echo "部分文件编译成功 ($vofiles_count/$vfiles_count)"
           else
-            echo "❌ 没有文件编译成功"
+            echo "没有文件编译成功"
             exit 1
           fi
       - name: 全局逻辑一致性校验
@@ -344,14 +328,14 @@ MAKEFILE_EOF
           echo "开始逻辑一致性检查..."
           vo_files=$(find theories/ lib/ extensions/ -name "*.vo")
           if [ -z "$vo_files" ]; then
-            echo "❌ 未找到编译产物，跳过逻辑一致性检查"
+            echo "未找到编译产物，跳过逻辑一致性检查"
             exit 1
           fi
           echo "检查 $(echo "$vo_files" | wc -l) 个编译文件..."
           if coqchk -silent -norecursive $vo_files 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log; then
-            echo "✅ 逻辑一致性检查通过"
+            echo "逻辑一致性检查通过"
           else
-            echo "❌ 逻辑一致性检查失败"
+            echo "逻辑一致性检查失败"
           fi
       - name: 生成结构化验证报告
         shell: bash
@@ -362,29 +346,27 @@ MAKEFILE_EOF
           total_files=$(find theories lib extensions -name "*.v" | wc -l)
           compiled_files=$(find theories lib extensions -name "*.vo" | wc -l)
           coqchk_status=$([ -f "${{ env.REPORT_DIR }}/global-coqchk.log" ] && (grep -q "Error" "${{ env.REPORT_DIR }}/global-coqchk.log" && echo "失败" || echo "通过") || echo "未执行")
-          cat > ${{ env.REPORT_DIR }}/SUMMARY.md << 'REPORT_EOF'
-# FRF 2.0 全局形式化验证报告
-
-## 验证概览
-- **验证时间**: $(date +'%Y-%m-%d %H:%M:%S')
-- **触发事件**: ${{ github.event_name }}
-- **提交哈希**: ${{ github.sha }}
-- **运行容器**: coqorg/coq:${{ env.COQ_VERSION }}
-- **Coq版本**: $(coqc --version | head -n1)
-- **MathComp版本**: ${{ env.MATHCOMP_VERSION }}
-- **编译核心数**: $(nproc)
-
-## 验证结果
-- **总待验证文件数**: $total_files
-- **成功验证文件数**: $compiled_files
-- **验证成功率**: $((compiled_files * 100 / total_files))%
-- **逻辑一致性**: $coqchk_status
-
-## 核心模块状态
-REPORT_EOF
+          echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "## 验证概览" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **验证时间**: $(date +'%Y-%m-%d %H:%M:%S')" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **触发事件**: ${{ github.event_name }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **提交哈希**: ${{ github.sha }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **运行容器**: coqorg/coq:${{ env.COQ_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **Coq版本**: $(coqc --version | head -n1)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **MathComp版本**: ${{ env.MATHCOMP_VERSION }}" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **编译核心数**: $(nproc)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "## 验证结果" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **总待验证文件数**: $total_files" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **成功验证文件数**: $compiled_files" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **验证成功率**: $((compiled_files * 100 / total_files))%" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "- **逻辑一致性**: $coqchk_status" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "## 核心模块状态" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           core_modules=(
             "theories/FRF_MetaTheory.vo:FRF_MetaTheory"
-            "theories/Equivalence.vo:Equivalence" 
+            "theories/Equivalence.vo:Equivalence"
             "lib/Algebra.vo:Algebra"
             "extensions/Quantum/QFT_FRF.vo:QFT_FRF"
           )
@@ -397,11 +379,12 @@ REPORT_EOF
               echo "❌ **$mod_name**: 验证失败" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             fi
           done
-          echo -e "\n## 详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "## 详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- [编译日志](global-compile.log)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- [单线程编译日志](global-compile-single.log)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "- [逻辑一致性检查日志](global-coqchk.log)" >> ${{ env.REPORT_DIR }}/SUMMARY.md
-          echo "✅ 验证报告生成完成"
+          echo "验证报告生成完成"
       - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
@@ -417,5 +400,5 @@ REPORT_EOF
       - name: 验证失败紧急通知
         if: failure()
         run: |
-          echo "❌ FRF 2.0 全局形式化验证失败"
+          echo "FRF 2.0 全局形式化验证失败"
           echo "请检查编译日志和逻辑一致性检查日志以获取详细信息"
