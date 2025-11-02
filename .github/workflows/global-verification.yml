@@ -222,7 +222,7 @@ EOF
                 echo "✅ 清理后coq_makefile成功"
               else
                 echo "创建备用Makefile..."
-                cat > Makefile << 'EOF'
+                cat > Makefile << 'MAKEFILE_EOF'
 # 备用Makefile for FRF 2.0 全局验证
 COQC := coqc
 COQDOC := coqdoc
@@ -250,12 +250,12 @@ validate: all
 	$(COQDEBUG) -silent -norecursive $(VOFILES)
 
 .PHONY: all clean validate
-EOF
+MAKEFILE_EOF
                 echo "备用Makefile创建完成"
               fi
             else
               echo "创建备用Makefile..."
-              cat > Makefile << 'EOF'
+              cat > Makefile << 'MAKEFILE_EOF'
 # 备用Makefile for FRF 2.0 全局验证
 COQC := coqc
 COQDOC := coqdoc
@@ -283,7 +283,7 @@ validate: all
 	$(COQDEBUG) -silent -norecursive $(VOFILES)
 
 .PHONY: all clean validate
-EOF
+MAKEFILE_EOF
               echo "备用Makefile创建完成"
             fi
           fi
@@ -362,26 +362,26 @@ EOF
           total_files=$(find theories lib extensions -name "*.v" | wc -l)
           compiled_files=$(find theories lib extensions -name "*.vo" | wc -l)
           coqchk_status=$([ -f "${{ env.REPORT_DIR }}/global-coqchk.log" ] && (grep -q "Error" "${{ env.REPORT_DIR }}/global-coqchk.log" && echo "失败" || echo "通过") || echo "未执行")
-          cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
-          # FRF 2.0 全局形式化验证报告
-          
-          ## 验证概览
-          - **验证时间**: $(date +'%Y-%m-%d %H:%M:%S')
-          - **触发事件**: ${{ github.event_name }}
-          - **提交哈希**: ${{ github.sha }}
-          - **运行容器**: coqorg/coq:${{ env.COQ_VERSION }}
-          - **Coq版本**: $(coqc --version | head -n1)
-          - **MathComp版本**: ${{ env.MATHCOMP_VERSION }}
-          - **编译核心数**: $(nproc)
-          
-          ## 验证结果
-          - **总待验证文件数**: $total_files
-          - **成功验证文件数**: $compiled_files
-          - **验证成功率**: $((compiled_files * 100 / total_files))%
-          - **逻辑一致性**: $coqchk_status
-          
-          ## 核心模块状态
-          EOF
+          cat > ${{ env.REPORT_DIR }}/SUMMARY.md << 'REPORT_EOF'
+# FRF 2.0 全局形式化验证报告
+
+## 验证概览
+- **验证时间**: $(date +'%Y-%m-%d %H:%M:%S')
+- **触发事件**: ${{ github.event_name }}
+- **提交哈希**: ${{ github.sha }}
+- **运行容器**: coqorg/coq:${{ env.COQ_VERSION }}
+- **Coq版本**: $(coqc --version | head -n1)
+- **MathComp版本**: ${{ env.MATHCOMP_VERSION }}
+- **编译核心数**: $(nproc)
+
+## 验证结果
+- **总待验证文件数**: $total_files
+- **成功验证文件数**: $compiled_files
+- **验证成功率**: $((compiled_files * 100 / total_files))%
+- **逻辑一致性**: $coqchk_status
+
+## 核心模块状态
+REPORT_EOF
           core_modules=(
             "theories/FRF_MetaTheory.vo:FRF_MetaTheory"
             "theories/Equivalence.vo:Equivalence" 
