@@ -137,7 +137,7 @@ jobs:
             "coq-mathcomp-fingroup=${{ env.MATHCOMP_VERSION }}"
             "coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }}"
             "coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}"
-            "coq-equations"
+            "coq-equations=1.3+8.18"
             "${{ env.COQ_EXTRA_OPAM }}"
           )
           to_install=()
@@ -204,10 +204,11 @@ jobs:
             echo "❌ 未找到CoqProject文件，无法生成验证目标"
             exit 1
           fi
+          # 明确指定COQC路径和版本，避免环境变量误解析为选项
           if [ -f "Makefile.template" ]; then
-            coq_makefile -f CoqProject -o Makefile -extra Makefile.template
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template COQC=coqc COQ_VERSION=${{ env.COQ_VERSION }} MATHCOMP_VERSION=${{ env.MATHCOMP_VERSION }}
           else
-            coq_makefile -f CoqProject -o Makefile
+            coq_makefile -f CoqProject -o Makefile COQC=coqc COQ_VERSION=${{ env.COQ_VERSION }} MATHCOMP_VERSION=${{ env.MATHCOMP_VERSION }}
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
             echo "❌ Makefile中未定义全局验证目标 '${{ env.GLOBAL_TARGET }}'"
