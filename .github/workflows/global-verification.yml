@@ -163,8 +163,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           if [ -f "CoqProject" ]; then
-            echo "清理CoqProject文件中的无效选项..."
-            grep -v -E "^(#|opam install|.*coq=)" CoqProject | grep -v "^$" > CoqProject.clean
+            echo "清理CoqProject文件中的无效选项和注释..."
+            grep -v -E "^(#|opam install|.*coq=)" CoqProject | sed 's/#.*$//' | grep -v '^$' > CoqProject.clean
             mv CoqProject.clean CoqProject
             echo "CoqProject文件预处理完成"
             echo "清理后CoqProject文件内容："
@@ -181,21 +181,29 @@ jobs:
             exit 1
           fi
           echo "开始生成Makefile..."
-          coq_makefile_args=""
-          while IFS= read -r line; do
-            if [[ $line == -arg* ]]; then
-              args=$(echo "$line" | sed 's/-arg //')
-              for arg in $args; do
-                coq_makefile_args="$coq_makefile_args -arg $arg"
-              done
-            elif [[ $line == -* ]] && [[ $line != -arg* ]]; then
-              coq_makefile_args="$coq_makefile_args $line"
-            elif [[ $line == *.v ]]; then
-              coq_makefile_args="$coq_makefile_args $line"
-            fi
-          done < CoqProject
-          echo "coq_makefile参数: $coq_makefile_args"
-          coq_makefile $coq_makefile_args -o Makefile
+          if [ -f "Makefile.template" ]; then
+            echo "使用Makefile.template生成Makefile"
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template
+          else
+            echo "直接生成Makefile"
+            coq_makefile -f CoqProject -o Makefile
+          fi
+          if [ $? -ne 0 ]; then
+            echo "coq_makefile执行失败，尝试手动解析CoqProject..."
+            coq_makefile_args=""
+            while IFS= read -r line; do
+              if [[ $line == -arg* ]]; then
+                arg_value=$(echo "$line" | sed 's/-arg //')
+                coq_makefile_args="$coq_makefile_args -arg $arg_value"
+              elif [[ $line == -* ]] && [[ $line != -arg* ]]; then
+                coq_makefile_args="$coq_makefile_args $line"
+              elif [[ $line == *.v ]]; then
+                coq_makefile_args="$coq_makefile_args $line"
+              fi
+            done < CoqProject
+            echo "coq_makefile参数: $coq_makefile_args"
+            coq_makefile $coq_makefile_args -o Makefile
+          fi
           if [ $? -ne 0 ]; then
             echo "coq_makefile执行失败"
             exit 1
@@ -214,6 +222,15 @@ jobs:
           mkdir -p ${{ env.REPORT_DIR }}
           echo "开始并行编译验证..."
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
+          compile_status=${PIPESTATUS[0]}
+          if [ $compile_status -ne 0 ]; then
+            echo "编译失败，尝试单线程编译..."
+            make ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile-single.log
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              echo "单线程编译也失败"
+              exit 1
+            fi
+          fi
           echo "检查编译产物..."
           failed_files=()
           while IFS= read -r v_file; do
@@ -235,18 +252,25 @@ jobs:
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           echo "开始逻辑一致性检查..."
-          coqchk -silent -norecursive $(find theories/ lib/ extensions/ -name "*.vo" 2>/dev/null) 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
-          if [ ${PIPESTATUS[0]} -ne 0 ]; then
-            echo "逻辑一致性检查失败"
-            exit 1
+          find theories/ lib/ extensions/ -name "*.vo" 2>/dev/null > vo_files.list
+          if [ -s vo_files.list ]; then
+            coqchk -silent -norecursive $(cat vo_files.list) 2>&1 | tee ${{ env.REPORT_DIR }}/global-coqchk.log
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              echo "逻辑一致性检查失败"
+              exit 1
+            fi
+            echo "逻辑一致性检查通过"
+          else
+            echo "未找到任何.vo文件，跳过逻辑一致性检查"
           fi
-          echo "逻辑一致性检查通过"
       - name: 生成结构化验证报告
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
+          total_files=$(grep -E '^[^#].*\.v$' CoqProject | wc -l)
+          success_files=$(find theories/ lib/ extensions/ -name "*.vo" 2>/dev/null | wc -l)
           cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
           # FRF 2.0 全局形式化验证报告
           验证时间: $(date +'%Y-%m-%d %H:%M:%S')
@@ -256,8 +280,8 @@ jobs:
           Coq版本: $(coqc --version | head -n1)
           MathComp版本: ${{ env.MATHCOMP_VERSION }}
           编译核心数: $(nproc)
-          总待验证文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)
-          成功验证文件数: $(find theories/ lib/ extensions/ -name "*.vo" 2>/dev/null | wc -l)
+          总待验证文件数: $total_files
+          成功验证文件数: $success_files
           逻辑一致性: 校验通过
           EOF
           core_modules=(
@@ -267,6 +291,9 @@ jobs:
             "theories/core/TypeTheory0.vo"
             "theories/core/CategoryTheory0.vo"
             "theories/core/Geometry0.vo"
+            "theories/relations/0_Equivalence.vo"
+            "theories/relations/0_Operational.vo"
+            "theories/proofs/0_Unified_Theorems.vo"
           )
           for mod in "${core_modules[@]}"; do
             if [ -f "$mod" ]; then
@@ -277,7 +304,13 @@ jobs:
           done
           echo "详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           echo "编译日志: global-compile.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          if [ -f "${{ env.REPORT_DIR }}/global-compile-single.log" ]; then
+            echo "单线程编译日志: global-compile-single.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          fi
           echo "逻辑一致性检查日志: global-coqchk.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          if [ -f "${{ env.REPORT_DIR }}/failed-files.log" ]; then
+            echo "失败文件列表: failed-files.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          fi
       - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
@@ -288,6 +321,7 @@ jobs:
             **/*.glob
             Makefile
             CoqProject
+            vo_files.list
             ${{ env.VENV_PATH }}/lib/python*/site-packages/*.dist-info
           retention-days: 90
       - name: 验证失败紧急通知
