@@ -167,6 +167,9 @@ jobs:
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
           eval $(opam env --switch=default)
+          echo "=== 🔧 安装pip3（容器默认缺失） ==="
+          apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
+          echo "=== 🚀 安装Python依赖 ==="
           pip3 install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
           echo "=== 📋 依赖版本最终校验 ==="
           if ! command -v coqc &> /dev/null; then
