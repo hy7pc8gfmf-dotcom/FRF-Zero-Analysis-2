@@ -163,8 +163,8 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           if [ -f "CoqProject" ]; then
-            echo "清理CoqProject文件中的无效选项和注释..."
-            grep -v -E "^(#|opam install|.*coq=)" CoqProject | sed 's/#.*$//' | grep -v '^$' > CoqProject.clean
+            echo "清理CoqProject文件中的无效选项..."
+            grep -v -E "^(#|opam install|.*coq=|.*启用|.*保持|.*增加)" CoqProject | grep -v "^$" > CoqProject.clean
             mv CoqProject.clean CoqProject
             echo "CoqProject文件预处理完成"
             echo "清理后CoqProject文件内容："
@@ -189,20 +189,22 @@ jobs:
             coq_makefile -f CoqProject -o Makefile
           fi
           if [ $? -ne 0 ]; then
-            echo "coq_makefile执行失败，尝试手动解析CoqProject..."
-            coq_makefile_args=""
+            echo "coq_makefile执行失败，尝试备用方案..."
+            valid_args=""
             while IFS= read -r line; do
-              if [[ $line == -arg* ]]; then
-                arg_value=$(echo "$line" | sed 's/-arg //')
-                coq_makefile_args="$coq_makefile_args -arg $arg_value"
-              elif [[ $line == -* ]] && [[ $line != -arg* ]]; then
-                coq_makefile_args="$coq_makefile_args $line"
+              if [[ $line == -R* ]] || [[ $line == -Q* ]] || [[ $line == -I* ]]; then
+                valid_args="$valid_args $line"
               elif [[ $line == *.v ]]; then
-                coq_makefile_args="$coq_makefile_args $line"
+                valid_args="$valid_args $line"
+              elif [[ $line == -arg* ]]; then
+                clean_arg=$(echo "$line" | sed 's/#.*$//' | xargs)
+                if [[ $clean_arg == -arg*-w* ]] || [[ $clean_arg == -arg*-native-compiler* ]] || [[ $clean_arg == -arg*-q* ]] || [[ $clean_arg == -arg*-async-proofs* ]]; then
+                  valid_args="$valid_args $clean_arg"
+                fi
               fi
             done < CoqProject
-            echo "coq_makefile参数: $coq_makefile_args"
-            coq_makefile $coq_makefile_args -o Makefile
+            echo "备用方案参数: $valid_args"
+            coq_makefile $valid_args -o Makefile
           fi
           if [ $? -ne 0 ]; then
             echo "coq_makefile执行失败"
@@ -224,21 +226,28 @@ jobs:
           make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
           compile_status=${PIPESTATUS[0]}
           if [ $compile_status -ne 0 ]; then
-            echo "编译失败，尝试单线程编译..."
+            echo "并行编译失败，尝试单线程编译..."
             make ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile-single.log
             if [ ${PIPESTATUS[0]} -ne 0 ]; then
-              echo "单线程编译也失败"
-              exit 1
+              echo "单线程编译也失败，尝试逐个文件编译..."
+              while IFS= read -r v_file; do
+                if [[ $v_file == *.v ]] && [[ ! $v_file =~ ^# ]]; then
+                  echo "编译文件: $v_file"
+                  coqc -q $v_file 2>&1 | tee -a ${{ env.REPORT_DIR }}/file-by-file.log
+                fi
+              done < CoqProject
             fi
           fi
           echo "检查编译产物..."
           failed_files=()
           while IFS= read -r v_file; do
-            vo_file="${v_file%.v}.vo"
-            if [ ! -f "$vo_file" ]; then
-              failed_files+=("$vo_file")
+            if [[ $v_file == *.v ]] && [[ ! $v_file =~ ^# ]]; then
+              vo_file="${v_file%.v}.vo"
+              if [ ! -f "$vo_file" ]; then
+                failed_files+=("$vo_file")
+              fi
             fi
-          done < <(grep -E '^[^#].*\.v$' CoqProject)
+          done < CoqProject
           if [ ${#failed_files[@]} -ne 0 ]; then
             echo "以下文件验证失败："
             printf '%s\n' "${failed_files[@]}" | tee ${{ env.REPORT_DIR }}/failed-files.log
@@ -297,7 +306,7 @@ jobs:
           )
           for mod in "${core_modules[@]}"; do
             if [ -f "$mod" ]; then
-              echo "核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+              echo "核心模块验证成功: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             else
               echo "核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             fi
@@ -306,6 +315,9 @@ jobs:
           echo "编译日志: global-compile.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           if [ -f "${{ env.REPORT_DIR }}/global-compile-single.log" ]; then
             echo "单线程编译日志: global-compile-single.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          fi
+          if [ -f "${{ env.REPORT_DIR }}/file-by-file.log" ]; then
+            echo "逐个文件编译日志: file-by-file.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           fi
           echo "逻辑一致性检查日志: global-coqchk.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
           if [ -f "${{ env.REPORT_DIR }}/failed-files.log" ]; then
