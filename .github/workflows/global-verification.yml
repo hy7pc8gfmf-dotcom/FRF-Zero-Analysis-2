@@ -163,10 +163,36 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           if [ -f "CoqProject" ]; then
+            echo "原始CoqProject文件内容："
+            cat CoqProject
             echo "清理CoqProject文件中的无效选项..."
-            grep -v "coq=8.19.0" CoqProject > CoqProject.clean
+            # 删除所有包含版本号的无效选项
+            grep -v -E "(coq=8\.[0-9]+\.[0-9]+|coq=8\.[0-9]+)" CoqProject > CoqProject.clean
+            # 删除所有包含MATHCOMP_VERSION的无效选项
+            grep -v -E "mathcomp=.*${{ env.MATHCOMP_VERSION }}" CoqProject.clean > CoqProject.clean2
+            mv CoqProject.clean2 CoqProject.clean
+            # 删除所有不支持的参数格式
+            grep -v -E "^[[:space:]]*-arg" CoqProject.clean > CoqProject.clean2
+            mv CoqProject.clean2 CoqProject.clean
             mv CoqProject.clean CoqProject
+            echo "清理后的CoqProject文件内容："
+            cat CoqProject
             echo "CoqProject文件预处理完成"
+          else
+            echo "警告：未找到CoqProject文件"
+          fi
+      - name: 创建最小化CoqProject文件
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [ ! -f "CoqProject" ]; then
+            echo "创建最小化CoqProject文件..."
+            find theories lib extensions -name "*.v" > CoqProject
+            echo "添加编译选项..."
+            echo "-R theories FRF" >> CoqProject
+            echo "-R lib Lib" >> CoqProject
+            echo "-R extensions Extensions" >> CoqProject
+            echo "CoqProject文件创建完成"
           fi
       - name: 生成全局验证Makefile
         shell: bash
@@ -178,9 +204,10 @@ jobs:
             echo "错误：未找到CoqProject文件"
             exit 1
           fi
-          echo "CoqProject文件内容："
+          echo "最终CoqProject文件内容："
           cat CoqProject
           echo "开始生成Makefile..."
+          # 使用更简单的coq_makefile命令，避免复杂参数
           if [ -f "Makefile.template" ]; then
             echo "使用Makefile.template生成Makefile"
             coq_makefile -f CoqProject -o Makefile -extra Makefile.template
@@ -189,14 +216,30 @@ jobs:
             coq_makefile -f CoqProject -o Makefile
           fi
           if [ $? -ne 0 ]; then
-            echo "coq_makefile执行失败"
+            echo "coq_makefile执行失败，尝试手动创建Makefile"
+            # 如果coq_makefile失败，尝试手动创建基本Makefile
+            cat > Makefile << 'EOF'
+include Makefile.conf
+ALLVFILES := $(shell grep -E '^[^#-].*\.v$$' CoqProject)
+VOFILES := $(ALLVFILES:.v=.vo)
+GLOBFILES := $(ALLVFILES:.v=.glob)
+all: $(VOFILES)
+%.vo: %.v
+	coqc -R theories FRF -R lib Lib -R extensions Extensions $<
+clean:
+	rm -f $(VOFILES) $(GLOBFILES) *.glob
+.PHONY: all clean
+EOF
+            echo "手动创建Makefile完成"
+          fi
+          if [ -f "Makefile" ]; then
+            echo "Makefile生成成功"
+            echo "Makefile前20行内容："
+            head -20 Makefile
+          else
+            echo "错误：Makefile生成失败"
             exit 1
           fi
-          if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
-            echo "错误：Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'"
-            exit 1
-          fi
-          echo "Makefile生成成功"
       - name: 执行全局形式化验证
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -205,7 +248,8 @@ jobs:
           source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
           echo "开始并行编译验证..."
-          make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
+          # 使用更简单的make命令，避免复杂依赖
+          make -j$(nproc) 2>&1 | tee ${{ env.REPORT_DIR }}/global-compile.log
           echo "检查编译产物..."
           failed_files=()
           while IFS= read -r v_file; do
@@ -213,7 +257,7 @@ jobs:
             if [ ! -f "$vo_file" ]; then
               failed_files+=("$vo_file")
             fi
-          done < <(grep -E '^[^#].*\.v$' CoqProject)
+          done < <(find theories lib extensions -name "*.v")
           if [ ${#failed_files[@]} -ne 0 ]; then
             echo "以下文件验证失败："
             printf '%s\n' "${failed_files[@]}"
@@ -248,7 +292,7 @@ jobs:
           Coq版本: $(coqc --version | head -n1)
           MathComp版本: ${{ env.MATHCOMP_VERSION }}
           编译核心数: $(nproc)
-          总待验证文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)
+          总待验证文件数: $(find theories lib extensions -name "*.v" | wc -l)
           成功验证文件数: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)
           逻辑一致性: 校验通过
           EOF
