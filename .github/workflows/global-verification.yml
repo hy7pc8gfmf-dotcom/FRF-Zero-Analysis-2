@@ -23,7 +23,7 @@ jobs:
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
       TEMP_DIR: "/__w/_temp/_runner_file_commands"
-      OPAM_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/opam/"
+      OPAM_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/opam-repository/"
       COQ_MAIN_MIRROR: "https://mirrors.tuna.tsinghua.edu.cn/coq-opam/released/"
       OPAM_FALLBACK_MIRROR: "https://opam.ocaml.org/"
       COQ_FALLBACK_MIRROR: "https://coq.inria.fr/opam/released/"
@@ -69,29 +69,43 @@ jobs:
         run: |
           eval $(opam env --switch=default)
           opam repo list --all-switches
-          echo "=== 🔧 尝试直接更新默认仓库URL ==="
-          if opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches; then
-            echo "=== ✅ 主镜像源URL更新成功 ==="
+          echo "=== 🔧 验证主镜像URL有效性 ==="
+          if curl --head --silent --fail ${{ env.OPAM_MAIN_MIRROR }}index.tar.gz > /dev/null; then
+            echo "=== ✅ 主镜像URL可访问 ==="
+            opam repository set-url default ${{ env.OPAM_MAIN_MIRROR }} --all-switches || {
+              echo "=== ⚠️ 设置主镜像失败，尝试移除后添加 ==="
+              opam repo remove default --all-switches || true
+              opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
+            }
           else
-            echo "=== ⚠️  更新失败，尝试移除后重新添加 ==="
-            opam repo remove default --all-switches || true
-            opam repo add default ${{ env.OPAM_MAIN_MIRROR }} --all-switches
+            echo "=== ⚠️ 主镜像URL不可访问，直接切换到兜底镜像 ==="
+            opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches || {
+              opam repo remove default --all-switches || true
+              opam repo add default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
+            }
           fi
           echo "=== 🔧 配置Coq仓库 ==="
-          if opam repo list | grep -q "coq-released"; then
-            opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+          if curl --head --silent --fail ${{ env.COQ_MAIN_MIRROR }}index.tar.gz > /dev/null; then
+            if opam repo list | grep -q "coq-released"; then
+              opam repository set-url coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+            else
+              opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+            fi
           else
-            opam repo add coq-released ${{ env.COQ_MAIN_MIRROR }} --all-switches
+            echo "=== ⚠️ Coq主镜像不可访问，切换到Coq兜底镜像 ==="
+            if opam repo list | grep -q "coq-released"; then
+              opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            else
+              opam repo add coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
+            fi
           fi
-          echo "=== 🔧 尝试更新仓库 ==="
-          if opam update -y --retry 10; then
-            echo "=== ✅ 主镜像源更新成功 ==="
-          else
-            echo "=== ⚠️  主镜像源失败，切换到兜底镜像源 ==="
+          echo "=== 🔧 执行仓库更新 ==="
+          opam update -y --retry 5 || {
+            echo "=== ⚠️ 更新失败，重试兜底镜像 ==="
             opam repository set-url default ${{ env.OPAM_FALLBACK_MIRROR }} --all-switches
             opam repository set-url coq-released ${{ env.COQ_FALLBACK_MIRROR }} --all-switches
-            opam update -y --retry 10 || { echo "❌ 兜底镜像源也失败"; exit 1; }
-          fi
+            opam update -y --retry 5 || { echo "❌ 兜底镜像更新也失败"; exit 1; }
+          }
           installed_pkgs=$(opam list --short)
           required_pkgs=(
             "coq=${{ env.COQ_VERSION }}"
@@ -115,7 +129,7 @@ jobs:
           done
           if [ ${#to_install[@]} -gt 0 ]; then
             echo "=== 🚀 开始安装依赖 ==="
-            opam install -y --retry 10 --jobs 2 "${to_install[@]}"
+            opam install -y --retry 5 --jobs 2 "${to_install[@]}"
           else
             echo "=== ✅ 所有依赖已完整安装，无需额外操作 ==="
           fi
