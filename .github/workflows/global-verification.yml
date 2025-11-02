@@ -204,11 +204,11 @@ jobs:
             echo "❌ 未找到CoqProject文件，无法生成验证目标"
             exit 1
           fi
-          # 明确指定COQC路径和版本，避免环境变量误解析为选项
+          # 仅保留必要参数，避免多余变量引发解析错误
           if [ -f "Makefile.template" ]; then
-            coq_makefile -f CoqProject -o Makefile -extra Makefile.template COQC=coqc COQ_VERSION=${{ env.COQ_VERSION }} MATHCOMP_VERSION=${{ env.MATHCOMP_VERSION }}
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template
           else
-            coq_makefile -f CoqProject -o Makefile COQC=coqc COQ_VERSION=${{ env.COQ_VERSION }} MATHCOMP_VERSION=${{ env.MATHCOMP_VERSION }}
+            coq_makefile -f CoqProject -o Makefile
           fi
           if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
             echo "❌ Makefile中未定义全局验证目标 '${{ env.GLOBAL_TARGET }}'"
