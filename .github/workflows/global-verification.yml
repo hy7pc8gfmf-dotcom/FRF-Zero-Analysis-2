@@ -175,7 +175,7 @@ jobs:
           python3 -m venv ${{ env.VENV_PATH }}
           source ${{ env.VENV_PATH }}/bin/activate
           echo "=== 🚀 安装Python依赖 ==="
-          pip install --no-cache-dir --timeout 60 coq-parser==0.1.5 reportlab==4.0.9
+          pip install --no-cache-dir --timeout 60 reportlab==4.0.9
           echo "=== 📋 依赖版本最终校验 ==="
           if ! command -v coqc &> /dev/null; then
             echo "❌ Coq未安装成功"
@@ -278,10 +278,10 @@ jobs:
             "extensions/Quantum/QFT_FRF.vo"
           )
           for mod in "${core_modules[@]}"; do
-            if [ ${#failed_files[@]} -ne 0 ]; then
-              echo "❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
-            else
+            if [ -f "$mod" ]; then
               echo "✅ 核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            else
+              echo "❌ 核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
             fi
           done
           echo -e "\n## 📋 详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
