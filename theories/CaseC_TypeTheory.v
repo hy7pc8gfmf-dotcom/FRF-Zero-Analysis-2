@@ -1,4 +1,4 @@
-# theories/CaseC_TypeTheory.v
+(* # theories/CaseC_TypeTheory.v *)
 (* 模块定位：类型论中“0”（空类型Empty）形式化验证核心（二级场景层），对应论文2.1.1节与附录C，严格遵循“一级基础层→二级场景层→三级集成层”架构，仅依赖一级基础模块，无冗余导入/循环依赖，全量保留类型论核心功能（爆炸原理、空类型初始性等） *)
 Require Import Mathlib.Logic.Empty.
 Require Import Mathlib.Logic.FunctionalExtensionality.

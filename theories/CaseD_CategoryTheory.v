@@ -1,4 +1,4 @@
-# theories/CaseD_CategoryTheory.v
+(* # theories/CaseD_CategoryTheory.v *)
 (* 模块定位：范畴论中“0”（零对象）形式化验证核心（二级场景层），对应论文2.1.4节及附录D
    核心适配：统一IsZeroObject记法（从FRF_CS_Null_Common导入），删除冗余定义，确保与ZeroObjectPreservedByEquivalence.v兼容
    架构依赖：一级基础层（SelfContainedLib/FRF_CS_Null_Common/FRF_MetaTheory）→ 本模块，无循环依赖

@@ -1,4 +1,4 @@
-# theories/CaseB_Algebra.v
+(* # theories/CaseB_Algebra.v *)
 (* 模块定位：FRF 2.0 代数场景核心（二级核心层），验证“0”（幺半群/群单位元）的唯一性、功能角色及跨系统等价性，
    整合核心：1. 融合两版本核心功能（代数基础+FRF对接+量子适配+群结构）；2. 显式声明FunctionalExtensionality公理依赖；3. 去重统一符号；4. 全量保留必要功能
    依赖约束：仅一级基础层（SelfContainedLib/FRF_MetaTheory）+ Mathlib基础公理+QFT_FRF适配层，无循环依赖
@@ -26,7 +26,7 @@ Open Scope R_scope.
 Open Scope nat_scope.
 
 (* ======================== 定义前置（形式化完备，无重复，依赖均为已证定义） ======================== *)
-### 1. 核心代数结构（复用基础层定义，整合两版本实例，无冗余）
+(* ### 1. 核心代数结构（复用基础层定义，整合两版本实例，无冗余） *)
 (* 1.1 幺半群实例（整合新增版三实例+原版风格，统一结构） *)
 Definition nat_add_monoid : Monoid := {|
   Monoid.carrier := nat;
@@ -136,7 +136,7 @@ Definition QuantumSystem_Algebra : FormalSystem := {|
   FormalSystem.id_right := fun a => let (_, op, [Hid, _]) := a in Hid _;
 |}.
 
-### 2. FRF概念身份（整合两版本，结构统一）
+(* ### 2. FRF概念身份（整合两版本，结构统一） *)
 Definition NatAddMonoid_Identity (z : nat) : ConceptIdentity (algebra_to_frf_system nat_add_monoid) z := {|
   ci_role := monoid_id_functional_role nat_add_monoid;
   ci_rels := [  (* 整合原版关系网络 *)
@@ -154,7 +154,7 @@ Definition NatAddMonoid_Identity (z : nat) : ConceptIdentity (algebra_to_frf_sys
 |}.
 
 (* ======================== 证明前置（显式依赖，无逻辑断层） ======================== *)
-### 1. 公理依赖引理（明确Funext应用，无隐性依赖）
+(* ### 1. 公理依赖引理（明确Funext应用，无隐性依赖） *)
 Lemma monoid_op_funext : ∀ (M : Monoid) (f g : M.(Monoid.carrier) → M.(Monoid.carrier)),
   (∀ a, f a = g a) → f = g.
 Proof.
@@ -163,7 +163,7 @@ Proof.
 Qed.
 Print Assumptions monoid_op_funext. (* 显式追溯依赖 *)
 
-### 2. 基础辅助引理（整合两版本，无重复）
+(* ### 2. 基础辅助引理（整合两版本，无重复） *)
 Lemma monoid_id_both_sides : ∀ (M : Monoid) (a : M.(Monoid.carrier)),
   M.(op) M.(id) (M.(op) a M.(id)) = a.
 Proof.
@@ -174,7 +174,7 @@ Qed.
 Lemma nat_add_id_eq_zero : nat_add_monoid.(id) = 0. Proof. reflexivity. Qed.
 Lemma R_add_id_eq_zero : R_add_monoid.(id) = 0%R. Proof. reflexivity. Qed.
 
-### 3. 量子相关引理（保留原版，无直接依赖）
+(* ### 3. 量子相关引理（保留原版，无直接依赖） *)
 Lemma quantum_inner_pos_def_instance :
   ∃ (ψ φ : QFT_FRF.FockSpace.carrier),
     QFT_FRF.Quantum.(QFT_FRF.inner_pos_def) ψ φ ∧
@@ -206,7 +206,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（证明完备，显式依赖，无Admitted） ======================== *)
-### 1. 幺半群单位元唯一性（整合两版本，显式标注依赖）
+(* ### 1. 幺半群单位元唯一性（整合两版本，显式标注依赖） *)
 Theorem monoid_id_unique : ∀ (M : Monoid) (id1 id2 : M.(Monoid.carrier)),
   (∀ a, M.(op) id1 a = a ∧ M.(op) a id1 = a) ∧
   (∀ a, M.(op) id2 a = a ∧ M.(op) a id2 = a) →
@@ -219,7 +219,7 @@ Proof.
 Qed.
 Print Assumptions monoid_id_unique. (* 输出：仅依赖Monoid公理，无额外隐性依赖 *)
 
-### 2. 自然数加法幺半群单位元唯一性（整合两版本）
+(* ### 2. 自然数加法幺半群单位元唯一性（整合两版本） *)
 Corollary nat_add_monoid_id_unique : ∀ (z : nat),
   (∀ n, nat_add_monoid.(op) z n = n ∧ nat_add_monoid.(op) n z = n) → z = 0.
 Proof.
@@ -228,7 +228,7 @@ Proof.
   rewrite nat_add_id_eq_zero; reflexivity.
 Qed.
 
-### 3. 非平凡幺半群无零对象（保留原版，无修改）
+(* ### 3. 非平凡幺半群无零对象（保留原版，无修改） *)
 Theorem non_trivial_monoid_no_zero_object : ∀ (M : Monoid α),
   (∃ a b : α, a ≠ b) →
   ¬(∃ Z : α, (∀ a : α, M.(op) Z a = Z) ∧ (∀ a : α, M.(op) a Z = Z)).
@@ -239,7 +239,7 @@ Proof.
   rewrite H, H0 in Hab; contradiction.
 Qed.
 
-### 4. FRF功能角色验证（保留新增版，对接元理论）
+(* ### 4. FRF功能角色验证（保留新增版，对接元理论） *)
 Theorem monoid_id_plays_frf_role : ∀ (M : Monoid),
   FRF_MetaTheory.PlaysFunctionalRole (algebra_to_frf_system M) 
     M.(id) 
@@ -274,7 +274,7 @@ Proof.
   |}; auto.
 Defined.
 
-### 5. 跨代数系统功能等价（保留新增版）
+(* ### 5. 跨代数系统功能等价（保留新增版） *)
 Theorem cross_monoid_id_func_equiv : ∀ (M1 M2 : Monoid)
   (f : M1.(Monoid.carrier) → M2.(Monoid.carrier)) (is_iso : IsIsomorphism algebra_cat f),
   f M1.(id) = M2.(id) ↔ 
@@ -284,7 +284,7 @@ Proof.
   split; [intros H_f_id; unfold FRF_MetaTheory.core_feat_equiv, monoid_id_functional_role; split; [apply Permutation_singleton; auto | apply Forall2_singleton; auto] | intros [H_perm H_eq]; unfold monoid_id_functional_role in H_eq; apply Forall2_inv in H_eq; auto; apply H_f_id; auto].
 Qed.
 
-### 6. 量子与群公理无交集（保留原版）
+(* ### 6. 量子与群公理无交集（保留原版） *)
 Theorem quantum_group_axioms_disjoint :
   AxiomSet.inter_empty 
     (map QuantumAxiomAdapter.quantum_axiom_to_generic QuantumSystem_Algebra.(axioms)) 

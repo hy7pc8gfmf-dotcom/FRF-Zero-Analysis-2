@@ -1,4 +1,4 @@
-# theories/CaseF_Logic.v
+(* theories/CaseF_Logic.v *)
 (* 模块定位：FRF 2.0 数学基础层 - 逻辑系统“零”概念形式化验证核心（二级核心层）
    核心目标：形式化直觉主义逻辑⊥、线性逻辑0_⊕/0_⊗，验证FRF三大主张在逻辑领域的普适性
    依赖约束：一级基础层（SelfContainedLib/FRF_MetaTheory/FRF_CS_Null_Common/FRF2_CrossSystem）+ CaseA_SetTheory + Mathlib标准模块
@@ -76,7 +76,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定义（无自引用+接口统一，功能全保留） ======================== *)
-### 1. 直觉主义逻辑系统（⊥为逻辑“零”，核心功能：爆炸原理）
+(* ### 1. 直觉主义逻辑系统（⊥为逻辑“零”，核心功能：爆炸原理）
 Record IntuitionisticLogic : Type := {
   IL_Formula : Type;
   IL_Derivation : IL_Formula → Prop;
@@ -99,7 +99,7 @@ Definition IL_Impl {IL : IntuitionisticLogic} := IL.(IL_Impl) : IL_Formula → I
 Arguments IntuitionisticFalse {_} : clear implicits.
 Arguments IL_Impl {_} _ _ : clear implicits.
 
-### 2. 线性逻辑系统（0_⊕/0_⊗为逻辑“零”，核心功能：吸收律/零化律）
+(* ### 2. 线性逻辑系统（0_⊕/0_⊗为逻辑“零”，核心功能：吸收律/零化律）
 Record LinearLogic : Type := {
   LL_Formula : Type;
   LL_Derivation : LL_Formula → Prop;
@@ -130,7 +130,7 @@ Arguments LinearMultiplicativeZero {_} : clear implicits.
 Arguments LL_Add {_} _ _ : clear implicits.
 Arguments LL_Mul {_} _ _ : clear implicits.
 
-### 3. 功能角色定义（无自引用，符合FRF元理论）
+(* ### 3. 功能角色定义（无自引用，符合FRF元理论）
 Definition il_false_functional_role (IL : IntuitionisticLogic) : FRF_MetaTheory.FunctionalRole := {|
   FRF_MetaTheory.role_id := "Intuitionistic_Logic_Bottom_Role";
   FRF_MetaTheory.core_features := [FRF_MetaTheory.CoreFeature "Explosion_Principle"];
@@ -161,17 +161,17 @@ Definition ll_add_zero_functional_role (LL : LinearLogic) : FRF_MetaTheory.Funct
   FRF_MetaTheory.edge_weight_normalized := eq_refl 0;
 |}.
 
-### 4. 逻辑态射定义（复用范畴论基础，无重复实现）
+(* ### 4. 逻辑态射定义（复用范畴论基础，无重复实现）
 Definition LogicMorphism {IL1 IL2 : IntuitionisticLogic} (A : IL1.(IL_Formula)) (B : IL2.(IL_Formula)) : Type :=
   SelfContainedLib.Category.Morphism (IL1, A) (IL2, B) IntuitionisticLogicSystem.
 Arguments LogicMorphism {_ _} _ _ : clear implicits.
 
-### 5. 直觉主义⊥与Empty类型同构（保留核心映射，证明完备）
+(* ### 5. 直觉主义⊥与Empty类型同构（保留核心映射，证明完备）
 Definition ILFalse_to_Empty {IL : IntuitionisticLogic} : IntuitionisticFalse IL → Empty := fun _ => False_ind Empty.
 Definition Empty_to_ILFalse {IL : IntuitionisticLogic} : Empty → IntuitionisticFalse IL := fun e => False_ind (IntuitionisticFalse IL) e.
 
 (* ======================== 基础引理（补全逻辑，无断层，依赖显式） ======================== *)
-### 1. 直觉主义逻辑基础引理
+(* ### 1. 直觉主义逻辑基础引理
 Lemma il_false_explosion {IL : IntuitionisticLogic} {A : IL.(IL_Formula)} :
   IL_Derivation (IntuitionisticFalse IL) → IL_Derivation A.
 Proof. intros H; apply IL.(IL_ax_false A) in H; exact H. Qed.
@@ -201,7 +201,7 @@ Proof.
   all: intros []; contradiction.
 Qed.
 
-### 2. 线性逻辑基础引理
+(* ### 2. 线性逻辑基础引理
 Lemma ll_add_zero_absorb {LL : LinearLogic} {A : LL.(LL_Formula)} :
   LL_Derivation (LL_Add A (LinearAdditiveZero LL)) ↔ LL_Derivation A.
 Proof. apply LL.(LL_ax_add_zero_left A); reflexivity. Qed.
@@ -222,7 +222,7 @@ Proof.
   contradiction (H_absorb ↔ H_annihilate).
 Qed.
 
-### 3. 蕴含关系等价性引理（修复逻辑断层，推导完整）
+(* ### 3. 蕴含关系等价性引理（修复逻辑断层，推导完整）
 Lemma impl_composition_equiv {IL : IntuitionisticLogic} {A B C : IL.(IL_Formula)} :
   (IL_Derivation A → (IL_Derivation B → IL_Derivation C)) ↔ 
   ((IL_Derivation A → IL_Derivation B) → IL_Derivation C).
@@ -243,7 +243,7 @@ Proof.
     apply H_impl f.
 Qed.
 
-### 4. 类型安全引理（修复funext滥用，使用记录扩展性）
+(* ### 4. 类型安全引理（修复funext滥用，使用记录扩展性）
 Lemma intuitionistic_formula_type_distinct {IL1 IL2 : IntuitionisticLogic} :
   IL1 ≠ IL2 → IL1.(IL_Formula) ≠ IL2.(IL_Formula).
 Proof.
@@ -260,7 +260,7 @@ Proof.
   - funext A B. rewrite H_type_eq. exact IL2.(IL_Impl) A B.
 Qed.
 
-### 5. 同构辅助引理（保运算+保零，证明完整）
+(* ### 5. 同构辅助引理（保运算+保零，证明完整）
 Lemma il_set_morphism_preserve_op :
   ∀ (IL IL' : IntuitionisticLogic) (A : IL.(IL_Formula)) (B : IL'.(IL_Formula)),
   let f := fun (L : IntuitionisticLogic) (F : L.(IL_Formula)) => 
@@ -386,7 +386,7 @@ Definition LinearLogicSystem : FRF_MetaTheory.FormalSystem := {|
 |}.
 Arguments LinearLogicSystem : clear implicits.
 
-### 动态零态定义（严格对接FRF2_CrossSystem，无类型冲突）
+(* ### 动态零态定义（严格对接FRF2_CrossSystem，无类型冲突）
 Definition intuitionistic_logic_zero : FRF2_CrossSystem.ZeroSystem := {|
   FRF2_CrossSystem.ZS_obj := IntuitionisticLogicSystem.(FRF_MetaTheory.carrier);
   FRF2_CrossSystem.z := IntuitionisticLogicSystem.(FRF_MetaTheory.id);
@@ -416,7 +416,7 @@ Definition linear_logic_zero : FRF2_CrossSystem.ZeroSystem := {|
 |}.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备） ======================== *)
-### 1. 直觉主义⊥的FRF角色验证定理
+(* ### 1. 直觉主义⊥的FRF角色验证定理
 Theorem il_false_plays_frf_role {IL : IntuitionisticLogic} :
   FRF_MetaTheory.PlaysFunctionalRole IntuitionisticLogicSystem 
     (IL, IntuitionisticFalse IL) 
@@ -447,7 +447,7 @@ Proof.
   |}; auto.
 Defined.
 
-### 2. 线性0_⊕的身份唯一性定理
+(* ### 2. 线性0_⊕的身份唯一性定理
 Theorem ll_add_zero_identity_unique {LL : LinearLogic} {F : LL.(LL_Formula)} :
   ∀ A : LL.(LL_Formula), LL_Derivation (LL_Add A F) ↔ LL_Derivation A ∧
   (∃ rel : FRF_MetaTheory.DefinitiveRelation LinearLogicSystem,
@@ -468,7 +468,7 @@ Proof.
   - contradiction H_axioms_non_empty.
 Qed.
 
-### 3. 逻辑系统“零”的系统相对性定理
+(* ### 3. 逻辑系统“零”的系统相对性定理
 Theorem logic_zero_system_relativity :
   ¬(∃ ess : Prop, (∀ sys ∈ [IntuitionisticLogicSystem; LinearLogicSystem], 
       ess ↔ FRF_MetaTheory.core_function (il_false_functional_role (proj1 (FRF_MetaTheory.id sys))) sys (FRF_MetaTheory.id sys))).
@@ -488,7 +488,7 @@ Proof.
   contradiction (H_il_func ↔ H_ll_func).
 Qed.
 
-### 4. 直觉主义逻辑与集合论零系统同构定理（证明无跳跃）
+(* ### 4. 直觉主义逻辑与集合论零系统同构定理（证明无跳跃）
 Theorem il_set_zero_isomorphism :
   ∃ f : FRF2_CrossSystem.ZeroMorphism intuitionistic_logic_zero CaseA_SetTheory.SetZeroSystem,
   SelfContainedLib.Category.IsIsomorphism FRF_CS_Null_Common.ZeroSystemCategory f.

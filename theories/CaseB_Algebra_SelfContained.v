@@ -1,4 +1,4 @@
-# theories/CaseB_Algebra_SelfContained.v
+(* # theories/CaseB_Algebra_SelfContained.v *)
 (* 模块定位：自包含代数基础模块（二级场景层），聚焦加法单位元唯一性与幺半群零对象分析  
    架构依赖：仅依赖一级基础模块SelfContainedLib/Algebra.v，无跨场景依赖  
    核心功能：保留原模块全量功能（单位元唯一性、幺半群零对象判定、平凡幺半群实例）  

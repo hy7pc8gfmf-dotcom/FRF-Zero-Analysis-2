@@ -1,4 +1,4 @@
-# theories/FRF_Comparative.v
+(* # theories/FRF_Comparative.v *)
 (* 模块定位：FRF框架跨系统对比核心（三级集成层），聚焦“数字0”相关对象的跨系统功能/关系对比，新增frf-verify-report集成，支撑顶刊验证报告生成，严格遵循“一级基础层→二级场景层→三级集成层”架构，无循环依赖，兼容Coq 8.18.0+Mathlib 3.74.0 *)
 Require Import FRF_MetaTheory.             (* 一级基础层：FRF元理论核心 *)
 Require Import FRF_CS_Null_Common.        (* 一级基础层：统一PropertyCategory/CS_FormalSystem *)

@@ -1,4 +1,4 @@
-# theories/ChurchNumerals.v
+(* # theories/ChurchNumerals.v *)
 (* 模块定位：无类型λ演算中Church数形式化核心，聚焦Church零的“迭代起点”功能，仅依赖Coq基础模块+SelfContainedLib/Algebra，无循环依赖，对接FRF“操作性定义优先”主张 *)
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Logic.FunctionalExtensionality.

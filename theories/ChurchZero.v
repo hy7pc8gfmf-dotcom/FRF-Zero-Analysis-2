@@ -1,4 +1,4 @@
-# theories/ChurchZero.v
+(* # theories/ChurchZero.v *)
 (* 模块定位：无类型λ演算中Church零的FRF全维度验证核心，对应论文第6.4节，仅依赖Coq基础模块+项目自包含定义，无循环依赖，严格对接FRF_MetaTheory与ChurchNumerals模块 *)
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Logic.FunctionalExtensionality.

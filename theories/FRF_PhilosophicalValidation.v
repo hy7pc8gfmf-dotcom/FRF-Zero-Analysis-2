@@ -1,4 +1,4 @@
-# theories/FRF_PhilosophicalValidation.v
+(* # theories/FRF_PhilosophicalValidation.v *)
 (* 模块定位：FRF框架哲学主张形式化验证核心，将结构主义、维特根斯坦“意义即使用”等哲学命题机械化为Coq定理，严格对接FRF_MetaTheory与跨系统实例模块（含数学空值+多语言空值），无循环依赖，遵循“定义前置→证明前置→定理完备”架构 *)
 Require Import FRF_MetaTheory.
 Require Import FRF_Comparative.

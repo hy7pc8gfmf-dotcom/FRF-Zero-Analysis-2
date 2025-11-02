@@ -1,4 +1,4 @@
-# theories/CaseD_Category_SelfContained.v
+(* # theories/CaseD_Category_SelfContained.v *)
 (* 模块定位：自包含范畴论零对象分析核心（二级场景层），聚焦“同一范畴中零对象同构唯一性”，补全空范畴对象唯一性证明
    架构依赖：仅依赖一级基础模块（SelfContainedLib/Category.v、FRF_CS_Null_Common.v），无跨场景依赖
    核心优化：补充empty_category_obj_unique引理，证明空范畴对象集合仅含unit一个实例，解决未证假设；保持全量功能不变

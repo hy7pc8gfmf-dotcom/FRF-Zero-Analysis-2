@@ -1,4 +1,4 @@
-# theories/FRF_MetaTheory.v
+(* theories/FRF_MetaTheory.v *)
 (* 模块定位：FRF 2.0 元理论核心（一级基础层），定义框架核心概念（形式系统、功能角色、定义性关系等），
    整合核心：1. 融合两版本功能（新增版功能分层量化 + 原版系统相对性/功能等价）；2. 解决FunctionalRole歧义；3. 去重统一；4. 全量保留必要定理
    依赖约束：仅依赖SelfContainedLib、FRF_CS_Null_Common、Mathlib基础模块，无循环依赖
@@ -28,7 +28,7 @@ Open Scope R_scope.
 Open Scope cs_null_scope.
 
 (* ======================== 定义前置（形式化完备，无重复，融合两版本核心） ======================== *)
-### 1. 基础核心定义（统一结构，无歧义）
+(* ### 1. 基础核心定义（统一结构，无歧义） *)
 (* 1.1 公理统一类型（保留原版，兼容所有系统） *)
 Definition Axiom : Type := Prop.
 
@@ -100,7 +100,7 @@ Record ConceptIdentity (S : FormalSystem) (obj : S.(carrier)) : Type := {
 }.
 Arguments ConceptIdentity {_ _} : clear implicits.
 
-### 2. 辅助定义（融合两版本，无冗余）
+(* ### 2. 辅助定义（融合两版本，无冗余）*)
 (* 2.1 功能必要性（保留原版，对接分层功能） *)
 Definition necessary_for_basic_property (S : FormalSystem) (obj : S.(carrier)) (cat : FRF_CS_Null_Common.PropertyCategory) : Prop :=
   S.(prop_category) = cat ∧
@@ -144,7 +144,7 @@ Definition role_similarity (r1 r2 : FunctionalRole S) : R :=
   if core_feat_equiv r1 r2 then edge_feat_sim r1 r2 else 0.
 
 (* ======================== 证明前置（无逻辑断层，融合两版本引理） ======================== *)
-### 1. 功能特征与权重引理（新增版核心，解决歧义）
+(* ### 1. 功能特征与权重引理（新增版核心，解决歧义） *)
 (* 1.1 核心功能无重复→互不相同 *)
 Lemma core_no_dup_impl_distinct : ∀ (S : FormalSystem) (r : FunctionalRole S),
   r.(core_no_dup) → ∀ f1 f2 ∈ r.(core_features), f1 ≠ f2.
@@ -165,7 +165,7 @@ Proof.
   rewrite H_norm in H0; lia.
 Qed.
 
-### 2. 功能等价与范畴引理（原版核心，保留系统相对性）
+(* ### 2. 功能等价与范畴引理（原版核心，保留系统相对性） *)
 (* 2.1 系统范畴相等→存在双射同态 *)
 Lemma system_property_category_eq_implies_sys_eq : ∀ (S1 S2 : FormalSystem),
   S1.(prop_category) = S2.(prop_category) →
@@ -203,7 +203,7 @@ Proof.
   contradiction H_core.
 Qed.
 
-### 3. 相似度合规引理（新增版，量化对比基础）
+(* ### 3. 相似度合规引理（新增版，量化对比基础） *)
 (* 3.1 边缘相似度对称性 *)
 Lemma edge_feat_sim_sym : ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
   edge_feat_sim r1 r2 = edge_feat_sim r2 r1.
@@ -234,7 +234,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（形式化完备，融合两版本核心主张） ======================== *)
-### 1. 功能角色决定身份（FRF核心，融合量化标准）
+(* ### 1. 功能角色决定身份（FRF核心，融合量化标准） *)
 Theorem functional_role_determines_identity : ∀ (S : FormalSystem) (obj1 obj2 : S.(carrier)),
   (∃ r : FunctionalRole S, S ⊢ obj1 : r ∧ S ⊢ obj2 : r) → obj1 = obj2.
 Proof.
@@ -246,7 +246,7 @@ Proof.
   auto; split; [apply core_feat_equiv_trans with (r2 := r); auto | apply edge_feat_sim_sym; reflexivity].
 Qed.
 
-### 2. 功能角色相似度合规（解决主观权重问题）
+(* ### 2. 功能角色相似度合规（解决主观权重问题） *)
 Theorem role_similarity_compliant : ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
   role_similarity r1 r2 ∈ [0,1] ∧
   (core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = edge_feat_sim r1 r2) ∧
@@ -259,7 +259,7 @@ Proof.
   - split; [intros H; unfold role_similarity; rewrite H; reflexivity | intros H; unfold role_similarity in H; destruct (core_feat_equiv r1 r2); auto; rewrite H in H0; apply edge_feat_sim_bounded in H0; lia].
 Qed.
 
-### 3. 系统相对性（原版核心，保留跨系统差异）
+(* ### 3. 系统相对性（原版核心，保留跨系统差异） *)
 Theorem system_relativity : ∀ (S1 S2 : FormalSystem),
   S1 ≠ S2 → ¬(∃ (obj1 : S1.(carrier)) (obj2 : S2.(carrier)) (r1 : FunctionalRole S1) (r2 : FunctionalRole S2),
     core_feat_equiv r1 r2 ∧ edge_feat_sim r1 r2 = 1).
@@ -272,7 +272,7 @@ Proof.
   contradiction H_sys_neq.
 Qed.
 
-### 4. 功能等价判定（原版核心，对接量化标准）
+(* ### 4. 功能等价判定（原版核心，对接量化标准） *)
 Theorem func_equiv_criterion : ∀ (S1 S2 : FormalSystem) (obj1 : S1.(carrier)) (obj2 : S2.(carrier))
   (r1 : FunctionalRole S1) (r2 : FunctionalRole S2),
   S1.(prop_category) = S2.(prop_category) →
@@ -285,7 +285,7 @@ Proof.
   split; [apply H_bij | intros a b; apply H_op].
 Qed.
 
-### 5. 跨系统功能对比（新增版核心，解决量化问题）
+(* ### 5. 跨系统功能对比（新增版核心，解决量化问题） *)
 Theorem cross_system_role_compare : ∀ (S1 S2 : FormalSystem)
   (r1 : FunctionalRole S1) (r2 : FunctionalRole S2)
   (f_map : FunctionalFeature → FunctionalFeature),
@@ -302,7 +302,7 @@ Proof.
   rewrite H; apply edge_feat_sim_bounded; auto.
 Qed.
 
-### 6. 关系网络支撑功能（原版核心，无修改）
+(* ### 6. 关系网络支撑功能（原版核心，无修改） *)
 Theorem relational_network_supports_function : ∀ (S : FormalSystem) (obj : S.(carrier)) (r : FunctionalRole S),
   S ⊢ obj : r → (∀ R ∈ (ConceptIdentity S obj).(ci_rels), ∃ ax ∈ S.(axioms), R ⪯ S ∧ ax = proj1_sig (R.(rel_axiom_dep))).
 Proof.
