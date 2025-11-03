@@ -2,6 +2,8 @@
 From Coq Require Import Utf8.
 From Coq Require Import Arith.Arith.
 
+Open Scope nat_scope. (* 核心修复：打开nat作用域，确保nat被正确解析为类型而非Set *)
+
 Module Type BasicGeometry.
   Parameter Point : Type.
   Parameter distance : Point -> Point -> nat.
@@ -9,7 +11,7 @@ Module Type BasicGeometry.
 End BasicGeometry.
 
 Module DiscreteGeometry <: BasicGeometry.
-  Definition Point := nat * nat.
+  Definition Point := nat * nat. (* 修复后：nat正确解析为具体类型，而非Set *)
   Definition distance (p q : Point) : nat :=
     let (x1, y1) := p in
     let (x2, y2) := q in
