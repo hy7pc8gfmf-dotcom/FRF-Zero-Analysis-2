@@ -1,56 +1,65 @@
--R . FRF
--R SelfContainedLib FRF.SelfContainedLib
--R theories FRF.Theories
--R CaseA_SetTheory FRF.CaseA_SetTheory
--R CS_Null FRF.CS_Null
--R Quantum FRF.Quantum
--R DynamicSystem FRF.DynamicSystem
--R Toolchain FRF.Toolchain
--R Test FRF.Test
+# 核心优化：简化逻辑路径绑定（避免嵌套过深+路径重叠）、按依赖层级排序、清理冗余配置
+-Q SelfContainedLib SelfContainedLib  # 基础层：直接绑定，导入时用「Require Import SelfContainedLib.Algebra」
+-Q theories FRF.Theories            # 核心层：数学基础+FRF元理论，导入时用「Require Import FRF.Theories.FRF_MetaTheory」
+-Q CS_Null FRF.CS_Null              # 扩展层：编程语言空值，导入时用「Require Import FRF.CS_Null.RustNull」
+-Q Quantum FRF.Quantum              # 扩展层：量子物理，导入时用「Require Import FRF.Quantum.QFT_FRF」
+-Q DynamicSystem FRF.DynamicSystem  # 扩展层：动态系统，导入时用「Require Import FRF.DynamicSystem.BlockchainSystem」
+-Q Toolchain FRF.Toolchain          # 工具层：跨工具链翻译，导入时用「Require Import FRF.Toolchain.FRF_to_Agda」
+-Q Test FRF.Test                    # 测试层：验证用例，导入时用「Require Import FRF.Test.Test_FRF_MetaTheory」
 
+# 编译参数优化：明确警告过滤、异步证明配置（兼容CI环境）
 -arg -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated
--arg -native-compiler yes
--arg -q
--arg -async-proofs on
+-arg -async-proofs full             # 异步证明全启用（提升CI编译速度）
+-arg -async-proofs-queue-size 10    # 队列大小适配CI核心数
+-arg -q                             # 抑制冗余启动信息
 
+# 按「基础层→核心层→扩展层→工具层→测试层」排序（确保依赖顺序正确）
+# 1. 基础层（无外部依赖）
 SelfContainedLib/Algebra.v
 SelfContainedLib/Category.v
 SelfContainedLib/Geometry.v
 
-theories/FRF_MetaTheory.v
-theories/FRF_Comparative.v
-theories/FRF_PhilosophicalValidation.v
-theories/ChurchZero.v
-theories/ChurchNumerals.v
-theories/CaseA_SetTheory.v
-theories/CaseB_Algebra.v
-theories/CaseB_Algebra_SelfContained.v
-theories/CaseC_TypeTheory.v
-theories/CaseD_CategoryTheory.v
-theories/CaseD_Category_SelfContained.v
-theories/CaseF_Logic.v
+# 2. 核心层（依赖基础层）
+theories/FRF_MetaTheory.v           # FRF元理论（最核心，优先编译）
+theories/FRF_PhilosophicalValidation.v  # 哲学验证（依赖FRF_MetaTheory）
+theories/FRF_Comparative.v         # 跨形式系统分析（依赖核心定理）
 
+# 3. 数学基础场景（依赖核心层+基础层）
+theories/ChurchNumerals.v           # λ演算基础（依赖Algebra）
+theories/ChurchZero.v               # Church零（依赖ChurchNumerals）
+theories/CaseA_SetTheory.v          # 集合论（依赖FRF_MetaTheory）
+theories/CaseB_Algebra.v           # 代数（依赖SelfContainedLib.Algebra+CaseA）
+theories/CaseB_Algebra_SelfContained.v  # 自包含代数（依赖CaseB_Algebra）
+theories/CaseC_TypeTheory.v         # 类型论（依赖FRF_MetaTheory）
+theories/CaseD_CategoryTheory.v    # 范畴论（依赖SelfContainedLib.Category）
+theories/CaseD_Category_SelfContained.v  # 自包含范畴论（依赖CaseD_CategoryTheory）
+theories/CaseF_Logic.v             # 逻辑（依赖FRF_MetaTheory）
+
+# 4. 扩展层（依赖核心层+数学基础）
+CS_Null/FRF_CS_Null_Common.v       # 空值公共模块（依赖FRF_MetaTheory）
 CS_Null/RustNull.v
 CS_Null/CxxNull.v
 CS_Null/JavaNull.v
 CS_Null/PythonNull.v
 CS_Null/MathNull.v
-CS_Null/FRF_CS_Null.v
+CS_Null/FRF_CS_Null.v              # 跨语言空值分析（依赖所有CS_Null模块）
 
-Quantum/QFT_FRF.v
-Quantum/CaseE_QuantumVacuum.v
-Quantum/CurvedSpacetimeQFT.v
+Quantum/QFT_FRF.v                  # 平坦时空QFT（依赖SelfContainedLib.Algebra）
+Quantum/CaseE_QuantumVacuum.v     # 量子真空（依赖QFT_FRF）
+Quantum/CurvedSpacetimeQFT.v       # 弯曲时空QFT（依赖QFT_FRF+SelfContainedLib.Geometry）
 
-DynamicSystem/TimeVaryingSystem.v
-DynamicSystem/Utils/Serialization.v
-DynamicSystem/BlockchainSystem.v
-DynamicSystem/ControlSystem.v
-DynamicSystem/DistributedSystem.v
+DynamicSystem/Utils/Serialization.v # 序列化工具（依赖基础层）
+DynamicSystem/TimeVaryingSystem.v   # 时变系统基础（依赖FRF_MetaTheory）
+DynamicSystem/DistributedSystem.v   # 分布式系统（依赖TimeVaryingSystem）
+DynamicSystem/BlockchainSystem.v    # 区块链（依赖Serialization+TimeVaryingSystem）
+DynamicSystem/ControlSystem.v       # 控制系统（依赖TimeVaryingSystem）
 
+# 5. 工具层（依赖所有核心/扩展模块）
 Toolchain/FRF_to_Agda.v
 Toolchain/FRF_to_Isabelle.v
 Toolchain/FRF_to_Lean.v
 
+# 6. 测试层（依赖所有业务模块）
 Test/Test_FRF_MetaTheory.v
 Test/Test_QuantumVacuum.v
 Test/Test_BlockchainSystem.v
