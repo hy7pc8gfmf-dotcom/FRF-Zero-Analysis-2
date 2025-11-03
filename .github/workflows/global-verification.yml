@@ -1,243 +1,273 @@
-name: FRF 2.0 全局形式化验证
+name: FRF 2.0 优化模块验证流
 on:
   push:
     branches: [main, master]
+    paths:
+      - 'SelfContainedLib/**.v'
+      - 'theories/FRF_MetaTheory.v'
+      - '.github/workflows/global-verification.yml'
   pull_request:
     branches: [main, master]
-  workflow_dispatch:
+    paths:
+      - 'SelfContainedLib/**.v'
+      - 'theories/FRF_MetaTheory.v'
+  workflow_dispatch:  # 支持手动触发，方便测试优化后的模块
 
 jobs:
-  formal-verification:
+  optimize-module-verification:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
-    
+    env:
+      # 预定义核心模块路径（优化后需验证的模块）
+      CORE_BASE_MODULES: "SelfContainedLib/Algebra.v SelfContainedLib/Category.v SelfContainedLib/Geometry.v"
+      CORE_META_MODULE: "theories/FRF_MetaTheory.v"
+
     steps:
-    - name: 检出代码仓库
-      uses: actions/checkout@v4
+      - name: 检出代码仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1  # 仅拉取最新代码，加速流程
 
-    - name: 安装系统依赖
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          opam \
-          bubblewrap \
-          g++ \
-          pkg-config \
-          m4 \
-          rsync \
-          git \
-          wget
-        echo "✅ 系统依赖安装完成"
+      - name: 安装系统依赖（基础编译环境）
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            opam \
+            bubblewrap \
+            g++ \
+            pkg-config \
+            m4 \
+            rsync \
+            git \
+            wget
+          echo "✅ 系统依赖安装完成"
 
-    - name: 初始化OPAM环境
-      run: |
-        opam init --disable-sandboxing -y --compiler=4.14.0
-        eval $(opam env)
-        opam repo add coq-released https://coq.inria.fr/opam/released
-        opam update
-        echo "✅ OPAM环境初始化完成"
+      - name: 初始化OPAM环境（兼容Coq 8.18.0）
+        run: |
+          # 禁用sandboxing避免权限问题，指定OCaml 4.14.0（与Coq 8.18.0兼容）
+          opam init --disable-sandboxing -y --compiler=4.14.0
+          eval $(opam env)
+          # 添加Coq官方仓库，确保依赖版本兼容
+          opam repo add coq-released https://coq.inria.fr/opam/released
+          opam update -y
+          echo "✅ OPAM环境初始化完成"
 
-    - name: 安装兼容的Coq和依赖
-      run: |
-        # 设置环境变量
-        eval $(opam env)
-        
-        # 安装Coq 8.18.0
-        echo "安装Coq 8.18.0..."
-        opam install -y coq.8.18.0
-        
-        # 安装与Coq 8.18.0兼容的mathcomp版本
-        echo "安装兼容的mathcomp-ssreflect..."
-        opam install -y coq-mathcomp-ssreflect.1.17.0
-        
-        # 验证版本
-        echo "验证安装版本..."
-        coqc --version
-        opam list --installed | grep -E "coq|mathcomp"
-        
-        echo "✅ 兼容环境安装完成"
-
-    - name: 验证项目结构
-      run: |
-        eval $(opam env)
-        
-        echo "=== 项目结构验证 ==="
-        echo "总Coq文件数: $(find . -name '*.v' | wc -l)"
-        
-        # 检查关键文件
-        for dir in SelfContainedLib theories; do
-          if [ -d "$dir" ]; then
-            echo "✅ $dir 目录存在"
-            find "$dir" -name "*.v" | head -3
-          else
-            echo "❌ $dir 目录缺失"
-          fi
-        done
-
-    - name: 基础环境测试
-      run: |
-        eval $(opam env)
-        
-        echo "=== 基础环境测试 ==="
-        
-        # 测试coqc命令
-        echo "1. 测试coqc命令..."
-        which coqc
-        coqc --version
-        
-        # 测试简单编译
-        echo "2. 测试简单编译..."
-        cat > /tmp/simple_test.v << 'EOF'
-        Theorem simple_test : True.
-        Proof. exact I. Qed.
-        EOF
-        
-        coqc /tmp/simple_test.v
-        
-        if [ -f "/tmp/simple_test.vo" ]; then
-          echo "✅ 基础编译测试通过"
-          rm /tmp/simple_test.vo /tmp/simple_test.glob
-        else
-          echo "❌ 基础编译测试失败"
-          exit 1
-        fi
-        rm /tmp/simple_test.v
-
-    - name: 分步编译核心模块
-      run: |
-        eval $(opam env)
-        
-        echo "=== 分步编译核心模块 ==="
-        
-        # 使用简化的路径映射
-        BASE_FLAGS="-Q SelfContainedLib SelfContainedLib"
-        
-        # 编译基础库
-        echo "1. 编译基础库..."
-        for base_file in SelfContainedLib/Algebra.v SelfContainedLib/Category.v SelfContainedLib/Geometry.v; do
-          if [ -f "$base_file" ]; then
-            echo "编译: $base_file"
-            if coqc $BASE_FLAGS "$base_file"; then
-              echo "✅ 成功: $base_file"
-            else
-              echo "❌ 失败: $base_file"
-              # 显示前5行错误信息
-              coqc $BASE_FLAGS "$base_file" 2>&1 | head -5
-            fi
-          fi
-        done
-
-    - name: 编译结果分析
-      if: always()
-      run: |
-        eval $(opam env)
-        
-        echo "=== 编译结果分析 ==="
-        
-        total_v_files=$(find . -name "*.v" | wc -l)
-        compiled_vo_files=$(find . -name "*.vo" | wc -l)
-        
-        echo "统计信息:"
-        echo "- 总Coq文件: $total_v_files"
-        echo "- 已编译文件: $compiled_vo_files"
-        
-        if [ $compiled_vo_files -gt 0 ]; then
-          echo "✅ 编译成功!"
-          echo "编译产物:"
-          find . -name "*.vo" | sed 's|^\./||'
+      - name: 安装兼容的Coq与依赖库（确保优化模块可编译）
+        run: |
+          eval $(opam env)
           
-          success_rate=$((compiled_vo_files * 100 / total_v_files))
-          echo "编译成功率: $success_rate%"
-        else
-          echo "❌ 编译失败"
-          echo "问题诊断:"
-          echo "1. Coq版本兼容性问题"
-          echo "2. 代码语法需要适配"
-          echo "3. 依赖模块缺失"
-        fi
+          # 安装核心依赖：Coq 8.18.0 + 完整Mathlib 3.74.0（支撑FRF_MetaTheory.v）
+          echo "安装Coq 8.18.0..."
+          opam install -y coq.8.18.0
+          
+          echo "安装完整Mathlib 3.74.0..."
+          opam install -y coq-mathlib=3.74.0
+          
+          echo "安装mathcomp-ssreflect 1.17.0（基础代数依赖）..."
+          opam install -y coq-mathcomp-ssreflect.1.17.0
+          
+          # 验证安装版本，确保无版本冲突
+          echo "=== 验证依赖版本 ==="
+          coqc --version | head -1
+          opam list --installed | grep -E "coq|mathcomp|mathlib"
+          echo "✅ 依赖环境安装完成"
 
-    - name: 生成验证报告
-      if: always()
-      run: |
-        eval $(opam env)
-        
-        echo "=== 生成验证报告 ==="
-        
-        mkdir -p verification-reports
-        
-        # 收集数据
-        total_v_files=$(find . -name "*.v" | wc -l)
-        compiled_vo_files=$(find . -name "*.vo" | wc -l)
-        coq_version=$(coqc --version | head -1)
-        
-        # 生成报告
-        echo "# FRF 2.0 形式化验证报告" > verification-reports/REPORT.md
-        echo "" >> verification-reports/REPORT.md
-        echo "**验证时间**: $(date)" >> verification-reports/REPORT.md
-        echo "**环境**: Ubuntu 22.04" >> verification-reports/REPORT.md
-        echo "**Coq版本**: $coq_version" >> verification-reports/REPORT.md
-        echo "" >> verification-reports/REPORT.md
-        echo "## 编译统计" >> verification-reports/REPORT.md
-        echo "- 总Coq文件: $total_v_files" >> verification-reports/REPORT.md
-        echo "- 成功编译: $compiled_vo_files" >> verification-reports/REPORT.md
-        
-        if [ $total_v_files -gt 0 ]; then
-          success_rate=$((compiled_vo_files * 100 / total_v_files))
-          echo "- 编译成功率: $success_rate%" >> verification-reports/REPORT.md
-        fi
-        
-        echo "" >> verification-reports/REPORT.md
-        echo "## 详细结果" >> verification-reports/REPORT.md
-        
-        if [ $compiled_vo_files -gt 0 ]; then
-          echo "### ✅ 验证成功" >> verification-reports/REPORT.md
-          echo "成功编译了 $compiled_vo_files 个核心模块。" >> verification-reports/REPORT.md
-          echo "" >> verification-reports/REPORT.md
-          echo "**已编译模块:**" >> verification-reports/REPORT.md
-          echo "\`\`\`" >> verification-reports/REPORT.md
-          find . -name "*.vo" | sed 's|^\./||' >> verification-reports/REPORT.md
-          echo "\`\`\`" >> verification-reports/REPORT.md
-        else
-          echo "### ❌ 验证失败" >> verification-reports/REPORT.md
-          echo "未能编译任何Coq模块。" >> verification-reports/REPORT.md
-          echo "" >> verification-reports/REPORT.md
-          echo "**环境信息:**" >> verification-reports/REPORT.md
-          echo "- Coq版本: $coq_version" >> verification-reports/REPORT.md
-          echo "- 项目文件: $total_v_files 个" >> verification-reports/REPORT.md
-          echo "" >> verification-reports/REPORT.md
-          echo "**解决方案建议:**" >> verification-reports/REPORT.md
-          echo "1. 检查并修复代码中的导入语句" >> verification-reports/REPORT.md
-          echo "2. 确保使用兼容的Coq和mathcomp版本" >> verification-reports/REPORT.md
-          echo "3. 简化路径映射配置" >> verification-reports/REPORT.md
-        fi
-        
-        echo "" >> verification-reports/REPORT.md
-        echo "## 环境信息" >> verification-reports/REPORT.md
-        echo "\`\`\`" >> verification-reports/REPORT.md
-        opam list --installed | grep -E "coq|mathcomp" >> verification-reports/REPORT.md 2>/dev/null || echo "无法获取包信息" >> verification-reports/REPORT.md
-        echo "\`\`\`" >> verification-reports/REPORT.md
-        
-        echo "✅ 验证报告生成完成"
+      - name: 验证项目结构（确保优化模块存在）
+        run: |
+          eval $(opam env)
+          
+          echo "=== 优化模块路径验证 ==="
+          # 检查基础库模块（Algebra/Category/Geometry）
+          for mod in $CORE_BASE_MODULES; do
+            if [ -f "$mod" ]; then
+              echo "✅ 优化模块存在：$mod"
+            else
+              echo "❌ 优化模块缺失：$mod"
+              exit 1
+            fi
+          done
+          
+          # 检查元理论模块（FRF_MetaTheory.v）
+          if [ -f "$CORE_META_MODULE" ]; then
+            echo "✅ 优化模块存在：$CORE_META_MODULE"
+          else
+            echo "❌ 优化模块缺失：$CORE_META_MODULE"
+            exit 1
+          fi
+          
+          echo "=== 项目文件统计 ==="
+          total_v=$(find . -name "*.v" | wc -l)
+          echo "总Coq文件数：$total_v"
+          echo "需验证优化模块数：$(echo $CORE_BASE_MODULES $CORE_META_MODULE | wc -w)"
 
-    - name: 上传验证报告
-      uses: actions/upload-artifact@v4
-      with:
-        name: frf-verification-report
-        path: verification-reports/
-        retention-days: 7
+      - name: 基础环境测试（验证coqc命令可用性）
+        run: |
+          eval $(opam env)
+          
+          echo "=== 基础编译能力测试 ==="
+          # 编译简单测试文件，排除环境本身问题
+          cat > /tmp/verify_env.v << 'EOF'
+          Theorem env_test : True.
+          Proof. exact I. Qed.
+          EOF
+          
+          if coqc /tmp/verify_env.v; then
+            if [ -f "/tmp/verify_env.vo" ]; then
+              echo "✅ 基础编译测试通过（coqc命令正常）"
+              rm -f /tmp/verify_env.vo /tmp/verify_env.glob
+            else
+              echo "❌ 基础编译测试失败（未生成.vo文件）"
+              exit 1
+            fi
+          else
+            echo "❌ 基础编译测试失败（coqc命令异常）"
+            exit 1
+          fi
+          rm -f /tmp/verify_env.v
 
-    - name: 验证状态总结
-      if: always()
-      run: |
-        eval $(opam env)
-        
-        compiled_count=$(find . -name "*.vo" | wc -l)
-        if [ $compiled_count -ge 1 ]; then
-          echo "🎉 FRF 2.0 验证取得进展!"
-          echo "📊 编译模块数: $compiled_count"
-          echo "✅ 基础环境验证通过"
-        else
-          echo "❌ FRF 2.0 验证遇到阻碍"
-          echo "📋 详细报告已生成"
-          echo "🔧 需要代码级适配"
-        fi
+      - name: 分步编译优化模块（按依赖顺序）
+        run: |
+          eval $(opam env)
+          
+          echo "=== 分步编译优化模块 ==="
+          # 1. 获取Mathlib安装路径（用于路径映射，支撑FRF_MetaTheory.v）
+          MATHLIB_PATH=$(opam var coq:user-contrib)/Mathlib
+          echo "Mathlib物理路径：$MATHLIB_PATH"
+          
+          # 2. 配置路径映射（关键：绑定SelfContainedLib和Mathlib逻辑路径）
+          BASE_FLAGS="-Q SelfContainedLib SelfContainedLib -Q $MATHLIB_PATH Mathlib"
+          echo "编译参数：$BASE_FLAGS"
+          
+          # 3. 按依赖顺序编译（基础库→元理论，避免连锁失败）
+          # 顺序：Algebra.v（无依赖）→Category.v（依赖Algebra）→Geometry.v（依赖Algebra）→FRF_MetaTheory.v（依赖基础库）
+          for mod in $CORE_BASE_MODULES $CORE_META_MODULE; do
+            echo -e "\n编译：$mod"
+            if coqc $BASE_FLAGS "$mod"; then
+              echo "✅ 成功：$mod（生成$(echo $mod | sed 's/\.v/\.vo/')）"
+            else
+              echo "❌ 失败：$mod（详细错误如下）"
+              # 显示前15行错误日志，方便定位问题（如导入路径、语法错误）
+              coqc $BASE_FLAGS "$mod" 2>&1 | head -15
+              exit 1
+            fi
+          done
+          
+          echo -e "\n🎉 所有优化模块编译通过！"
+
+      - name: 编译结果分析（统计验证成功率）
+        run: |
+          eval $(opam env)
+          
+          echo "=== 优化模块验证结果分析 ==="
+          # 统计总优化模块数和已编译成功数
+          total_optimized=$(echo $CORE_BASE_MODULES $CORE_META_MODULE | wc -w)
+          compiled_vo=$(find . -name "*.vo" | grep -E "$(echo $CORE_BASE_MODULES $CORE_META_MODULE | sed 's/ /\|/g' | sed 's/\.v//g')" | wc -l)
+          
+          echo "统计信息："
+          echo "- 需验证优化模块数：$total_optimized"
+          echo "- 编译成功模块数：$compiled_vo"
+          
+          # 计算成功率（仅针对优化模块）
+          if [ $total_optimized -gt 0 ]; then
+            success_rate=$((compiled_vo * 100 / total_optimized))
+            echo "- 优化模块验证成功率：$success_rate%"
+            
+            if [ $success_rate -eq 100 ]; then
+              echo "✅ 优化模块100%验证通过！"
+            else
+              echo "⚠️ 部分优化模块未通过（成功率<$success_rate%）"
+              exit 1
+            fi
+          else
+            echo "❌ 无优化模块可验证"
+            exit 1
+          fi
+          
+          # 列出已编译的优化模块产物
+          echo -e "\n已编译的优化模块产物："
+          find . -name "*.vo" | grep -E "$(echo $CORE_BASE_MODULES $CORE_META_MODULE | sed 's/ /\|/g' | sed 's/\.v//g')" | sed 's|^\./||'
+
+      - name: 生成优化模块验证报告
+        run: |
+          eval $(opam env)
+          
+          echo "=== 生成优化模块验证报告 ==="
+          mkdir -p verification-reports
+          report_path="verification-reports/OPTIMIZED_MODULE_REPORT.md"
+          
+          # 收集基础信息
+          verify_time=$(date "+%Y-%m-%d %H:%M:%S UTC")
+          coq_version=$(coqc --version | head -1)
+          total_optimized=$(echo $CORE_BASE_MODULES $CORE_META_MODULE | wc -w)
+          compiled_vo=$(find . -name "*.vo" | grep -E "$(echo $CORE_BASE_MODULES $CORE_META_MODULE | sed 's/ /\|/g' | sed 's/\.v//g')" | wc -l)
+          success_rate=$((compiled_vo * 100 / total_optimized))
+          
+          # 生成Markdown报告
+          cat > $report_path << EOF
+          # FRF 2.0 优化模块验证报告
+          
+          ## 验证基本信息
+          - **验证时间**: $verify_time
+          - **运行环境**: Ubuntu 22.04 (GitHub Actions)
+          - **Coq版本**: $coq_version
+          - **Mathlib版本**: 3.74.0
+          - **验证目标**: 优化后的核心模块（基础库+元理论）
+          
+          ## 验证统计
+          | 指标                | 数值  |
+          |---------------------|-------|
+          | 需验证优化模块数    | $total_optimized |
+          | 编译成功模块数      | $compiled_vo |
+          | 验证成功率          | $success_rate% |
+          
+          ## 详细结果
+          ### ✅ 编译成功的优化模块
+          | 模块路径                          | 功能说明                  |
+          |-----------------------------------|---------------------------|
+          | SelfContainedLib/Algebra.v        | 自包含代数核心（无Mathlib依赖） |
+          | SelfContainedLib/Category.v       | 范畴论核心结构（依赖Algebra） |
+          | SelfContainedLib/Geometry.v       | 几何流形定义（修正路径错误） |
+          | theories/FRF_MetaTheory.v        | FRF元理论核心（依赖基础库） |
+          
+          ### 📋 编译产物列表
+          \`\`\`
+          $(find . -name "*.vo" | grep -E "$(echo $CORE_BASE_MODULES $CORE_META_MODULE | sed 's/ /\|/g' | sed 's/\.v//g')" | sed 's|^\./||')
+          \`\`\`
+          
+          ## 环境依赖详情
+          \`\`\`
+          $(opam list --installed | grep -E "coq|mathcomp|mathlib" | sort)
+          \`\`\`
+          
+          ## 验证结论
+          - 所有优化模块均通过编译，无导入路径错误、依赖缺失问题；
+          - 基础库模块（Algebra/Category/Geometry）实现自包含，无需外部依赖；
+          - FRF元理论模块成功对接基础库，验证流程打通。
+          EOF
+          
+          echo "✅ 验证报告生成完成（路径：$report_path）"
+
+      - name: 上传优化模块验证报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: frf-optimized-module-report
+          path: verification-reports/
+          retention-days: 14  # 报告保留14天，方便回溯
+          if-no-files-found: error  # 无报告时触发错误
+
+      - name: 验证状态总结
+        run: |
+          eval $(opam env)
+          
+          compiled_vo=$(find . -name "*.vo" | grep -E "$(echo $CORE_BASE_MODULES $CORE_META_MODULE | sed 's/ /\|/g' | sed 's/\.v//g')" | wc -l)
+          total_optimized=$(echo $CORE_BASE_MODULES $CORE_META_MODULE | wc -w)
+          
+          if [ $compiled_vo -eq $total_optimized ]; then
+            echo "🎉 FRF 2.0 优化模块全量验证通过！"
+            echo "📊 验证结果：$compiled_vo/$total_optimized 模块编译成功"
+            echo "✅ 基础库+元理论模块无错误，可支撑后续场景模块开发"
+          else
+            echo "❌ FRF 2.0 优化模块验证失败"
+            echo "📊 验证结果：$compiled_vo/$total_optimized 模块编译成功"
+            exit 1
+          fi
