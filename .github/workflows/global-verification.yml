@@ -96,11 +96,7 @@ jobs:
           # 如果Makefile存在且可用，尝试使用它
           if [ -f "Makefile" ]; then
             echo "使用Makefile编译..."
-            if make -j2 compile 2>&1 | head -50; then
-              echo "✅ Makefile编译成功"
-            else
-              echo "⚠️ Makefile编译有错误，继续其他方法"
-            fi
+            make -j2 compile || echo "Makefile编译有错误，继续其他方法"
           fi
           
           # 编译其他重要模块
@@ -115,11 +111,7 @@ jobs:
           for module in "${important_modules[@]}"; do
             if [ -f "$module" ]; then
               echo "编译: $module"
-              coqc -Q SelfContainedLib SelfContainedLib \
-                   -Q theories FRF.Theories \
-                   -Q CS_Null FRF.CS_Null \
-                   -Q Quantum FRF.Quantum \
-                   "$module" 2>&1 | tail -5 || echo "编译跳过: $module"
+              coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null -Q Quantum FRF.Quantum "$module" || echo "编译跳过: $module"
             fi
           done
 
@@ -132,7 +124,7 @@ jobs:
           
           mkdir -p verification-reports
           
-          cat > verification-reports/REPORT.md << EOF
+          cat > verification-reports/REPORT.md << 'EOF'
 # FRF 2.0 形式化验证报告
 
 **验证时间**: $(date)
@@ -184,9 +176,7 @@ EOF
         uses: actions/upload-artifact@v4
         with:
           name: frf-verification-report
-          path: |
-            verification-reports/
-            **/*.vo
+          path: verification-reports/
           retention-days: 7
 
       - name: 验证成功通知
