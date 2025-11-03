@@ -3,6 +3,7 @@
    整合核心：1. 融合两版本功能（新增版功能分层量化 + 原版系统相对性/功能等价）；2. 解决FunctionalRole歧义；3. 去重统一；4. 全量保留必要定理
    依赖约束：仅依赖SelfContainedLib、FRF_CS_Null_Common、Mathlib基础模块，无循环依赖
    适配环境：Coq 8.18.0 + Mathlib 3.74.0 *)
+From Coq Require Import FunctionalExtensionality.
 Require Import FRF_CS_Null_Common.
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
