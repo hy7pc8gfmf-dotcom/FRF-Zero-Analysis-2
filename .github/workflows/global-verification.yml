@@ -171,62 +171,62 @@ jobs:
         compiled_vo_files=$(find . -name "*.vo" | wc -l)
         coq_version=$(coqc --version | head -1)
         
-        # 生成报告
-        cat > verification-reports/REPORT.md << EOF
-# FRF 2.0 形式化验证报告
-
-**验证时间**: $(date)
-**环境**: Ubuntu 22.04
-**Coq版本**: $coq_version
-
-## 编译统计
-- 总Coq文件: $total_v_files
-- 成功编译: $compiled_vo_files
-- 编译成功率: $((compiled_vo_files * 100 / total_v_files))%
-
-## 详细结果
-EOF
-
-        if [ $compiled_vo_files -gt 0 ]; then
-          cat >> verification-reports/REPORT.md << EOF
-### ✅ 验证成功
-成功编译了 $compiled_vo_files 个核心模块，FRF框架基础验证通过。
-
-**已编译模块:**
-\`\`\`
-$(find . -name "*.vo" | sed 's|^\./||')
-\`\`\`
-EOF
+        # 使用多个echo命令避免复杂的多行字符串
+        echo "# FRF 2.0 形式化验证报告" > verification-reports/REPORT.md
+        echo "" >> verification-reports/REPORT.md
+        echo "**验证时间**: $(date)" >> verification-reports/REPORT.md
+        echo "**环境**: Ubuntu 22.04" >> verification-reports/REPORT.md
+        echo "**Coq版本**: $coq_version" >> verification-reports/REPORT.md
+        echo "" >> verification-reports/REPORT.md
+        echo "## 编译统计" >> verification-reports/REPORT.md
+        echo "- 总Coq文件: $total_v_files" >> verification-reports/REPORT.md
+        echo "- 成功编译: $compiled_vo_files" >> verification-reports/REPORT.md
+        
+        if [ $total_v_files -gt 0 ]; then
+          success_rate=$((compiled_vo_files * 100 / total_v_files))
+          echo "- 编译成功率: $success_rate%" >> verification-reports/REPORT.md
         else
-          cat >> verification-reports/REPORT.md << EOF
-### ❌ 验证失败
-未能编译任何Coq模块。
-
-**可能原因:**
-1. Coq环境配置问题
-2. 代码语法错误
-3. 依赖关系缺失
-4. 路径映射配置错误
-
-**建议排查步骤:**
-1. 检查Coq版本兼容性
-2. 验证单个文件编译: \`coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Algebra.v\`
-3. 检查文件依赖关系
-EOF
+          echo "- 编译成功率: 0%" >> verification-reports/REPORT.md
         fi
-
-        cat >> verification-reports/REPORT.md << EOF
-
-## 环境信息
-\`\`\`
-$(opam list --installed | grep -E "coq|mathcomp")
-\`\`\`
-
-## 项目结构
-\`\`\`
-$(find . -name "*.v" -type f | head -20)
-\`\`\`
-EOF
+        
+        echo "" >> verification-reports/REPORT.md
+        echo "## 详细结果" >> verification-reports/REPORT.md
+        
+        if [ $compiled_vo_files -gt 0 ]; then
+          echo "### ✅ 验证成功" >> verification-reports/REPORT.md
+          echo "成功编译了 $compiled_vo_files 个核心模块，FRF框架基础验证通过。" >> verification-reports/REPORT.md
+          echo "" >> verification-reports/REPORT.md
+          echo "**已编译模块:**" >> verification-reports/REPORT.md
+          echo "\`\`\`" >> verification-reports/REPORT.md
+          find . -name "*.vo" | sed 's|^\./||' >> verification-reports/REPORT.md
+          echo "\`\`\`" >> verification-reports/REPORT.md
+        else
+          echo "### ❌ 验证失败" >> verification-reports/REPORT.md
+          echo "未能编译任何Coq模块。" >> verification-reports/REPORT.md
+          echo "" >> verification-reports/REPORT.md
+          echo "**可能原因:**" >> verification-reports/REPORT.md
+          echo "1. Coq环境配置问题" >> verification-reports/REPORT.md
+          echo "2. 代码语法错误" >> verification-reports/REPORT.md
+          echo "3. 依赖关系缺失" >> verification-reports/REPORT.md
+          echo "4. 路径映射配置错误" >> verification-reports/REPORT.md
+          echo "" >> verification-reports/REPORT.md
+          echo "**建议排查步骤:**" >> verification-reports/REPORT.md
+          echo "1. 检查Coq版本兼容性" >> verification-reports/REPORT.md
+          echo "2. 验证单个文件编译: \`coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Algebra.v\`" >> verification-reports/REPORT.md
+          echo "3. 检查文件依赖关系" >> verification-reports/REPORT.md
+        fi
+        
+        echo "" >> verification-reports/REPORT.md
+        echo "## 环境信息" >> verification-reports/REPORT.md
+        echo "\`\`\`" >> verification-reports/REPORT.md
+        opam list --installed | grep -E "coq|mathcomp" >> verification-reports/REPORT.md
+        echo "\`\`\`" >> verification-reports/REPORT.md
+        
+        echo "" >> verification-reports/REPORT.md
+        echo "## 项目结构" >> verification-reports/REPORT.md
+        echo "\`\`\`" >> verification-reports/REPORT.md
+        find . -name "*.v" -type f | head -20 >> verification-reports/REPORT.md
+        echo "\`\`\`" >> verification-reports/REPORT.md
 
         echo "✅ 验证报告生成完成"
 
