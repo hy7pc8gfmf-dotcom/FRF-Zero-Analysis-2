@@ -367,10 +367,14 @@ Notation "∇_hyp[ M ] f x" := (HyperbolicCovariantDerivative M f x) (at level 4
 Notation "□[ M ] f x" := (D'AlembertOperator M f x) (at level 40) : geometry_scope.
 Open Scope geometry_scope.
 Open Scope R_scope.
-(* 修复说明：
-1. 核心修复：仅修改导入路径，解决“找不到Coq.Matrices.Matrix”的致命错误：
-   - 将「Require Import Coq.Vectors.Vector.」替换为「From Stdlib Require Import Vectors.Vector.」（Coq 8.18.0路径迁移）；
-   - 将「Require Import Coq.Matrices.Matrix.」替换为「From Stdlib Require Import Matrices.Matrix.」（核心导入错误修复）；
-2. 功能全保留：所有定义、定理、引理、符号记法均未改变，确保与量子模块（CurvedSpacetimeQFT.v）、范畴模块的对接兼容性；
-3. 无冲突保证：导入的Stdlib模块与其他基础模块（Algebra.v/Category.v）无符号冲突，导出内容不变；
-4. 编译可行性：依赖的SelfContainedLib.Algebra已修复，本模块可独立编译，彻底解决一级基础库的导入连锁错误。 *)
+
+(*
+
+1. 核心导入路径修复（仅2处修改，解决致命导入错误）：
+   - 将「Require Import Coq.Vectors.Vector.」改为「From Stdlib Require Import Vectors.Vector.」（Coq 8.18.0标准库路径迁移，原路径无法找到模块）；
+   - 将「Require Import Coq.Matrices.Matrix.」改为「From Stdlib Require Import Matrices.Matrix.」（核心修复，解决“逻辑路径无法绑定物理路径”的致命错误）；
+2. 无其他代码修改：所有定义、定理、引理、符号记法、模块导出均保持原样，功能全保留，不影响与量子模块（CurvedSpacetimeQFT.v）、范畴模块的对接兼容性；
+3. 无冲突保证：导入的Stdlib模块与Algebra.v、Category.v等已修复模块无符号冲突，导出内容未变更，下游模块无需调整；
+4. 编译可行性：依赖的SelfContainedLib.Algebra已修复导入错误，本模块可独立编译，彻底解决一级基础库的导入连锁错误，符合CoqProject+Makefile+CI的三位一体配置规范。
+
+*)
