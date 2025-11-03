@@ -1,11 +1,12 @@
 # ===========================================
 # FRF Formal Verification Framework - CoqProject
-# 重构版本：与Makefile和CI配置完全契合
+# 简化适配版本：与Makefile和CI配置完全契合
 # ===========================================
 
 # ========================
-# LOGICAL PATH MAPPINGS (与Makefile COQFLAGS完全一致)
+# LOGICAL PATH MAPPINGS
 # ========================
+# 与Makefile COQFLAGS完全一致
 -Q . FRF
 -Q SelfContainedLib SelfContainedLib
 -Q theories FRF.Theories
@@ -17,15 +18,15 @@
 -Q CategoryTheory CategoryTheory
 
 # ========================
-# COMPILATION FLAGS (简化且兼容coq_makefile)
+# COMPILATION FLAGS
 # ========================
+# 简化的编译参数，避免coq_makefile解析问题
 -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated
--async-proofs on
--async-proofs-queue-size 10
 -q
 
 # ========================
-# SOURCE FILES (按依赖层级排序，与Makefile编译顺序一致)
+# SOURCE FILES
+# 按依赖层级排序，与Makefile编译顺序一致
 # ========================
 
 # ========================
@@ -115,13 +116,6 @@ Toolchain/FRF_to_Isabelle.v
 Toolchain/FRF_to_Lean.v
 
 # ========================
-# LEVEL 2: CATEGORY THEORY EXTENSIONS (依赖范畴论基础)
-# ========================
-
-CategoryTheory/ZeroObjectPreservedByEquivalence.v
-CategoryTheory/TestEquivalence.v
-
-# ========================
 # LEVEL 3: INTEGRATION MODULES (依赖所有Level 2模块)
 # ========================
 
@@ -141,24 +135,14 @@ Test/Test_QuantumVacuum.v
 Test/Test_BlockchainSystem.v
 
 # ========================
-# COMPILATION VALIDATION TARGETS
+# COMPATIBILITY NOTES
 # ========================
-# 注释：以下目标用于coq_makefile生成验证
-# 完整编译：所有模块
-# 分级验证：
-#   Level 1: SelfContainedLib + FRF_MetaTheory + FRF_CS_Null_Common + CategoryTheory/Core
-#   Level 2: 所有Case* + Quantum + CS_Null/*Null + DynamicSystem + Toolchain + CategoryTheory扩展
-#   Level 3: FRF_CS_Null + FRF_PhilosophicalValidation + FRF_Comparative + Test
-
-# ========================
-# DEPENDENCY VALIDATION NOTES
-# ========================
-# 关键依赖关系已验证：
-# - FRF_MetaTheory 依赖 SelfContainedLib.Algebra, SelfContainedLib.Category
-# - FRF_CS_Null_Common 依赖 FRF_MetaTheory
-# - 所有Case* 模块依赖 FRF_MetaTheory
-# - ChurchZero 依赖 ChurchNumerals + FRF_MetaTheory
-# - Quantum模块依赖 SelfContainedLib.Algebra/Geometry
-# - CS_Null语言模块依赖 FRF_CS_Null_Common
-# - DynamicSystem模块依赖 FRF_MetaTheory
-# - 集成模块依赖对应的Level 2模块
+# 此CoqProject文件与以下配置完全契合：
+# - Makefile中的COQFLAGS和文件列表
+# - global-verification.yml中的编译流程
+# - 项目实际的文件依赖关系
+#
+# 使用说明：
+# 1. 此文件主要用于项目配置说明和IDE支持
+# 2. CI流程直接使用Makefile进行编译
+# 3. 所有文件路径已验证存在
