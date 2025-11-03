@@ -1,83 +1,50 @@
 # ===========================================
 # FRF Formal Verification Framework - CoqProject
-# 简化重构版本：专注于核心模块和正确路径映射
+# 简化版本：确保路径映射与Makefile和CI一致
 # ===========================================
 
-# ========================
-# LOGICAL PATH MAPPINGS
-# ========================
-# 简化路径映射，确保与编译命令一致
+# 核心路径映射（与Makefile保持一致）
+-R . FRF
 -Q SelfContainedLib SelfContainedLib
--Q theories FRF.Theories
+-Q theories FRF.Theories  
 -Q CS_Null FRF.CS_Null
 -Q Quantum FRF.Quantum
 -Q DynamicSystem FRF.DynamicSystem
+-Q Test FRF.Test
 
-# ========================
-# COMPILATION FLAGS
-# ========================
-# 最小化编译参数，避免兼容性问题
+# 编译选项
 -w -notation-overridden
 -q
 
-# ========================
-# SOURCE FILES
-# 只包含实际存在且可编译的核心文件
-# ========================
+# 依赖包
+-arg -async-proofs
+-arg -off
+-arg -native-compiler
+-arg -no
 
-# ========================
-# LEVEL 1: CORE FOUNDATION (无依赖)
-# ========================
-
-# 基础数学库 - 必须首先编译
+# Level 1: 基础库（无依赖）
 SelfContainedLib/Algebra.v
-SelfContainedLib/Category.v
+SelfContainedLib/Category.v  
 SelfContainedLib/Geometry.v
 
-# ========================
-# LEVEL 2: FRF META-THEORY (依赖基础库)
-# ========================
-
-# FRF元理论核心
+# Level 2: FRF元理论（依赖基础库）
 theories/FRF_MetaTheory.v
-
-# λ演算基础
 theories/ChurchNumerals.v
 theories/ChurchZero.v
 
-# ========================
-# LEVEL 3: MATHEMATICAL SCENARIOS (依赖FRF元理论)
-# ========================
-
-# 集合论场景
+# Level 3: 数学场景（依赖FRF元理论）
 theories/CaseA_SetTheory.v
-
-# 代数场景
 theories/CaseB_Algebra.v
 theories/CaseB_Algebra_SelfContained.v
-
-# 类型论场景
 theories/CaseC_TypeTheory.v
-
-# 范畴论场景
 theories/CaseD_CategoryTheory.v
 theories/CaseD_Category_SelfContained.v
-
-# 逻辑场景
 theories/CaseF_Logic.v
 
-# ========================
-# LEVEL 4: PHYSICS EXTENSIONS (依赖代数+几何)
-# ========================
-
+# Level 4: 扩展模块
 Quantum/QFT_FRF.v
 Quantum/CaseE_QuantumVacuum.v
 Quantum/CurvedSpacetimeQFT.v
-
-# ========================
-# LEVEL 5: PROGRAMMING LANGUAGE ANALYSIS (依赖FRF基础)
-# ========================
-
 CS_Null/FRF_CS_Null_Common.v
 CS_Null/RustNull.v
 CS_Null/CxxNull.v
@@ -85,32 +52,12 @@ CS_Null/JavaNull.v
 CS_Null/PythonNull.v
 CS_Null/MathNull.v
 
-# ========================
-# LEVEL 6: INTEGRATION MODULES (依赖所有基础模块)
-# ========================
-
+# Level 5: 集成模块
 CS_Null/FRF_CS_Null.v
 theories/FRF_PhilosophicalValidation.v
 theories/FRF_Comparative.v
 
-# ========================
-# LEVEL 7: TEST MODULES (依赖所有业务模块)
-# ========================
-
+# Level 6: 测试模块
 Test/Test_FRF_MetaTheory.v
 Test/Test_QuantumVacuum.v
 Test/Test_BlockchainSystem.v
-
-# ========================
-# COMPATIBILITY NOTES
-# ========================
-# 此CoqProject经过以下验证：
-# 1. 所有文件路径实际存在
-# 2. 依赖顺序基于实际导入关系
-# 3. 路径映射与CI编译命令一致
-# 4. 编译参数最小化以避免兼容性问题
-#
-# 使用说明：
-# - 此文件主要用于项目配置和IDE支持
-# - CI流程使用直接coqc命令编译，不依赖coq_makefile
-# - 文件按依赖层级严格排序

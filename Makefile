@@ -1,6 +1,6 @@
 # ===========================================
 # FRF Formal Verification Framework - Makefile
-# 简化重构版本：专注于核心编译和验证
+# 修复版本：统一路径映射和依赖关系
 # ===========================================
 
 # ========================
@@ -8,13 +8,16 @@
 # ========================
 COQC = coqc
 COQCHK = coqchk
+COQDOC = coqdoc
 
-# 简化的路径映射（与CoqProject一致）
-COQFLAGS = -Q SelfContainedLib SelfContainedLib \
+# 统一路径映射（与CoqProject和CI一致）
+COQFLAGS = -Q . FRF \
+           -Q SelfContainedLib SelfContainedLib \
            -Q theories FRF.Theories \
            -Q CS_Null FRF.CS_Null \
            -Q Quantum FRF.Quantum \
            -Q DynamicSystem FRF.DynamicSystem \
+           -Q Test FRF.Test \
            -w -notation-overridden \
            -q
 
@@ -68,7 +71,7 @@ TEST_MODULES = \
 	Test/Test_QuantumVacuum.v \
 	Test/Test_BlockchainSystem.v
 
-# 完整文件列表
+# 完整文件列表（按依赖顺序）
 ALL_SRC_FILES = \
 	$(CORE_BASE) \
 	$(CORE_FRF) \
@@ -101,13 +104,21 @@ compile-core: $(CORE_BASE:.v=.vo) $(CORE_FRF:.v=.vo)
 	@echo "✅ 核心模块编译完成！"
 
 # ========================
-# SIMPLE COMPILATION RULES
+# ROBUST COMPILATION RULES
 # ========================
 
-# 通用编译规则
+# 通用编译规则（带错误处理）
 %.vo: %.v
 	@echo "编译: $<"
-	@$(COQC) $(COQFLAGS) $< || (echo "❌ 编译失败: $<" && false)
+	@if $(COQC) $(COQFLAGS) $< > $<.log 2>&1; then \
+		echo "✅ 成功: $<"; \
+		rm -f $<.log; \
+	else \
+		echo "❌ 编译失败: $<"; \
+		cat $<.log | head -20; \
+		rm -f $<.log; \
+		false; \
+	fi
 
 # ========================
 # VALIDATION & TESTING
@@ -117,7 +128,7 @@ validate: compile
 	@echo "🔍 验证所有证明..."
 	@if command -v $(COQCHK) >/dev/null 2>&1; then \
 		echo "运行coqchk验证..."; \
-		$(COQCHK) -silent $(ALL_VO_FILES) 2>&1 | head -10 || echo "验证过程有警告"; \
+		$(COQCHK) -silent $(COQFLAGS) $(ALL_VO_FILES) 2>&1 | head -10 || echo "验证过程有警告"; \
 		echo "✅ 验证完成！"; \
 	else \
 		echo "⚠️ coqchk未找到，跳过验证"; \
@@ -139,12 +150,16 @@ test: compile
 check: 
 	@echo "📊 编译状态检查..."
 	@total_files=0; \
+	compiled_files=0; \
 	for file in $(ALL_SRC_FILES); do \
 		if [ -f "$$file" ]; then \
 			total_files=$$((total_files + 1)); \
+			vo_file=$${file%.v}.vo; \
+			if [ -f "$$vo_file" ]; then \
+				compiled_files=$$((compiled_files + 1)); \
+			fi \
 		fi \
 	done; \
-	compiled_files=$$(find . -name "*.vo" | wc -l); \
 	echo "总Coq文件: $$total_files"; \
 	echo "已编译: $$compiled_files"; \
 	if [ $$compiled_files -ge 3 ]; then \
@@ -188,14 +203,25 @@ check-version:
 		echo "⚠️ Coq版本不匹配：需要 8.18.0，当前 $$current_version"; \
 	fi
 
+deps:
+	@echo "📦 安装Coq依赖..."
+	@eval $$(opam env) && opam install -y \
+		coq-mathcomp-ssreflect \
+		coq-equations \
+		coq-bignums \
+		coq-metacoq-template \
+		coq-metacoq-checker
+	@echo "✅ 依赖安装完成！"
+
 # ========================
 # DOCUMENTATION
 # ========================
 
 doc:
 	@echo "📚 生成HTML文档..."
-	@if command -v coqdoc >/dev/null 2>&1; then \
-		coqdoc --html -d html -t "FRF形式验证框架文档" $(COQFLAGS) $(ALL_SRC_FILES); \
+	@if command -v $(COQDOC) >/dev/null 2>&1; then \
+		mkdir -p html; \
+		$(COQDOC) --html -d html -t "FRF形式验证框架文档" $(COQFLAGS) $(ALL_SRC_FILES); \
 		echo "✅ HTML文档生成在 html/ 目录"; \
 	else \
 		echo "⚠️ coqdoc未找到，跳过文档生成"; \
@@ -210,6 +236,7 @@ clean:
 	@rm -f $(ALL_VO_FILES) 2>/dev/null || true
 	@rm -f $(ALL_SRC_FILES:.v=.glob) 2>/dev/null || true
 	@rm -f $(ALL_SRC_FILES:.v=.v.d) 2>/dev/null || true
+	@rm -f $(ALL_SRC_FILES:.v=.log) 2>/dev/null || true
 	@rm -rf html 2>/dev/null || true
 	@echo "✅ 清理完成！"
 
@@ -217,6 +244,7 @@ distclean: clean
 	@echo "🧹 深度清理..."
 	@find . -name "*~" -delete 2>/dev/null || true
 	@find . -name ".*.aux" -delete 2>/dev/null || true
+	@find . -name "*.log" -delete 2>/dev/null || true
 	@echo "✅ 深度清理完成！"
 
 # ========================
@@ -225,7 +253,7 @@ distclean: clean
 
 help:
 	@echo "=================================================="
-	@echo "📌 FRF形式验证框架 Makefile (简化适配版本)"
+	@echo "📌 FRF形式验证框架 Makefile (修复版本)"
 	@echo "=================================================="
 	@echo "基本目标："
 	@echo "  all           - 编译所有模块 + 验证证明 (默认)"
@@ -234,6 +262,7 @@ help:
 	@echo "  validate      - 验证所有证明"
 	@echo "  test          - 运行测试套件"
 	@echo "  check         - 检查编译完整性"
+	@echo "  deps          - 安装Coq依赖包"
 	@echo ""
 	@echo "分级测试："
 	@echo "  test-level1   - 编译/验证 Level 1 基础库"
@@ -283,10 +312,14 @@ status:
 	fi
 	@echo ""
 	@total_src=0; \
+	compiled=0; \
 	for file in $(ALL_SRC_FILES); do \
 		if [ -f "$$file" ]; then \
 			total_src=$$((total_src + 1)); \
+			vo_file=$${file%.v}.vo; \
+			if [ -f "$$vo_file" ]; then \
+				compiled=$$((compiled + 1)); \
+			fi \
 		fi \
 	done; \
-	compiled=$$(find . -name "*.vo" | wc -l); \
 	echo "📈 编译进度: $$compiled/$$total_src"

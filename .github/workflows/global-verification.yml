@@ -24,7 +24,8 @@ jobs:
           g++ \
           pkg-config \
           m4 \
-          rsync
+          rsync \
+          git
         echo "✅ 系统依赖安装完成"
 
     - name: 初始化OPAM环境
@@ -42,7 +43,9 @@ jobs:
           coq.8.18.0 \
           coq-mathcomp-ssreflect \
           coq-equations \
-          coq-bignums
+          coq-bignums \
+          coq-metacoq-template \
+          coq-metacoq-checker
         echo "✅ Coq和依赖安装完成"
         coqc --version
 
@@ -52,7 +55,7 @@ jobs:
         ls -la
         echo "Coq文件数量: $(find . -name '*.v' | wc -l)"
         echo "关键文件检查:"
-        for file in Makefile SelfContainedLib/Algebra.v theories/FRF_MetaTheory.v; do
+        for file in Makefile CoqProject SelfContainedLib/Algebra.v theories/FRF_MetaTheory.v; do
           if [ -f "$file" ]; then
             echo "✅ $file"
           else
@@ -68,6 +71,7 @@ jobs:
         cat > test_coq.v << 'EOF'
         Theorem test : True.
         Proof. exact I. Qed.
+        Print test.
         EOF
         
         echo "编译测试文件..."
@@ -75,67 +79,42 @@ jobs:
         
         if [ -f "test_coq.vo" ]; then
           echo "✅ Coq编译环境正常"
-          rm test_coq.vo test_coq.glob
+          rm test_coq.vo test_coq.glob test_coq.v
         else
           echo "❌ Coq编译环境有问题"
           exit 1
         fi
-        rm test_coq.v
 
-    - name: 编译单个核心模块测试
+    - name: 使用Makefile编译核心模块
       run: |
-        echo "=== 编译单个核心模块测试 ==="
+        echo "=== 使用Makefile编译核心模块 ==="
         
-        # 尝试编译Algebra.v
-        if [ -f "SelfContainedLib/Algebra.v" ]; then
-          echo "编译 Algebra.v..."
-          coqc SelfContainedLib/Algebra.v
-          
-          if [ -f "SelfContainedLib/Algebra.vo" ]; then
-            echo "✅ Algebra.v 编译成功"
-          else
-            echo "❌ Algebra.v 编译失败"
-            echo "检查编译错误:"
-            coqc SelfContainedLib/Algebra.v 2>&1 || true
-          fi
-        else
-          echo "❌ Algebra.v 文件不存在"
-        fi
+        # 先安装依赖
+        make deps || echo "依赖安装跳过或已完成"
+        
+        # 编译核心模块
+        echo "编译Level 1基础库..."
+        make test-level1
+        
+        echo "编译Level 2 FRF元理论..."
+        make test-level2
+        
+        echo "检查编译结果..."
+        make check
 
-    - name: 使用简单路径映射编译
+    - name: 完整编译验证
       run: |
-        echo "=== 使用简单路径映射编译 ==="
+        echo "=== 完整编译验证 ==="
         
-        # 使用最简单的路径映射
-        echo "编译基础模块..."
+        # 完整编译
+        echo "编译所有模块..."
+        make compile
         
-        # 编译SelfContainedLib模块
-        for file in SelfContainedLib/Algebra.v SelfContainedLib/Category.v SelfContainedLib/Geometry.v; do
-          if [ -f "$file" ]; then
-            echo "编译: $file"
-            coqc -Q SelfContainedLib SelfContainedLib "$file" 2>&1 | head -20 || echo "编译跳过: $file"
-          fi
-        done
+        echo "运行验证..."
+        make validate
         
-        # 编译theories模块
-        if [ -f "theories/FRF_MetaTheory.v" ]; then
-          echo "编译: theories/FRF_MetaTheory.v"
-          coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories theories/FRF_MetaTheory.v 2>&1 | head -20 || echo "编译跳过"
-        fi
-        
-        # 检查编译结果
-        compiled_files=$(find . -name "*.vo" | wc -l)
-        echo "已编译文件数: $compiled_files"
-        
-        if [ $compiled_files -eq 0 ]; then
-          echo "❌ 仍然没有编译产物，检查详细错误:"
-          for file in SelfContainedLib/Algebra.v; do
-            if [ -f "$file" ]; then
-              echo "详细编译 $file:"
-              coqc -Q SelfContainedLib SelfContainedLib "$file"
-            fi
-          done
-        fi
+        echo "运行测试..."
+        make test
 
     - name: 检查编译结果
       if: always()
@@ -144,21 +123,19 @@ jobs:
         compiled_files=$(find . -name "*.vo" | wc -l)
         echo "已编译文件数: $compiled_files"
         
-        echo "当前目录内容:"
-        ls -la
-        
-        echo "SelfContainedLib目录内容:"
-        ls -la SelfContainedLib/ || echo "SelfContainedLib目录不存在"
-        
-        echo "theories目录内容:"
-        ls -la theories/ || echo "theories目录不存在"
+        echo "编译产物列表:"
+        find . -name "*.vo" | head -20
         
         if [ $compiled_files -gt 0 ]; then
           echo "✅ 编译成功，找到 $compiled_files 个.vo文件"
-          find . -name "*.vo"
         else
           echo "❌ 没有编译产物"
-          # 不退出，继续生成报告
+          # 尝试诊断问题
+          echo "=== 诊断信息 ==="
+          echo "Makefile版本:"
+          head -n 10 Makefile
+          echo "CoqProject内容:"
+          head -n 10 CoqProject
         fi
 
     - name: 生成验证报告
@@ -171,17 +148,19 @@ jobs:
         
         mkdir -p verification-reports
         
-        # 生成报告
-        echo "# FRF 2.0 形式化验证报告" > verification-reports/REPORT.md
-        echo "" >> verification-reports/REPORT.md
-        echo "**验证时间**: $(date)" >> verification-reports/REPORT.md
-        echo "**环境**: Ubuntu 22.04 + Coq 8.18.0" >> verification-reports/REPORT.md
-        echo "**Coq版本**: $(coqc --version | head -1)" >> verification-reports/REPORT.md
-        echo "" >> verification-reports/REPORT.md
-        echo "## 编译统计" >> verification-reports/REPORT.md
-        echo "- 总Coq文件: $total_files" >> verification-reports/REPORT.md
-        echo "- 成功编译: $compiled_files" >> verification-reports/REPORT.md
-        
+        # 生成详细报告
+        cat > verification-reports/REPORT.md << EOF
+# FRF 2.0 形式化验证报告
+
+**验证时间**: $(date)
+**环境**: Ubuntu 22.04 + Coq 8.18.0
+**Coq版本**: $(coqc --version | head -1)
+
+## 编译统计
+- 总Coq文件: $total_files
+- 成功编译: $compiled_files
+EOF
+
         if [ $total_files -gt 0 ]; then
           success_rate=$((compiled_files * 100 / total_files))
           echo "- 成功率: $success_rate%" >> verification-reports/REPORT.md
@@ -190,28 +169,29 @@ jobs:
         fi
         
         echo "" >> verification-reports/REPORT.md
-        echo "## 详细诊断" >> verification-reports/REPORT.md
-        echo "### 项目结构" >> verification-reports/REPORT.md
-        echo "- 当前目录: $(pwd)" >> verification-reports/REPORT.md
-        echo "- 目录内容:" >> verification-reports/REPORT.md
+        echo "## 项目结构" >> verification-reports/REPORT.md
+        echo "\`\`\`" >> verification-reports/REPORT.md
         ls -la >> verification-reports/REPORT.md
+        echo "\`\`\`" >> verification-reports/REPORT.md
         
-        echo "### Coq文件列表" >> verification-reports/REPORT.md
-        find . -name "*.v" >> verification-reports/REPORT.md
-        
-        echo "### 编译产物" >> verification-reports/REPORT.md
+        echo "" >> verification-reports/REPORT.md
+        echo "## 编译产物" >> verification-reports/REPORT.md
         if [ $compiled_files -gt 0 ]; then
+          echo "\`\`\`" >> verification-reports/REPORT.md
           find . -name "*.vo" >> verification-reports/REPORT.md
+          echo "\`\`\`" >> verification-reports/REPORT.md
         else
           echo "无编译产物" >> verification-reports/REPORT.md
         fi
         
         echo "" >> verification-reports/REPORT.md
         echo "## 验证结果" >> verification-reports/REPORT.md
-        if [ $compiled_files -ge 1 ]; then
-          echo "✅ **验证成功**: 至少编译了 $compiled_files 个文件" >> verification-reports/REPORT.md
+        if [ $compiled_files -ge 3 ]; then
+          echo "✅ **验证成功**: 成功编译了 $compiled_files 个文件" >> verification-reports/REPORT.md
+          echo "**状态**: FRF框架核心验证通过" >> verification-reports/REPORT.md
         else
-          echo "❌ **验证失败**: 无编译产物" >> verification-reports/REPORT.md
+          echo "❌ **验证失败**: 编译文件不足，仅 $compiled_files 个" >> verification-reports/REPORT.md
+          echo "**建议**: 检查依赖关系和路径映射" >> verification-reports/REPORT.md
         fi
         
         echo "✅ 验证报告生成完成"
@@ -235,4 +215,8 @@ jobs:
       if: failure()
       run: |
         echo "❌ FRF 2.0 形式化验证失败"
-        echo "请检查编译环境设置"
+        echo "请检查以下可能的问题:"
+        echo "1. Coq版本兼容性"
+        echo "2. 路径映射配置"
+        echo "3. 依赖包安装"
+        echo "4. 文件依赖关系"
