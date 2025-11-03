@@ -1,9 +1,11 @@
 (* # theories/ChurchNumerals.v *)
+
+(* # theories/ChurchNumerals.v *)
 (* 模块定位：无类型λ演算中Church数形式化核心，聚焦Church零的“迭代起点”功能，仅依赖Coq基础模块+SelfContainedLib/Algebra，无循环依赖，对接FRF“操作性定义优先”主张 *)
-Require Import Coq.Arith.Compare_dec.
-Require Import Coq.Logic.FunctionalExtensionality.
-Require Import Coq.Lists.List.
-Require Import SelfContainedLib.Algebra.
+From Coq Require Import Arith.Compare_dec.
+From Coq Require Import Logic.FunctionalExtensionality.
+From Coq Require Import Lists.List.
+From SelfContainedLib Require Import Algebra.
 
 (* ======================== 核心定义1：无类型λ项语言（自包含，无重复，定义前置） ======================== *)
 (* 1. λ项定义（德布鲁因索引，避免变量捕获，符合λ演算标准语法） *)
@@ -56,7 +58,7 @@ Definition church_zero : term := Abs (Abs (Var 0)).
 
 (* 2. Church后继：λn.λf.λx.f (n f x)（德布鲁因索引标准化，无歧义） *)
 Definition church_succ (n : term) : term :=
-  Abs (Abs (App (Var 1) (App (App n (Var 1)) (Var 0))).
+  Abs (Abs (App (Var 1) (App (App n (Var 1)) (Var 0)))).
 
 (* 3. Church数迭代语义：n f x 表示f迭代n次作用于x（FRF功能性角色核心） *)
 Definition church_iter (n f x : term) : term := App (App n f) x.
