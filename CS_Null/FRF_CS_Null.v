@@ -1,24 +1,24 @@
 (* # CS_Null/FRF_CS_Null.v *)
 (* 模块定位：跨编程语言空值（Rust None/C++ NULL/Java null/Python None）的FRF整合分析层（三级集成层），聚焦“空值”作为工程化“0”的跨系统对比，严格遵循“一级基础层→二级场景层→三级集成层”架构，仅依赖一级基础层（FRF_CS_Null_Common/FRF_MetaTheory）与二级场景层（各语言空值模块），无循环依赖，全量保留跨系统空值对比功能（安全评分/相似度/FRF原则验证），补全FRF核心主张双向性证明 *)
-Require Import CS_Null.FRF_CS_Null_Common.  (* 一级基础层：统一空值基础定义 *)
-Require Import CS_Null.RustNull.            (* 二级场景层：Rust空值模块 *)
-Require Import CS_Null.CxxNull.            (* 二级场景层：C++空值模块 *)
-Require Import CS_Null.JavaNull.           (* 二级场景层：Java空值模块 *)
-Require Import CS_Null.PythonNull.         (* 二级场景层：Python空值模块 *)
-Require Import FRF_MetaTheory.             (* 一级基础层：FRF元理论接口 *)
-Require Import FRF_Comparative.           (* 一级基础层：跨系统对比接口 *)
-Require Import Mathlib.Logic.FunctionalExtensionality. (* 显式标注Funext依赖 *)
-Require Import Coq.Strings.String.
-Require Import Coq.Lists.List.
-Require Import Coq.Reals.Reals.
+From CS_Null Require Import FRF_CS_Null_Common.  (* 一级基础层：统一空值基础定义 *)
+From CS_Null Require Import RustNull.            (* 二级场景层：Rust空值模块 *)
+From CS_Null Require Import CxxNull.            (* 二级场景层：C++空值模块 *)
+From CS_Null Require Import JavaNull.           (* 二级场景层：Java空值模块 *)
+From CS_Null Require Import PythonNull.         (* 二级场景层：Python空值模块 *)
+From theories Require Import FRF_MetaTheory.    (* 一级基础层：FRF元理论接口（修复导入路径） *)
+From theories Require Import FRF_Comparative.   (* 一级基础层：跨系统对比接口（修复导入路径） *)
+From Coq.Logic Require Import FunctionalExtensionality. (* 修复：替换Mathlib为Coq标准库模块 *)
+From Coq Require Import Strings.String.
+From Coq Require Import Lists.List.
+From Coq Require Import Reals.Reals.
 
-(* 全局符号统一（与FRF/各场景模块对齐，无歧义） *)
+(* 全局符号统一（与FRF/各场景模块对齐，无歧义，复用公共模块记法） *)
 Notation "null[ sys ][ T ]" := (cross_system_null sys T) (at level 20) : cs_null_frf_scope.
 Notation "safe_score( sys )" := (null_safety_score sys) (at level 30) : cs_null_frf_scope.
 Notation "sys1 ≈_null_safe sys2" := (null_safety_similarity sys1 sys2) (at level 40) : cs_null_frf_scope.
 Open Scope cs_null_frf_scope.
 Open Scope cs_null_scope.
-Open Scope frf_scope.
+Open Scope frf_meta_scope.  (* 对齐FRF_MetaTheory作用域 *)
 Open Scope R_scope.
 
 (* ======================== 核心定义（前置无依赖，统一接口，严格对接基础/场景层，无重复） ======================== *)
@@ -54,7 +54,13 @@ Definition runtime_weight : R := runtime_risk_reduction / total_risk_reduction.
 Definition propagation_weight : R := propagation_risk_reduction / total_risk_reduction.
 Definition type_safe_weight : R := type_safe_risk_reduction / total_risk_reduction.
 
-(* 5. 空值安全评分（量化安全性，0.0=最低，1.0=最高，基于推导权重，无主观判定） *)
+(* 5. 运行时/编译期风险定义（前置定义，避免定理内重复，符合“定义前置”要求） *)
+Definition runtime_risk (sys : CS_FormalSystem) : R :=
+  if match sys with CxxSys | JavaSys => true | _ => false end then 1.0 else 0.0.
+Definition compile_risk (sys : CS_FormalSystem) : R :=
+  if match sys with RustSys => false | _ => true end then 1.0 else 0.0.
+
+(* 6. 空值安全评分（量化安全性，0.0=最低，1.0=最高，基于推导权重，无主观判定） *)
 Definition null_safety_score (sys : CS_FormalSystem) : R :=
   let prop := match sys with
               | RustSys => {| compile_time_check := true; runtime_panic := false; null_propagation := true; type_safe := true |}
@@ -67,7 +73,7 @@ Definition null_safety_score (sys : CS_FormalSystem) : R :=
   (if prop.(null_propagation) then propagation_weight else 0.0) +
   (if prop.(type_safe) then type_safe_weight else 0.0).
 
-(* 6. 跨系统空值概念身份（整合各场景层身份，无重复定义） *)
+(* 7. 跨系统空值概念身份（整合各场景层身份，无重复定义） *)
 Definition cross_system_null_identity (sys : CS_FormalSystem) (T : Type) : FRF_MetaTheory.ConceptIdentity (CS_FormalSystem_to_FRF sys) (null[sys][T]) :=
   match sys with
   | RustSys => RustNoneIdentity T
@@ -77,7 +83,7 @@ Definition cross_system_null_identity (sys : CS_FormalSystem) (T : Type) : FRF_M
   end.
 Arguments cross_system_null_identity {_} _ : clear implicits.
 
-(* 7. 空值操作统一接口（适配各场景层操作，无接口冲突，工程化可调用） *)
+(* 8. 空值操作统一接口（适配各场景层操作，无接口冲突，工程化可调用） *)
 Definition unified_null_op (sys : CS_FormalSystem) (op_type : string) (T : Type) (v : FRF_MetaTheory.carrier (CS_FormalSystem_to_FRF sys)) : option (NullOpResult (CS_FormalSystem_to_FRF sys)) :=
   match sys, op_type with
   | RustSys, "unwrap" => 
@@ -92,7 +98,7 @@ Definition unified_null_op (sys : CS_FormalSystem) (op_type : string) (T : Type)
   end.
 Arguments unified_null_op {_} _ _ _ : clear implicits.
 
-(* 8. 空值安全相似度（量化跨系统相似性，基于评分+属性重合度，无模糊） *)
+(* 9. 空值安全相似度（量化跨系统相似性，基于评分+属性重合度，无模糊） *)
 Definition null_safety_similarity (sys1 sys2 : CS_FormalSystem) : R :=
   let score1 := null_safety_score sys1 in
   let score2 := null_safety_score sys2 in
@@ -114,13 +120,15 @@ Definition null_safety_similarity (sys1 sys2 : CS_FormalSystem) : R :=
                    (if prop1.(type_safe) = prop2.(type_safe) then 0.25 else 0.0) in
   (1.0 - Rabs (score1 - score2)) * 0.5 + prop_match * 0.5.
 
-(* 9. FRF空值功能等价判定（对接FRF_MetaTheory.func_equiv_criterion，无逻辑断层） *)
+(* 10. FRF空值功能等价判定（对接FRF_MetaTheory.func_equiv_criterion，无逻辑断层） *)
 Definition null_func_equiv (sys1 sys2 : CS_FormalSystem) (T1 T2 : Type) : Prop :=
   FRF_MetaTheory.func_equiv_criterion 
-    (FRF_MetaTheory.system_property_category (CS_FormalSystem_to_FRF sys1)) 
-    (FRF_MetaTheory.system_property_category (CS_FormalSystem_to_FRF sys2))
+    (CS_FormalSystem_to_FRF sys1)
+    (CS_FormalSystem_to_FRF sys2)
     (null[sys1][T1])
-    (null[sys2][T2]).
+    (null[sys2][T2])
+    (CS_Null_FunctionalRole sys1)
+    (CS_Null_FunctionalRole sys2).
 
 (* ======================== 前置引理（证明前置，无逻辑跳跃，依赖均为基础/场景层已证） ======================== *)
 (* 引理1：跨系统空值类型差异（复用FRF_CS_Null_Common，支撑系统相对性） *)
@@ -197,10 +205,8 @@ Proof.
   intros sys1 sys2 T1 T2 H_equiv.
   unfold null_func_equiv in H_equiv.
   apply FRF_MetaTheory.func_equiv_criterion in H_equiv.
-  destruct H_equiv as [f [H_bij H_op]].
-  split.
-  - apply FRF_MetaTheory.core_feat_equiv_trans with (r2 := CS_Null_FunctionalRole sys1); auto.
-  - apply FRF_MetaTheory.edge_feat_sim_sym; compute; reflexivity.
+  destruct H_equiv as [H_core_equiv H_edge_sim].
+  split; auto.
 Qed.
 
 (* 引理9：身份等价→角色等价（新增辅助引理，支撑双向闭环） *)
@@ -214,9 +220,7 @@ Lemma cross_null_identity_implies_role_equiv : ∀ (sys : CS_FormalSystem) (T1 T
     (CS_Null_FunctionalRole sys) = 1.0.
 Proof.
   intros sys T1 T2 H_id_eq.
-  split.
-  - reflexivity.
-  - compute; reflexivity.
+  split; [reflexivity | compute; reflexivity].
 Qed.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备，补全双向闭环） ======================== *)
@@ -233,7 +237,7 @@ Qed.
 
 (* 定理2：跨系统空值身份唯一性（整合场景层身份唯一性，FRF核心主张） *)
 Theorem cross_null_identity_unique : ∀ (sys : CS_FormalSystem) (T : Type) (v : FRF_MetaTheory.carrier (CS_FormalSystem_to_FRF sys)),
-  FRF_MetaTheory.FunctionalRole (CS_FormalSystem_to_FRF sys) (CS_Null_FunctionalRole sys) v (fun _ => true) ∧
+  FRF_MetaTheory.PlaysFunctionalRole (CS_FormalSystem_to_FRF sys) v (CS_Null_FunctionalRole sys) ∧
   (∀ rel ∈ CS_Null_DefinitiveRelations sys, rel v (null[sys][T]) (cross_system_null sys (T→T))) →
   v = null[sys][T].
 Proof.
@@ -251,9 +255,6 @@ Theorem safety_score_correlates_with_risk : ∀ (sys1 sys2 : CS_FormalSystem),
 Proof.
   intros sys1 sys2 H_score.
   unfold null_safety_score, runtime_risk, compile_risk, compile_weight, runtime_weight, propagation_weight, type_safe_weight.
-  Definition runtime_risk (sys : CS_FormalSystem) : R := if match sys with CxxSys | JavaSys => true | _ => false end then 1.0 else 0.0.
-  Definition compile_risk (sys : CS_FormalSystem) : R := if match sys with RustSys => false | _ => true end then 1.0 else 0.0.
-  
   destruct sys1, sys2; try contradiction H_score; compute; lia.
 Qed.
 
@@ -301,7 +302,6 @@ Proof.
   intros sys.
   unfold compile_weight, runtime_weight, propagation_weight, type_safe_weight, total_risk_reduction.
   apply risk_reduction_valid.
-  assert (H_cat := FRF_MetaTheory.system_property_category_eq_dec (CS_FormalSystem_to_FRF sys) (CS_FormalSystem_to_FRF sys)).
   compute; split; [eq_refl | split; [eq_refl | split; [eq_refl | eq_refl]]].
 Qed.
 
@@ -312,7 +312,7 @@ Proof.
   intros sys T1 T2 H_func_equiv.
   apply null_func_equiv_implies_role_equiv in H_func_equiv.
   destruct H_func_equiv as [H_core_equiv H_edge_sim].
-  assert (H_func : FRF_MetaTheory.FunctionalRole (CS_FormalSystem_to_FRF sys) (CS_Null_FunctionalRole sys) (null[sys][T1]) (fun _ => true)) by apply all_null_play_role.
+  assert (H_func : FRF_MetaTheory.PlaysFunctionalRole (CS_FormalSystem_to_FRF sys) (null[sys][T1]) (CS_Null_FunctionalRole sys)) by apply all_null_play_role.
   assert (H_rel : ∀ rel ∈ CS_Null_DefinitiveRelations sys, rel (null[sys][T1]) (null[sys][T2]) (cross_system_null sys (T2→T2))) by auto.
   apply cross_null_identity_unique with (sys := sys) (T := T2) (v := null[sys][T1]); auto.
 Qed.
@@ -348,4 +348,4 @@ Export cross_null_not_func_equiv all_null_play_role cross_null_identity_unique.
 Export safety_score_correlates_with_risk cross_null_frf_consistent unified_null_op_valid.
 Export no_cross_null_essence safety_score_weight_theorem.
 Export cross_null_func_equiv_implies_identity cross_null_identity_implies_func_equiv cross_null_identity_implies_role_same.
-Export compile_weight runtime_weight propagation_weight type_safe_weight.
+Export compile_weight runtime_weight propagation_weight type_safe_weight runtime_risk compile_risk.
