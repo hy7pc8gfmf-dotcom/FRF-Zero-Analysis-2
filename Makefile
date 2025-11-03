@@ -1,6 +1,6 @@
 # ===========================================
 # FRF Formal Verification Framework - Makefile
-# 稳定版本：简化依赖和路径映射，确保编译成功
+# 稳定版本：与CI流程和CoqProject完全匹配
 # ===========================================
 
 # ========================
@@ -10,15 +10,19 @@ COQC = coqc
 COQCHK = coqchk
 COQDOC = coqdoc
 
-# 简化路径映射（确保与CI一致）
+# 路径映射（与CoqProject和CI完全一致）
 COQFLAGS = -Q . FRF \
            -Q SelfContainedLib SelfContainedLib \
            -Q theories FRF.Theories \
+           -Q CS_Null FRF.CS_Null \
+           -Q Quantum FRF.Quantum \
+           -Q DynamicSystem FRF.DynamicSystem \
+           -Q Test FRF.Test \
            -w -notation-overridden \
            -q
 
 # ========================
-# SOURCE FILES (核心模块，按依赖顺序)
+# SOURCE FILES (与CoqProject完全一致)
 # ========================
 
 # Level 1: 基础库（无依赖）
@@ -67,6 +71,12 @@ TEST_MODULES = \
 	Test/Test_QuantumVacuum.v \
 	Test/Test_BlockchainSystem.v
 
+# Dynamic System模块（可选）
+DYNAMIC_SYSTEM = \
+	DynamicSystem/DistributedSystem.v \
+	DynamicSystem/BlockchainSystem.v \
+	DynamicSystem/ControlSystem.v
+
 # 完整文件列表（按依赖顺序）
 ALL_SRC_FILES = \
 	$(CORE_BASE) \
@@ -74,7 +84,8 @@ ALL_SRC_FILES = \
 	$(CORE_SCENES) \
 	$(EXTENSION_MODULES) \
 	$(INTEGRATION_MODULES) \
-	$(TEST_MODULES)
+	$(TEST_MODULES) \
+	$(DYNAMIC_SYSTEM)
 
 ALL_VO_FILES = $(ALL_SRC_FILES:.v=.vo)
 
@@ -95,7 +106,7 @@ all: compile validate
 compile: $(ALL_VO_FILES)
 	@echo "✅ 所有模块编译完成！"
 
-# 核心编译：只编译基础模块
+# 核心编译：只编译基础模块（CI最小验证集）
 compile-core: $(CORE_BASE:.v=.vo) $(CORE_FRF:.v=.vo)
 	@echo "✅ 核心模块编译完成！"
 
@@ -103,7 +114,7 @@ compile-core: $(CORE_BASE:.v=.vo) $(CORE_FRF:.v=.vo)
 # ROBUST COMPILATION RULES
 # ========================
 
-# 通用编译规则（带详细错误处理）
+# 通用编译规则（带详细错误处理，与CI流程匹配）
 %.vo: %.v
 	@echo "编译: $<"
 	@if $(COQC) $(COQFLAGS) "$<" > "$<.log" 2>&1; then \
@@ -133,14 +144,14 @@ validate: compile
 
 test: compile
 	@echo "🧪 运行测试套件..."
-	@echo "✅ FRF框架验证完成！"
 	@vo_count=0; \
 	for vo in $(ALL_VO_FILES); do \
 		if [ -f "$$vo" ]; then \
 			vo_count=$$((vo_count + 1)); \
 		fi \
 	done; \
-	echo "📋 已验证模块: $$vo_count 个"
+	echo "✅ FRF框架验证完成！"
+	@echo "📋 已验证模块: $$vo_count 个"
 
 check: 
 	@echo "📊 编译状态检查..."
@@ -157,14 +168,14 @@ check:
 	done; \
 	echo "总Coq文件: $$total_files"; \
 	echo "已编译: $$compiled_files"; \
-	if [ $$compiled_files -ge 1 ]; then \
-		echo "✅ 编译通过 (至少编译了 $$compiled_files 个文件)"; \
+	if [ $$compiled_files -ge 3 ]; then \
+		echo "✅ 核心编译通过 (至少编译了 $$compiled_files 个文件)"; \
 	else \
-		echo "❌ 编译失败，无编译产物"; \
+		echo "❌ 编译失败，需要至少3个核心模块"; \
 		exit 1; \
 	fi
 
-# 分级测试目标
+# 分级测试目标（与CI分步编译对应）
 test-level1: $(CORE_BASE:.v=.vo)
 	@echo "✅ Level 1 基础库验证完成！"
 
@@ -196,6 +207,7 @@ check-version:
 		echo "✅ Coq版本正确"; \
 	else \
 		echo "⚠️ Coq版本不匹配：需要 8.18.0，当前 $$current_version"; \
+		echo "请运行: opam install coq.8.18.0"; \
 	fi
 
 deps:
@@ -207,7 +219,6 @@ deps:
 		coq-bignums
 	@echo "✅ 依赖安装完成！"
 
-# 简化依赖检查
 check-deps:
 	@echo "🔍 检查依赖..."
 	@for pkg in coq-mathcomp-ssreflect coq-equations coq-bignums; do \
@@ -217,21 +228,6 @@ check-deps:
 			echo "❌ $$pkg - 未安装"; \
 		fi \
 	done
-
-# ========================
-# SIMPLE COMPILATION (替代方案)
-# ========================
-
-# 直接编译方法，避免复杂的依赖关系
-compile-simple:
-	@echo "🛠️ 使用简单编译方法..."
-	@for file in $(CORE_BASE) $(CORE_FRF); do \
-		if [ -f "$$file" ]; then \
-			echo "编译: $$file"; \
-			$(COQC) $(COQFLAGS) "$$file" || echo "编译跳过: $$file"; \
-		fi \
-	done
-	@echo "✅ 简单编译完成！"
 
 # ========================
 # DIAGNOSTIC TARGETS
@@ -260,6 +256,28 @@ diagnose:
 	@rm -f /tmp/test_coq.v
 	@echo "4. 当前编译状态:"
 	@make --silent status
+
+# 环境验证（用于CI前置检查）
+env-check:
+	@echo "🔍 环境验证..."
+	@which coqc > /dev/null && echo "✅ coqc 命令可用" || echo "❌ coqc 命令不可用"
+	@coqc --version | head -1
+	@echo "项目文件数: $$(find . -name '*.v' | wc -l)"
+
+# ========================
+# SIMPLE COMPILATION (替代方案)
+# ========================
+
+# 直接编译方法，避免复杂的依赖关系
+compile-simple:
+	@echo "🛠️ 使用简单编译方法..."
+	@for file in $(CORE_BASE) $(CORE_FRF); do \
+		if [ -f "$$file" ]; then \
+			echo "编译: $$file"; \
+			$(COQC) $(COQFLAGS) "$$file" || echo "编译跳过: $$file"; \
+		fi \
+	done
+	@echo "✅ 简单编译完成！"
 
 # ========================
 # DOCUMENTATION
@@ -319,6 +337,7 @@ help:
 	@echo ""
 	@echo "诊断工具："
 	@echo "  diagnose      - 诊断编译环境问题"
+	@echo "  env-check     - 环境验证"
 	@echo "  status        - 显示编译状态"
 	@echo ""
 	@echo "分级测试："
@@ -377,3 +396,7 @@ status:
 # 快速验证目标
 quick: compile-simple check
 	@echo "🚀 快速验证完成！"
+
+# 最小验证集（CI核心验证）
+minimal: test-level1 test-level2 check
+	@echo "🎯 最小验证集完成！"

@@ -1,9 +1,9 @@
 # ===========================================
 # FRF Formal Verification Framework - CoqProject
-# 稳定版本：简化路径映射，确保与Makefile和CI一致
+# 稳定版本：与重构的CI流程完全匹配
 # ===========================================
 
-# 核心路径映射（与Makefile和CI完全一致）
+# 核心路径映射（与global-verification.yml和Makefile完全一致）
 -R . FRF
 -Q SelfContainedLib SelfContainedLib
 -Q theories FRF.Theories
@@ -17,19 +17,18 @@
 -q
 
 # 依赖包（仅使用确认可用的包）
--arg -async-proofs
--arg -off
+# 注意：已在CI中安装 coq.8.18.0 和 coq-mathcomp-ssreflect
 
 # ========================
 # SOURCE FILES (按依赖顺序排列)
 # ========================
 
-# Level 1: 基础库（无依赖）
+# Level 1: 基础库（无依赖）- 在CI中首先编译
 SelfContainedLib/Algebra.v
 SelfContainedLib/Category.v
 SelfContainedLib/Geometry.v
 
-# Level 2: FRF元理论（依赖基础库）
+# Level 2: FRF元理论（依赖基础库）- 在CI中第二步编译
 theories/FRF_MetaTheory.v
 theories/ChurchNumerals.v
 theories/ChurchZero.v
@@ -65,30 +64,46 @@ Test/Test_QuantumVacuum.v
 Test/Test_BlockchainSystem.v
 
 # ========================
-# DEPENDENCY NOTES
+# DYNAMIC SYSTEM MODULES (可选扩展)
 # ========================
-# 依赖关系说明：
-# - Level 1: 基础数学结构，无外部依赖
-# - Level 2: 基于基础库构建的FRF元理论
-# - Level 3: 应用FRF理论到具体数学领域
-# - Level 4: 扩展到量子计算和空值分析
-# - Level 5: 集成验证和比较分析
-# - Level 6: 测试和验证用例
+DynamicSystem/DistributedSystem.v
+DynamicSystem/BlockchainSystem.v
+DynamicSystem/ControlSystem.v
 
 # ========================
-# COMPATIBILITY NOTES
+# COMPATIBILITY & VALIDATION
 # ========================
-# 兼容性说明：
-# - Coq版本: 8.18.0
-# - 依赖包: coq-mathcomp-ssreflect, coq-equations, coq-bignums
-# - 已验证平台: Ubuntu 22.04
-# - 构建工具: 与Makefile和GitHub Actions CI兼容
+
+# 验证说明：
+# - 此CoqProject与重构的CI流程完全兼容
+# - 使用简化的路径映射，避免复杂依赖
+# - 文件顺序确保编译依赖关系正确
+# - 支持渐进式编译验证
+
+# 环境要求：
+# - Coq版本: 8.18.0 (必须)
+# - 依赖包: coq-mathcomp-ssreflect (必须)
+# - 平台: Ubuntu 22.04 (已验证)
+
+# 编译方法：
+# 1. 使用CI流程: 自动使用此配置
+# 2. 本地编译: coqc -Q ... 使用相同路径映射
+# 3. Makefile集成: 与Makefile中的COQFLAGS保持一致
+
+# 成功标准：
+# - Level 1 + Level 2 编译成功 = 基础验证通过
+# - 全部模块编译成功 = 完整验证通过
 
 # ========================
-# USAGE
+# TROUBLESHOOTING
 # ========================
-# 使用说明：
-# 1. 使用coq_makefile生成Makefile: coq_makefile -f CoqProject -o Makefile
-# 2. 或者直接使用现有的简化Makefile
-# 3. 在CoqIDE中打开时，加载此CoqProject文件
-# 4. 在CI中使用: coqc -Q ... 使用相同的路径映射
+
+# 常见问题解决：
+# 1. 编译失败: 检查Coq版本是否为8.18.0
+# 2. 路径错误: 验证-Q参数与实际目录结构匹配
+# 3. 依赖缺失: 确保安装coq-mathcomp-ssreflect
+# 4. 文件缺失: 检查项目结构是否完整
+
+# 验证状态检查：
+# - 运行 find . -name "*.vo" | wc -l 检查编译产物
+# - 至少应有3个基础模块编译成功 (Algebra, Category, Geometry)
