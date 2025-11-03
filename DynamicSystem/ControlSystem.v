@@ -1,4 +1,4 @@
-# DynamicSystem/ControlSystem.v
+(* # DynamicSystem/ControlSystem.v *)
 (* 模块定位：控制系统中“0”（零平衡点）形式化验证核心（二级场景层），对应FRF 2.0框架
    核心优化：1. 复用跨模块序列化函数，去除重复定义；2. 强化约束显式化，消除隐含假设；3. 补全证明断层，强化机械可执行性；4. 统一符号与动态零态接口，确保跨模块兼容
    依赖约束：一级基础层（FRF_MetaTheory/FRF_CS_Null_Common/SelfContainedLib）+ Mathlib分析库 + Serialization模块；适配Coq 8.18.0 + Mathlib 3.74.0 *)
@@ -27,7 +27,7 @@ Open Scope R_scope.
 Open Scope vector_scope.
 
 (* ======================== 定义前置（无重复、可机械执行，依赖均为已证定义） ======================== *)
-### 1. 基础数据结构（强化约束显式化，无隐含假设）
+(* ### 1. 基础数据结构（强化约束显式化，无隐含假设） *)
 (* 控制状态：n维实向量，明确维度约束，与Vector模块对齐 *)
 Definition ControlState (n : nat) : Type := Vector R n.
 Arguments ControlState {_} : clear implicits.
@@ -49,7 +49,7 @@ Arguments ControlSystem {_} : clear implicits.
 Definition ZeroEquilibrium {n : nat} (CS : ControlSystem n) : CS.(state_space) := Vector.const n 0.
 Arguments ZeroEquilibrium {_ _} : clear implicits.
 
-### 2. 核心辅助定义（补全逻辑前提，对接跨模块接口）
+(* ### 2. 核心辅助定义（补全逻辑前提，对接跨模块接口） *)
 (* 2.1 动态零态定义：严格符合DynamicZero规范，支撑FRF全局可达性与时间不变性 *)
 Definition control_dynamic_zero {n : nat} (CS : ControlSystem n) : DynamicZero (ControlSystemFRF n) :=
   exist _ (ZeroEquilibrium CS)
@@ -88,7 +88,7 @@ Definition set_to_control_transition {n : nat} (s1 s2 : ZFC.set) (c : ControlSta
   let vec2 := chain_of_set s2 in
   Vector.norm (vec1 + vec2 - c) ≤ 1e-6. (* 数值稳定性约束，明确实数比较 *)
 
-### 3. 控制系统FRF形式化（严格对接FormalSystem，无结构偏差）
+(* ### 3. 控制系统FRF形式化（严格对接FormalSystem，无结构偏差） *)
 Definition ControlSystemFRF {n : nat} : FRF_MetaTheory.FormalSystem := {|
   FRF_MetaTheory.system_name := "Control_System_Zero_Equilibrium";
   FRF_MetaTheory.carrier := ControlSystem n;
@@ -121,7 +121,7 @@ Definition ControlSystemFRF {n : nat} : FRF_MetaTheory.FormalSystem := {|
 |}.
 Arguments ControlSystemFRF {_} : clear implicits.
 
-### 4. 核心概念定义（完善稳定性量化，去除隐含假设）
+(* ### 4. 核心概念定义（完善稳定性量化，去除隐含假设） *)
 (* 渐近稳定性：补充ε-δ量化，明确收敛条件，覆盖所有初始场景 *)
 Definition AsymptoticallyStable {n : nat} (CS : ControlSystem n) (x0 : CS.(state_space)) : Prop :=
   ∀ ε > 0, ∃ δ > 0, ∀ x, Vector.norm (x - x0) < δ → 
@@ -130,14 +130,14 @@ Definition AsymptoticallyStable {n : nat} (CS : ControlSystem n) (x0 : CS.(state
 Arguments AsymptoticallyStable {_ _} _ : clear implicits.
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 序列化函数正确性引理（复用跨模块已证结果，确保一致性）
+(* ### 1. 序列化函数正确性引理（复用跨模块已证结果，确保一致性） *)
 Lemma string_to_bytes_inj : ∀ s1 s2 : string, string_to_bytes s1 = string_to_bytes s2 → s1 = s2.
 Proof. apply Serialization.string_to_bytes_inj. Qed.
 
 Lemma R_to_bytes_compat : ∀ r : R, string_to_bytes (string_of_R r) = R_to_bytes r.
 Proof. reflexivity. Qed.
 
-### 2. 动力学解的存在唯一性引理（补全前提验证，无逻辑跳跃）
+(* ### 2. 动力学解的存在唯一性引理（补全前提验证，无逻辑跳跃） *)
 Lemma solve_dynamics_exists_unique : ∀ {n : nat} (CS : ControlSystem n) (x : ControlState n),
   ∃! (sol : R → ControlState n), sol 0 = x ∧ ∀ t, deriv sol t = CS.(dynamics) (sol t) sol.
 Proof.
@@ -148,7 +148,7 @@ Proof.
     apply FiniteDimensionalBanachSpace (ControlState n).
 Qed.
 
-### 3. 零平衡点时间不变性引理（补全证明，无隐含假设）
+(* ### 3. 零平衡点时间不变性引理（补全证明，无隐含假设） *)
 Lemma zero_equilibrium_immutable : ∀ {n : nat} (CS : ControlSystem n) (t : nat),
   C_trans(t, ZeroEquilibrium CS) = ZeroEquilibrium CS.
 Proof.
@@ -162,7 +162,7 @@ Qed.
 Where zero_state_valid {n : nat} (CS : ControlSystem n) : chain_valid (ZeroEquilibrium CS) :=
   unfold chain_valid, ZeroEquilibrium. split; auto.
 
-### 4. Lyapunov导数负定性引理（强化证明，依赖严格正定）
+(* ### 4. Lyapunov导数负定性引理（强化证明，依赖严格正定） *)
 Lemma lyapunov_deriv_neg_def : ∀ {n : nat} (CS : ControlSystem n),
   ∀ x ≠ 0ₛ, derivative (fun t => CS.(lyapunov) (proj1 (solve_dynamics_exists_unique CS x) t)) 0 < 0.
 Proof.
@@ -174,7 +174,7 @@ Proof.
   - apply CS.(dyn_lipschitz). (* Lipschitz条件 *)
 Qed.
 
-### 5. 收敛性与收敛时间唯一性引理（补全渐近稳定性推导）
+(* ### 5. 收敛性与收敛时间唯一性引理（补全渐近稳定性推导） *)
 Lemma asymptotic_stability_converge : ∀ {n : nat} (CS : ControlSystem n) (x : ControlState n) (converge_steps : nat),
   converge_steps = nat_of_R (Vector.norm x / 1e-6) →
   C_trans(converge_steps, x) = ZeroEquilibrium CS.
@@ -197,7 +197,7 @@ Proof.
   rewrite H, H0. reflexivity.
 Qed.
 
-### 6. 零平衡点渐近稳定性引理（补全证明，无逻辑断层）
+(* ### 6. 零平衡点渐近稳定性引理（补全证明，无逻辑断层） *)
 Lemma zero_equilibrium_asymptotically_stable : ∀ {n : nat} (CS : ControlSystem n),
   AsymptoticallyStable CS (ZeroEquilibrium CS).
 Proof.
@@ -219,7 +219,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备） ======================== *)
-### 1. 零平衡点功能必要性（FRF核心，无逻辑跳跃）
+(* ### 1. 零平衡点功能必要性（FRF核心，无逻辑跳跃） *)
 Theorem zero_equilibrium_necessary {n : nat} :
   ∀ (CS : ControlSystemFRF n.(FRF_MetaTheory.carrier)) (x0 : CS.(state_space)),
   x0 = ZeroEquilibrium CS ∧ AsymptoticallyStable CS x0 →
@@ -235,7 +235,7 @@ Proof.
     auto.
 Qed.
 
-### 2. 零平衡点身份唯一性（FRF核心：功能+关系决定身份）
+(* ### 2. 零平衡点身份唯一性（FRF核心：功能+关系决定身份） *)
 Theorem zero_eq_identity_unique {n : nat} :
   ∀ (CS : ControlSystemFRF n.(FRF_MetaTheory.carrier)) (x1 x2 : CS.(state_space)),
   x1 = ZeroEquilibrium CS ∧ AsymptoticallyStable CS x1 ∧
@@ -249,7 +249,7 @@ Proof.
   rewrite Hx1, Hx2; reflexivity.
 Qed.
 
-### 3. 零平衡点FRF角色验证（严格对接FRF_MetaTheory）
+(* ### 3. 零平衡点FRF角色验证（严格对接FRF_MetaTheory） *)
 Theorem zero_eq_plays_frf_role {n : nat} :
   FRF_MetaTheory.PlaysFunctionalRole (ControlSystemFRF n) (ControlSystemFRF n.(FRF_MetaTheory.id)) zero_eq_functional_role.
 Proof.
@@ -263,7 +263,7 @@ Proof.
   |}; auto.
 Defined.
 
-### 4. 控制系统与集合论零系统同构（跨系统融合，无类型冲突）
+(* ### 4. 控制系统与集合论零系统同构（跨系统融合，无类型冲突） *)
 Theorem control_set_zero_isomorphism {n : nat} :
   ∃ f : ZeroMorphism (DynamicZeroSystem (ControlSystemFRF n) (ZeroEquilibrium (ControlSystem n))) SetZeroSystem,
   IsIsomorphism ZCat f.
@@ -302,7 +302,7 @@ Proof.
     + apply set_chain_set_inverse; auto.
 Qed.
 
-### 5. 动态系统规范性验证（补充transition_compose完整证明）
+(* ### 5. 动态系统规范性验证（补充transition_compose完整证明） *)
 Theorem control_system_trans_compose : ∀ {n : nat} (t1 t2 : nat) (c : ControlState n),
   C_trans(t1 + t2, c) = C_trans(t2, C_trans(t1, c)).
 Proof.

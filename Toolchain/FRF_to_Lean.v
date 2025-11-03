@@ -1,4 +1,4 @@
-# Toolchain/FRF_to_Lean.v
+(* # Toolchain/FRF_to_Lean.v *)
 (* 模块定位：FRF 2.0 跨工具链核心模块，实现 Coq → Lean 4 形式化翻译，
    核心优化：1. 补全FRFTerm归纳原理与终止性证明，消除形式化断层；
             2. 替换"unknown_type"为可追溯标注，移除模糊处理；
@@ -24,7 +24,7 @@ Require Import Mathlib.Data.Real.String.
 Require Import Mathlib.Logic.IndefiniteDescription.
 
 (* ======================== 定义前置（形式化完备，无模糊，机械可执行） ======================== *)
-### 1. 核心项类型定义（FRFTerm，显式绑定类型参数，覆盖全FRF场景）
+(* ### 1. 核心项类型定义（FRFTerm，显式绑定类型参数，覆盖全FRF场景） *)
 Inductive FRFTerm : Type :=
   | TypeTerm : Type → FRFTerm                                  (* 基础类型项（nat/Real/FRF组件类型） *)
   | PropTerm : Prop → FRFTerm                                  (* 命题项（公理/定理内容） *)
@@ -41,7 +41,7 @@ Inductive FRFTerm : Type :=
 Arguments FRFTerm : clear implicits.
 Arguments ZeroMorphismTerm {_ _} _ : clear implicits.
 
-### 2. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞）
+(* ### 2. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞） *)
 Lemma FRFTerm_ind :
   ∀ P : FRFTerm → Prop,
     (* 基础情况：原子项 *)
@@ -71,7 +71,7 @@ Proof.
     apply HMatrix; apply FRFTerm_ind; auto.
 Qed.
 
-### 3. 字符串处理函数（全覆盖类型，无模糊丢弃，符号统一）
+(* ### 3. 字符串处理函数（全覆盖类型，无模糊丢弃，符号统一） *)
 (* 3.1 FRFTerm类型判别（安全无副作用，支撑后续翻译分支） *)
 Definition is_type_term (t : FRFTerm) : bool := match t with TypeTerm _ => true | _ => false end.
 Definition is_prop_term (t : FRFTerm) : bool := match t with PropTerm _ => true | _ => false end.
@@ -133,14 +133,14 @@ Definition extract_zero_morphism {S T : FRF2_CrossSystem.ZeroSystem}
   (t : FRFTerm) : option (FRF2_CrossSystem.ZeroMorphism S T) :=
   match t with ZeroMorphismTerm {S} {T} f => Some f | _ => None end.
 
-### 4. 翻译核心类型（统一Toolchain模块接口，无歧义）
+(* ### 4. 翻译核心类型（统一Toolchain模块接口，无歧义） *)
 Definition LeanSyntax : Type := string.
 Definition LeanTranslation : Type := option LeanSyntax.
 Arguments LeanSyntax : clear implicits.
 Arguments LeanTranslation : clear implicits.
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 字符串分割正确性（复用Mathlib已证引理，无重复证明）
+(* ### 1. 字符串分割正确性（复用Mathlib已证引理，无重复证明） *)
 Lemma split_on_correct : ∀ (s sep target : string),
   String.contains s target →
   target ∈ StringSplitter.split sep s.
@@ -157,7 +157,7 @@ Proof.
       apply IHt in H_contain; apply StringSplitter.split_cons_head_neq_out.
 Qed.
 
-### 2. FRFTerm提取正确性（确保提取结果与原项类型匹配）
+(* ### 2. FRFTerm提取正确性（确保提取结果与原项类型匹配） *)
 Lemma extract_formal_system_correct : ∀ (S : FRF_MetaTheory.FormalSystem),
   extract_formal_system (FormalSystemTerm S) = Some S.
 Proof. intros S; reflexivity. Qed.
@@ -166,17 +166,17 @@ Lemma extract_zero_morphism_correct : ∀ (S T : FRF2_CrossSystem.ZeroSystem) (f
   extract_zero_morphism (ZeroMorphismTerm f) = Some f.
 Proof. intros S T f; reflexivity. Qed.
 
-### 3. 翻译保类型一致性（同类型项翻译后字符串相同，避免Lean类型错误）
+(* ### 3. 翻译保类型一致性（同类型项翻译后字符串相同，避免Lean类型错误） *)
 Lemma string_of_frf_type_consistent : ∀ T1 T2 : Type,
   T1 = T2 → string_of_frf_type T1 = string_of_frf_type T2.
 Proof. intros T1 T2 H_eq; rewrite H_eq; reflexivity. Qed.
 
 (* ======================== 核心翻译函数（逻辑严谨，保性质，证明完备） ======================== *)
-### 1. 辅助函数：未覆盖场景统一处理（容错无崩溃，支撑批量翻译）
+(* ### 1. 辅助函数：未覆盖场景统一处理（容错无崩溃，支撑批量翻译） *)
 Definition handle_uncovered (desc : string) : LeanTranslation :=
   None. (* 明确返回None，避免静默失败，上游可捕获错误 *)
 
-### 2. FRFTerm→Lean 4基础翻译（结构递归，正确性可证）
+(* ### 2. FRFTerm→Lean 4基础翻译（结构递归，正确性可证） *)
 Definition frf_term_to_lean (t : FRFTerm) : LeanTranslation :=
   Some (string_of_frf_term t).
 (* 正确性证明：翻译结果与字符串表示完全一致 *)
@@ -184,7 +184,7 @@ Lemma frf_term_to_lean_correct : ∀ t : FRFTerm,
   frf_term_to_lean t = Some (string_of_frf_term t).
 Proof. intros t; reflexivity. Qed.
 
-### 3. 形式系统翻译（保所有字段，符合Lean 4 Structure语法，无字段遗漏）
+(* ### 3. 形式系统翻译（保所有字段，符合Lean 4 Structure语法，无字段遗漏） *)
 Definition coq_formal_system_to_lean (S : FRF_MetaTheory.FormalSystem) : LeanTranslation :=
   let carrier_term := TypeTerm (FRF_MetaTheory.carrier S) in
   match frf_term_to_lean carrier_term with
@@ -219,7 +219,7 @@ end FRF")
   end.
 Arguments coq_formal_system_to_lean {_} : clear implicits.
 
-### 4. 零系统翻译（保核心性质：左单位律/右单位律/唯一性，无性质丢失）
+(* ### 4. 零系统翻译（保核心性质：左单位律/右单位律/唯一性，无性质丢失） *)
 Definition coq_zero_system_to_lean (ZS : FRF2_CrossSystem.ZeroSystem) : LeanTranslation :=
   let obj_term := TypeTerm (FRF2_CrossSystem.ZS_obj ZS) in
   match frf_term_to_lean obj_term with
@@ -244,7 +244,7 @@ end FRF")
   end.
 Arguments coq_zero_system_to_lean {_} : clear implicits.
 
-### 5. 零态射翻译（保结构映射：保运算/保零元素，无结构丢失）
+(* ### 5. 零态射翻译（保结构映射：保运算/保零元素，无结构丢失） *)
 Definition coq_zero_morphism_to_lean (S T : FRF2_CrossSystem.ZeroSystem) (f : FRF2_CrossSystem.ZeroMorphism S T) : LeanTranslation :=
   let dom_term := TypeTerm (FRF2_CrossSystem.ZS_obj S) in
   let codom_term := TypeTerm (FRF2_CrossSystem.ZS_obj T) in
@@ -268,7 +268,7 @@ end FRF")
   end.
 Arguments coq_zero_morphism_to_lean {_ _ _} : clear implicits.
 
-### 6. 命题翻译（保逻辑结构：全称/存在/析取/等价，无逻辑丢失）
+(* ### 6. 命题翻译（保逻辑结构：全称/存在/析取/等价，无逻辑丢失） *)
 Fixpoint coq_prop_to_lean (P : Prop) : LeanTranslation :=
   match P with
   | ∀ x : A, Q x => 
@@ -336,7 +336,7 @@ Fixpoint coq_prop_to_lean (P : Prop) : LeanTranslation :=
   end.
 Arguments coq_prop_to_lean {_} : clear implicits.
 
-### 7. Coq定理→Lean 4 Theorem（含自动化证明脚本，适配Lean语法）
+(* ### 7. Coq定理→Lean 4 Theorem（含自动化证明脚本，适配Lean语法） *)
 Definition coq_theorem_to_lean (thmName : string) (thmProp : Prop) : LeanTranslation :=
   match coq_prop_to_lean thmProp with
   | Some leanProp =>
@@ -351,7 +351,7 @@ end FRF")
   end.
 Arguments coq_theorem_to_lean _ _ : clear implicits.
 
-### 8. Lean 4文件批量生成（容错处理，支撑工程化调用）
+(* ### 8. Lean 4文件批量生成（容错处理，支撑工程化调用） *)
 Definition lean_common_imports : LeanSyntax :=
   "import Mathlib.Algebra.Monoid
 import Mathlib.LinearAlgebra.Matrix
@@ -382,7 +382,7 @@ Definition generate_lean_file (sysList : list FRF2_CrossSystem.ZeroSystem) (thmL
 .
 
 (* ======================== 核心定理（证明完备，无Admitted，逻辑闭环） ======================== *)
-### 1. 形式系统翻译保公理集（所有Coq公理均被Lean保留）
+(* ### 1. 形式系统翻译保公理集（所有Coq公理均被Lean保留） *)
 Theorem coq_formal_system_axioms_preserved : ∀ (S : FRF_MetaTheory.FormalSystem) (ax : FRF_MetaTheory.Axiom),
   ax ∈ FRF_MetaTheory.axioms S →
   match coq_formal_system_to_lean S with
@@ -409,7 +409,7 @@ Proof.
   apply split_on_correct with (sep := ", ") (target := axStr) (s := leanSys); auto.
 Qed.
 
-### 2. 零系统翻译保核心性质（左单位律/右单位律/唯一性均被Lean保留）
+(* ### 2. 零系统翻译保核心性质（左单位律/右单位律/唯一性均被Lean保留） *)
 Theorem coq_zero_system_properties_preserved : ∀ (ZS : FRF2_CrossSystem.ZeroSystem),
   match coq_zero_system_to_lean ZS with
   | Some leanZS =>
@@ -438,7 +438,7 @@ Proof.
   split; [split; [exact leftIdIn | exact rightIdIn] | exact uniqueIn].
 Qed.
 
-### 3. 翻译正确性（Coq可证命题→Lean 4可证，无逻辑断层）
+(* ### 3. 翻译正确性（Coq可证命题→Lean 4可证，无逻辑断层） *)
 Theorem coq_provable_implies_lean_provable : ∀ (P : Prop),
   FRF_MetaTheory.axiom_valid FRF_MetaTheory.FRF_System P →
   ∃ (leanP : LeanSyntax),

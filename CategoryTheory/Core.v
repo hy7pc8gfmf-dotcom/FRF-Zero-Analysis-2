@@ -1,4 +1,4 @@
-# CategoryTheory/Core.v
+(* # CategoryTheory/Core.v *)
 (* 文件: CategoryTheory/Core.v *)
 (* 模块定位：范畴论核心结构适配层（二级场景层依赖入口），不再重复定义，统一导入全系统唯一源头（SelfContainedLib/Category.v）
    完善核心：1. 删除所有重复定义，显式导入SelfContainedLib.Category的核心结构，消除符号冲突

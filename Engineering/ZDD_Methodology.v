@@ -1,4 +1,4 @@
-# Engineering/ZDD_Methodology.v
+(* # Engineering/ZDD_Methodology.v *)
 (* 模块定位：FRF框架工程实践层核心（三级集成层），定义零概念驱动设计（ZDD）方法论，支撑跨领域零概念落地（分布式数据库/量子系统等），严格对接FRF元理论与场景层模块，无循环依赖
    核心优化：1. 解决类型安全问题（显式公理转换）；2. 完善错误处理（Option类型替代False_ind）；3. 提升性能（元数据索引+批量验证）；4. 优化证明可读性（拆分长证明+语义化步骤）
    依赖约束：一级基础层（FRF_MetaTheory/SelfContainedLib）+ 二级场景层（CaseA/B/D/E）；适配Coq 8.18.0 + Mathlib 3.74.0 *)
@@ -28,7 +28,7 @@ Open Scope cs_null_scope.
 Open Scope R_scope.
 
 (* ======================== 定义前置（无重复、可机械执行，依赖均为已证定义） ======================== *)
-### 1. 类型安全工具（解决类型转换问题）
+(* ### 1. 类型安全工具（解决类型转换问题） *)
 (* 1.1 公理显式转换函数（按场景分类，无类型冲突，对接FRF元理论） *)
 Inductive AxiomSource : Type :=
   | SetAxiom : AxiomSource  (* 集合论公理来源 *)
@@ -66,7 +66,7 @@ Definition axiom_cast_to_frf (tax : TypedAxiom) : FRF_MetaTheory.Axiom :=
      FRF_MetaTheory.axiom_sys := tax.(ax_sys)
   |}.
 
-### 2. 性能优化结构（支撑大规模场景）
+(* ### 2. 性能优化结构（支撑大规模场景） *)
 (* 2.1 元数据索引映射（O(1)查询元数据，替代列表遍历） *)
 Definition ZDD_MetadataMap : Type := Map string (∀ sys : FRF_MetaTheory.FormalSystem, ZDD_Metadata sys).
 (* 全局元数据索引：预加载所有场景元数据，支撑快速查询 *)
@@ -90,7 +90,7 @@ Definition default_batch_config : ZDD_BatchConfig := {|
   batch_failure_early := true
 |}.
 
-### 3. 核心ZDD定义（保留原功能，新增安全/性能字段）
+(* ### 3. 核心ZDD定义（保留原功能，新增安全/性能字段） *)
 (* 3.1 ZDD元数据（补充系统标识，支撑索引查询） *)
 Record ZDD_Metadata (sys : FRF_MetaTheory.FormalSystem) : Type := {
   zdd_sys_name : string; (* 系统名称：与索引映射对齐 *)
@@ -115,7 +115,7 @@ Record ZDD_Requirement : Type := {
 }.
 Arguments ZDD_Requirement : clear implicits.
 
-### 4. 安全操作函数（解决错误处理问题）
+(* ### 4. 安全操作函数（解决错误处理问题） *)
 (* 4.1 安全获取元数据（返回Option，处理系统不匹配） *)
 Definition zdd_metadata_safe (sys : FRF_MetaTheory.FormalSystem) (meta_map : ZDD_MetadataMap) : option (ZDD_Metadata sys) :=
   match map_lookup meta_map sys.(FRF_MetaTheory.system_name) with
@@ -131,7 +131,7 @@ Definition zdd_validate_cases_batch (zc : FRF_MetaTheory.carrier sys) (cases : l
   (all_ok, results)
 where "par_map ~n:=k f l" := (ParList.map ~chunk_size:=k f l).
 
-### 5. 核心ZDD流程（安全+性能优化）
+(* ### 5. 核心ZDD流程（安全+性能优化）
 (* 5.1 需求→零概念映射（安全版本，返回映射结果+是否成功） *)
 Definition requirement_to_zero_safe (req : ZDD_Requirement) (zc : FRF_MetaTheory.carrier req.(req_sys)) : bool * Prop :=
   let map_ok := ∀ x, req.(req_func) x ↔ FRF_MetaTheory.core_function (FRF_MetaTheory.ci_role (FRF_MetaTheory.cid_of req.(req_sys) zc)) x in
@@ -151,7 +151,7 @@ Definition ZDD_Valid_Safe (sys : FRF_MetaTheory.FormalSystem) (zc : FRF_MetaTheo
   end.
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 类型安全引理（支撑转换函数正确性）
+(* ### 1. 类型安全引理（支撑转换函数正确性） *)
 (* 1.1 集合论公理转换一致性：转换后公理与原公理逻辑等价 *)
 Lemma axiom_cast_set_consistent : ∀ (ax : CaseA_SetTheory.ZFC.Axiom),
   let tax := axiom_cast_set ax in
@@ -172,7 +172,7 @@ Proof.
     + apply H in empty_prop; auto.
 Qed.
 
-### 2. 性能优化引理（支撑索引与批量操作正确性）
+(* ### 2. 性能优化引理（支撑索引与批量操作正确性） *)
 (* 2.1 元数据索引完整性：存在的元数据能通过索引查询到 *)
 Lemma zdd_metadata_map_complete : ∀ (sys : FRF_MetaTheory.FormalSystem) (meta : ZDD_Metadata sys),
   In (sys.(FRF_MetaTheory.system_name), fun s => meta) (map_to_list global_zdd_metadata_map) →
@@ -200,7 +200,7 @@ Proof.
     reflexivity.
 Qed.
 
-### 3. 安全操作引理（支撑错误处理正确性）
+(* ### 3. 安全操作引理（支撑错误处理正确性） *)
 (* 3.1 元数据不存在时安全判定返回None *)
 Lemma zdd_valid_safe_none : ∀ (sys : FRF_MetaTheory.FormalSystem) (zc : FRF_MetaTheory.carrier sys) (req : ZDD_Requirement) (batch_config : ZDD_BatchConfig),
   zdd_metadata_safe sys global_zdd_metadata_map = None →
@@ -212,7 +212,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备，拆分长证明） ======================== *)
-### 1. ZDD设计流程正确性（核心定理，拆分为子引理）
+(* ### 1. ZDD设计流程正确性（核心定理，拆分为子引理） *)
 Theorem zdd_design_correct : ∀ (sys : FRF_MetaTheory.FormalSystem) (req : ZDD_Requirement) (meta : ZDD_Metadata sys) (zc : FRF_MetaTheory.carrier sys) (batch_config : ZDD_BatchConfig),
   (* 前提：系统/领域对齐、元数据合法 *)
   req.(req_sys) = sys ∧
@@ -287,7 +287,7 @@ Proof.
   exists ax; split; auto.
 Qed.
 
-### 2. 分布式数据库场景ZDD合法性（对接优化后的DB_ZeroDesign.v）
+(* ### 2. 分布式数据库场景ZDD合法性（对接优化后的DB_ZeroDesign.v） *)
 Theorem zdd_distdb_valid :
   let req := {|
     req_id := "DistDB_Req_001";
@@ -319,7 +319,7 @@ Proof.
     + apply CaseA_SetTheory.empty_necessary_for_nat_generation.
 Qed.
 
-### 3. ZDD与FRF框架兼容性（确保方法论无冲突）
+(* ### 3. ZDD与FRF框架兼容性（确保方法论无冲突） *)
 Theorem zdd_frf_compatible : ∀ (sys : FRF_MetaTheory.FormalSystem) (req : ZDD_Requirement) (meta : ZDD_Metadata sys) (zc : FRF_MetaTheory.carrier sys),
   ZDD_Valid sys zc req meta default_batch_config →
   FRF_MetaTheory.necessary_for_basic_property sys zc (FRF_MetaTheory.prop_category sys) ∧

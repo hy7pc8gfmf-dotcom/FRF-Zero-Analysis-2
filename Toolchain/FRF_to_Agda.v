@@ -1,4 +1,4 @@
-# Toolchain/FRF_to_Agda.v
+(* # Toolchain/FRF_to_Agda.v *)
 (* 模块定位：FRF 2.0 跨工具链核心模块，实现 Coq → Agda 形式化翻译，
    核心优化：1. 补全嵌套量化命题翻译与逻辑等价性证明，消除形式化断层；
             2. 移除冗余重复定义，统一符号与接口；
@@ -22,7 +22,7 @@ Require Import Mathlib.Data.Real.String.
 Require Import Mathlib.Logic.IndefiniteDescription.
 
 (* ======================== 定义前置（形式化完备，无模糊，机械可执行） ======================== *)
-### 1. 核心项类型定义（FRFTerm，显式绑定类型参数，覆盖全FRF场景）
+(* ### 1. 核心项类型定义（FRFTerm，显式绑定类型参数，覆盖全FRF场景） *)
 Inductive FRFTerm : Type :=
   | TypeTerm : Type → FRFTerm                                  (* 基础类型项（nat/R/FRF组件类型） *)
   | PropTerm : Prop → FRFTerm                                  (* 命题项（公理/定理内容） *)
@@ -39,7 +39,7 @@ Inductive FRFTerm : Type :=
 Arguments FRFTerm : clear implicits.
 Arguments ZeroMorphismTerm {_ _} _ : clear implicits.
 
-### 2. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞）
+(* ### 2. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞） *)
 Lemma FRFTerm_ind :
   ∀ P : FRFTerm → Prop,
     (∀ T : Type, P (TypeTerm T)) →
@@ -63,7 +63,7 @@ Proof.
   - apply HMatrix; apply FRFTerm_ind; auto.
 Qed.
 
-### 3. 字符串处理函数（全覆盖类型，无模糊丢弃，符号统一）
+(* ### 3. 字符串处理函数（全覆盖类型，无模糊丢弃，符号统一） *)
 Definition is_type_term (t : FRFTerm) : bool := match t with TypeTerm _ => true | _ => false end.
 Definition is_prop_term (t : FRFTerm) : bool := match t with PropTerm _ => true | _ => false end.
 Definition is_zero_morphism_term {S T : FRF2_CrossSystem.ZeroSystem} 
@@ -121,13 +121,13 @@ Definition extract_zero_morphism {S T : FRF2_CrossSystem.ZeroSystem}
   (t : FRFTerm) : option (FRF2_CrossSystem.ZeroMorphism S T) :=
   match t with ZeroMorphismTerm {S} {T} f => Some f | _ => None end.
 
-### 4. 翻译核心类型（统一Toolchain模块接口，无歧义）
+(* ### 4. 翻译核心类型（统一Toolchain模块接口，无歧义） *)
 Definition AgdaSyntax : Type := string.
 Definition AgdaTranslation : Type := option AgdaSyntax.
 Arguments AgdaSyntax : clear implicits.
 Arguments AgdaTranslation : clear implicits.
 
-### 5. 嵌套量化命题辅助定义（补充嵌套场景覆盖）
+(* ### 5. 嵌套量化命题辅助定义（补充嵌套场景覆盖）
 Definition is_nested_quant_prop (P : Prop) : bool :=
   match P with
   | ∀ x : A, ∃ y : B, _ => true
@@ -138,7 +138,7 @@ Definition is_nested_quant_prop (P : Prop) : bool :=
   end.
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 字符串分割正确性（复用Mathlib已证引理）
+(* ### 1. 字符串分割正确性（复用Mathlib已证引理） *)
 Lemma split_on_correct : ∀ (s sep target : string),
   String.contains s target →
   target ∈ StringSplitter.split sep s.
@@ -155,7 +155,7 @@ Proof.
       apply IHt in H_contain; apply StringSplitter.split_cons_head_neq_out.
 Qed.
 
-### 2. FRFTerm提取正确性
+(* ### 2. FRFTerm提取正确性 *)
 Lemma extract_formal_system_correct : ∀ (S : FRF_MetaTheory.FormalSystem),
   extract_formal_system (FormalSystemTerm S) = Some S.
 Proof. intros S; reflexivity. Qed.
@@ -163,12 +163,12 @@ Lemma extract_zero_morphism_correct : ∀ (S T : FRF2_CrossSystem.ZeroSystem) (f
   extract_zero_morphism (ZeroMorphismTerm f) = Some f.
 Proof. intros S T f; reflexivity. Qed.
 
-### 3. 翻译保类型一致性
+(* ### 3. 翻译保类型一致性 *)
 Lemma string_of_frf_type_consistent : ∀ T1 T2 : Type,
   T1 = T2 → string_of_frf_type T1 = string_of_frf_type T2.
 Proof. intros T1 T2 H_eq; rewrite H_eq; reflexivity. Qed.
 
-### 4. 嵌套量化命题翻译正确性引理（新增核心引理）
+(* ### 4. 嵌套量化命题翻译正确性引理（新增核心引理） *)
 Lemma forall_exists_prop_equiv : ∀ (A B : Type) (P : A → B → Prop),
   (∀ x : A, ∃ y : B, P x y) ↔ Σ (f : A → B), ∀ x : A, P x (f x).
 Proof.
@@ -181,7 +181,7 @@ Lemma exists_forall_prop_equiv : ∀ (A B : Type) (P : A → B → Prop),
   (∃ x : A, ∀ y : B, P x y) ↔ Σ x : A, ∀ y : B, P x y.
 Proof. split; auto. Qed.
 
-### 5. 嵌套量化翻译保逻辑结构引理
+(* ### 5. 嵌套量化翻译保逻辑结构引理 *)
 Lemma nested_quant_translation_preserves_logic : ∀ (A B : Type) (P : A → B → Prop),
   let coqProp := ∀ x : A, ∃ y : B, P x y in
   let agdaStr := "∀ {x : " ++ string_of_frf_type A ++ "}, Σ " ++ string_of_frf_type B ++ " (λ y → " ++ string_of_prop (P (TypeTerm A) (TypeTerm B)) ++ ")" in
@@ -192,17 +192,17 @@ Proof.
 Qed.
 
 (* ======================== 核心翻译函数（逻辑严谨，保性质，证明完备） ======================== *)
-### 1. 辅助函数：未覆盖场景统一处理
+(* ### 1. 辅助函数：未覆盖场景统一处理 *)
 Definition handle_uncovered (desc : string) : AgdaTranslation := None.
 
-### 2. FRFTerm→Agda基础翻译
+(* ### 2. FRFTerm→Agda基础翻译 *)
 Definition frf_term_to_agda (t : FRFTerm) : AgdaTranslation :=
   Some (string_of_frf_term t).
 Lemma frf_term_to_agda_correct : ∀ t : FRFTerm,
   frf_term_to_agda t = Some (string_of_frf_term t).
 Proof. intros t; reflexivity. Qed.
 
-### 3. 形式系统翻译
+(* ### 3. 形式系统翻译 *)
 Definition coq_formal_system_to_agda (S : FRF_MetaTheory.FormalSystem) : AgdaTranslation :=
   let carrier_term := TypeTerm (FRF_MetaTheory.carrier S) in
   match frf_term_to_agda carrier_term with
@@ -236,7 +236,7 @@ Definition coq_formal_system_to_agda (S : FRF_MetaTheory.FormalSystem) : AgdaTra
   end.
 Arguments coq_formal_system_to_agda {_} : clear implicits.
 
-### 4. 零系统翻译
+(* ### 4. 零系统翻译 *)
 Definition coq_zero_system_to_agda (ZS : FRF2_CrossSystem.ZeroSystem) : AgdaTranslation :=
   let obj_term := TypeTerm (FRF2_CrossSystem.ZS_obj ZS) in
   match frf_term_to_agda obj_term with
@@ -263,7 +263,7 @@ Definition coq_zero_system_to_agda (ZS : FRF2_CrossSystem.ZeroSystem) : AgdaTran
   end.
 Arguments coq_zero_system_to_agda {_} : clear implicits.
 
-### 5. 零态射翻译
+(* ### 5. 零态射翻译 *)
 Definition coq_zero_morphism_to_agda (S T : FRF2_CrossSystem.ZeroSystem) (f : FRF2_CrossSystem.ZeroMorphism S T) : AgdaTranslation :=
   let dom_term := TypeTerm (FRF2_CrossSystem.ZS_obj S) in
   let codom_term := TypeTerm (FRF2_CrossSystem.ZS_obj T) in
@@ -288,7 +288,7 @@ Definition coq_zero_morphism_to_agda (S T : FRF2_CrossSystem.ZeroSystem) (f : FR
   end.
 Arguments coq_zero_morphism_to_agda {_ _ _} : clear implicits.
 
-### 6. 命题翻译（优化嵌套量化处理，全覆盖场景）
+(* ### 6. 命题翻译（优化嵌套量化处理，全覆盖场景） *)
 Fixpoint coq_prop_to_agda (P : Prop) : AgdaTranslation :=
   match P with
   | ∀ x : A, Q x => 
@@ -368,7 +368,7 @@ Fixpoint coq_prop_to_agda (P : Prop) : AgdaTranslation :=
   end.
 Arguments coq_prop_to_agda {_} : clear implicits.
 
-### 7. Agda文件批量生成
+(* ### 7. Agda文件批量生成 *)
 Definition agda_common_imports : AgdaSyntax :=
   "open import Data.Nat
 open import Data.Real
@@ -397,7 +397,7 @@ Definition generate_agda_file (sysList : list FRF2_CrossSystem.ZeroSystem) (thmL
 .
 
 (* ======================== 核心定理（证明完备，无Admitted，逻辑闭环） ======================== *)
-### 1. 形式系统翻译保公理集
+(* ### 1. 形式系统翻译保公理集 *)
 Theorem coq_formal_system_axioms_preserved : ∀ (S : FRF_MetaTheory.FormalSystem) (ax : FRF_MetaTheory.Axiom),
   ax ∈ FRF_MetaTheory.axioms S →
   match coq_formal_system_to_agda S with
@@ -421,7 +421,7 @@ Proof.
   apply split_on_correct with (sep := ", ") (target := axStr) (s := agdaSys); auto.
 Qed.
 
-### 2. 零系统翻译保核心性质
+(* ### 2. 零系统翻译保核心性质 *)
 Theorem coq_zero_system_properties_preserved : ∀ (ZS : FRF2_CrossSystem.ZeroSystem),
   match coq_zero_system_to_agda ZS with
   | Some agdaZS =>
@@ -446,7 +446,7 @@ Proof.
   split; [split; [exact leftIdIn | exact rightIdIn] | exact uniqueIn].
 Qed.
 
-### 3. 嵌套量化命题翻译保逻辑等价性（新增核心定理）
+(* ### 3. 嵌套量化命题翻译保逻辑等价性（新增核心定理） *)
 Theorem coq_nested_quant_prop_to_agda_equiv : ∀ (A B : Type) (P : A → B → Prop),
   FRF_MetaTheory.axiom_valid FRF_MetaTheory.FRF_System (∀ x : A, ∃ y : B, P x y) →
   ∃ (agdaP : AgdaSyntax),
@@ -466,7 +466,7 @@ Proof.
     reflexivity.
 Qed.
 
-### 4. 翻译正确性（含嵌套量化命题）
+(* ### 4. 翻译正确性（含嵌套量化命题） *)
 Theorem coq_provable_implies_agda_provable : ∀ (P : Prop),
   FRF_MetaTheory.axiom_valid FRF_MetaTheory.FRF_System P →
   ∃ (agdaP : AgdaSyntax),

@@ -1,4 +1,4 @@
-# DynamicSystem/BlockchainSystem.v
+(* # DynamicSystem/BlockchainSystem.v *)
 (* 模块定位：FRF 2.0动态系统下区块链创世块案例核心（二级场景层），融合区块链特性与DynamicZero理论
    核心优化：1. 整合跨模块重复定义，复用Serialization/CaseA_SetTheory统一接口；2. 修复逻辑错误（链回滚变量引用、类型不匹配）；3. 补全边界场景证明（空链/单区块/故障链）；4. 统一符号与依赖，无循环依赖
    依赖约束：一级基础层（FRF_MetaTheory/FRF2_CrossSystem）+ 动态系统基础 + 加密哈希模块 + 序列化工具库
@@ -27,7 +27,7 @@ Open Scope cs_null_scope.
 Open Scope string_scope.
 
 (* ======================== 定义前置（无重复、可机械执行，依赖均为已证定义） ======================== *)
-### 1. 基础数据结构（强化合法性约束，覆盖所有边界场景）
+(* ### 1. 基础数据结构（强化合法性约束，覆盖所有边界场景） *)
 Record Transaction : Type := {
   tx_id : string;          (* 唯一交易ID *)
   sender : string;         (* 发送者地址 *)
@@ -68,7 +68,7 @@ Definition chain_valid (c : Chain) : Prop :=
     Forall2 (fun prev curr => curr → prev ∧ block_height curr = S (block_height prev)) cs (b :: cs)
   end.
 
-### 2. 核心辅助定义（补全逻辑前提，消除隐含假设）
+(* ### 2. 核心辅助定义（补全逻辑前提，消除隐含假设） *)
 (* 创世块判定（显式定义，无模糊） *)
 Definition is_genesis_block (b : Block) : Prop := match b with GenesisBlock _ _ => True | _ => False end.
 
@@ -95,7 +95,7 @@ Definition block_hash_valid (b : Block) (prev_block : option Block) : Prop :=
   | NormalBlock _ _ _ _, None => False  (* 普通区块无前置区块非法 *)
   end.
 
-### 3. 区块链动态系统（明确逻辑分支，消除模糊判断）
+(* ### 3. 区块链动态系统（明确逻辑分支，消除模糊判断） *)
 Definition genesis_block_chain : Chain := 
   [GenesisBlock "genesis_frf2.0" []].
 
@@ -127,7 +127,7 @@ Definition BlockchainSystem : TimeVaryingSystem := {|
   transition_id := λ c, eq_refl;
 |}.
 
-### 4. 区块链动态零态（严格对接DynamicZero，补全存在性/唯一性证明前提）
+(* ### 4. 区块链动态零态（严格对接DynamicZero，补全存在性/唯一性证明前提） *)
 Definition genesis_block : DynamicZero BlockchainSystem :=
   exist _ genesis_block_chain
     (conj 
@@ -147,7 +147,7 @@ Definition genesis_block : DynamicZero BlockchainSystem :=
         Qed)
     ).
 
-### 5. 同构映射函数（对接CaseA_SetTheory，无重复定义，兼容跨系统验证）
+(* ### 5. 同构映射函数（对接CaseA_SetTheory，无重复定义，兼容跨系统验证） *)
 Definition set_to_transaction (elem : ZFC.set) : option Transaction :=
   match ZFC.set_to_4tuple elem with
   | Some (txid_set, sender_set, receiver_set, amount_set) =>
@@ -183,7 +183,7 @@ Definition set_to_chain_transition (s1 s2 : ZFC.set) (c : Chain) : Prop :=
   B_trans(1, c) = chain_of_set (ZFC.union s1 s2).
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 序列化函数正确性引理（复用+补充单射性证明）
+(* ### 1. 序列化函数正确性引理（复用+补充单射性证明） *)
 Lemma string_to_bytes_inj : ∀ s1 s2 : string, string_to_bytes s1 = string_to_bytes s2 → s1 = s2.
 Proof. apply Serialization.string_to_bytes_inj. Qed.
 
@@ -203,7 +203,7 @@ Proof.
     f_equal; auto.
 Qed.
 
-### 2. 创世块链不变性引理（补全归纳证明，消除逻辑断层）
+(* ### 2. 创世块链不变性引理（补全归纳证明，消除逻辑断层） *)
 Lemma genesis_chain_immutable : ∀ t : nat, B_trans(S t, genesis_block_chain) = genesis_block_chain.
 Proof.
   induction t; intros.
@@ -218,7 +218,7 @@ Proof.
     rewrite IHt. apply transition_compose; auto.
 Qed.
 
-### 3. 链回滚引理（修复变量引用错误，覆盖所有Chain场景）
+(* ### 3. 链回滚引理（修复变量引用错误，覆盖所有Chain场景） *)
 Lemma chain_rollback_genesis : ∀ c : Chain, ∀ rollback_steps : nat,
   rollback_steps = length (filter (λ b, ¬is_genesis_block b) c) →
   B_trans(rollback_steps, c) = ⟨0⟩_chain.
@@ -230,7 +230,7 @@ Proof.
     + rewrite H_eq. apply IH with (rollback_steps := rollback_steps - 1); auto.
 Qed.
 
-### 4. 回滚轮次唯一性引理（补全证明，无逻辑跳跃）
+(* ### 4. 回滚轮次唯一性引理（补全证明，无逻辑跳跃） *)
 Lemma rollback_time_unique : ∀ c : Chain, ∀ t1 t2 : nat,
   B_trans(t1, c) = ⟨0⟩_chain → B_trans(t2, c) = ⟨0⟩_chain → t1 = t2.
 Proof.
@@ -240,7 +240,7 @@ Proof.
   rewrite H, H0. reflexivity.
 Qed.
 
-### 5. 哈希链结合律引理（补全合法链传递性证明）
+(* ### 5. 哈希链结合律引理（补全合法链传递性证明） *)
 Lemma hash_chain_trans_compose : ∀ t1 t2 : nat, ∀ c : Chain,
   B_trans(t1 + t2, c) = B_trans(t2, B_trans(t1, c)).
 Proof.
@@ -254,7 +254,7 @@ Proof.
       rewrite IH, IH2. reflexivity.
 Qed.
 
-### 6. 追加合法区块保有效性引理（补全依赖证明）
+(* ### 6. 追加合法区块保有效性引理（补全依赖证明） *)
 Lemma append_valid_block_preserve_hash_valid : ∀ c : Chain, ∀ b : Block,
   chain_valid c ∧ block_hash_valid b (Some (hd c (GenesisBlock "default" []))) →
   chain_valid (b :: c).
@@ -266,7 +266,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备） ======================== *)
-### 1. 创世块功能必要性（补全“非法链无创世块”反证）
+(* ### 1. 创世块功能必要性（补全“非法链无创世块”反证） *)
 Theorem genesis_necessary_for_chain : ∀ c : Chain,
   c ≠ [] ∧ chain_valid c → exists G ∈ c, is_genesis_block G.
 Proof.
@@ -279,7 +279,7 @@ Proof.
       apply IH with (c := b' :: c''). split; auto.
 Qed.
 
-### 2. 创世块身份唯一性（基于序列化单射性，强化证明）
+(* ### 2. 创世块身份唯一性（基于序列化单射性，强化证明） *)
 Theorem genesis_identity_unique : ∀ G1 G2 : Block,
   is_genesis_block G1 ∧ is_genesis_block G2 ∧
   hash(G1) = hash(G2) ∧ Forall2 (fun tx1 tx2 => tx1 = tx2) (block_transactions G1) (block_transactions G2) →
@@ -293,7 +293,7 @@ Qed.
 Where block_transactions (b : Block) : list Transaction :=
   match b with GenesisBlock _ txs => txs | NormalBlock _ _ txs _ => txs end.
 
-### 3. 创世块满足动态零态（严格对接定义，无逻辑跳跃）
+(* ### 3. 创世块满足动态零态（严格对接定义，无逻辑跳跃） *)
 Theorem genesis_is_dynamic_zero : IsDynamicZero BlockchainSystem genesis_block.
 Proof.
   unfold IsDynamicZero, genesis_block.
@@ -302,7 +302,7 @@ Proof.
   - apply proj2_sig (proj2_sig genesis_block).
 Qed.
 
-### 4. 区块链零系统与集合论零系统同构（补全态射可逆性证明）
+(* ### 4. 区块链零系统与集合论零系统同构（补全态射可逆性证明） *)
 Theorem blockchain_set_zero_isomorphism :
   ∃ f : ZeroMorphism (DynamicZeroSystem BlockchainSystem genesis_block) SetZeroSystem,
   IsIsomorphism ZCat f.
@@ -344,7 +344,7 @@ Where chain_set_chain_inverse (c : Chain) : g (f c) = c :=
 Where set_chain_set_inverse (s : ZFC.set) : f (g s) = s :=
   destruct (ZFC.set_eq s vn_zero); simpl; auto; apply ZFC.set_extensionality; auto.
 
-### 5. 区块链系统合法性（动态系统规范验证）
+(* ### 5. 区块链系统合法性（动态系统规范验证） *)
 Theorem blockchain_system_valid : TimeVaryingSystemValid BlockchainSystem.
 Proof.
   unfold TimeVaryingSystemValid, BlockchainSystem.

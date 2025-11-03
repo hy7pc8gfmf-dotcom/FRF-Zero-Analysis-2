@@ -1,4 +1,4 @@
-# Engineering/DB_ZeroDesign.v
+(* # Engineering/DB_ZeroDesign.v *)
 (* 模块定位：FRF框架工程实践层案例核心（三级集成层），基于零概念驱动设计（ZDD）方法论落地分布式数据库空值设计，将数据库空值映射为集合论空集vn_zero，覆盖空值全生命周期操作与并发同步，无循环依赖
    核心优化：1. 解决类型安全性问题（显式公理转换）；2. 完善错误处理（Option类型替代False_ind）；3. 优化性能（索引+批量同步）；4. 提升证明可读性（拆分长证明+有意义命名）
    依赖约束：一级基础层（FRF_MetaTheory/SelfContainedLib/CaseA_SetTheory）+ 工程实践层（ZDD_Methodology.v）；适配Coq 8.18.0 + Mathlib 3.74.0 *)
@@ -26,7 +26,7 @@ Open Scope frf_scope.
 Open Scope cs_null_scope.
 
 (* ======================== 定义前置（无重复、可机械执行，依赖均为已证定义） ======================== *)
-### 1. 类型安全工具（解决类型转换问题）
+(* ### 1. 类型安全工具（解决类型转换问题） *)
 (* 1.1 公理显式转换函数（对接CaseA与FRF元理论，无类型冲突） *)
 Definition axiom_cast (ax : CaseA_SetTheory.ZFC.Axiom) : FRF_MetaTheory.Axiom :=
   match ax with
@@ -36,7 +36,7 @@ Definition axiom_cast (ax : CaseA_SetTheory.ZFC.Axiom) : FRF_MetaTheory.Axiom :=
   | _ => False_ind _ (* 仅支持空值设计所需核心公理，避免无效转换 *)
   end.
 
-### 2. 核心数据结构（保留原功能，新增性能优化字段）
+(* ### 2. 核心数据结构（保留原功能，新增性能优化字段） *)
 (* 2.1 数据库行（新增行索引标记，支撑快速查询） *)
 Record DB_Row : Type := {
   row_id : string;          (* 行唯一ID（非空） *)
@@ -78,7 +78,7 @@ Record DistributedDB : Type := {
 }.
 Arguments DistributedDB : clear implicits.
 
-### 3. 错误处理工具（解决表/行不存在问题）
+(* ### 3. 错误处理工具（解决表/行不存在问题） *)
 (* 3.1 安全表查询（返回Option，避免False_ind崩溃） *)
 Definition db_table_safe (db : DistributedDB) (tname : string) : option DB_Table :=
   map_lookup db.(db_table_idx) tname.
@@ -87,7 +87,7 @@ Definition db_table_safe (db : DistributedDB) (tname : string) : option DB_Table
 Definition table_row_safe (t : DB_Table) (rid : string) : option DB_Row :=
   map_lookup t.(table_row_idx) rid.
 
-### 4. 核心操作（性能优化+错误处理完善）
+(* ### 4. 核心操作（性能优化+错误处理完善）
 (* 4.1 行空值判定（基于索引，O(1)查询） *)
 Definition row_null_at (row : DB_Row) (col : string) : Prop :=
   In col row.(row_null_cols).
@@ -125,7 +125,7 @@ Definition db_sync_null_batch (db : DistributedDB) (n : string) (tname : string)
   | None => db (* 表不存在时返回原数据库，无崩溃 *)
   end.
 
-### 5. ZDD适配定义（保留原功能，对接优化后结构）
+(* ### 5. ZDD适配定义（保留原功能，对接优化后结构） *)
 (* 5.1 分布式数据库空值核心需求（形式化工程需求） *)
 Definition DB_Null_Requirement : ZDD_Requirement := {|
   req_id := "DistDB_Null_Req_001";
@@ -190,7 +190,7 @@ Definition DB_System : FRF_MetaTheory.FormalSystem := {|
 |}.
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 基础工具引理（支撑核心操作正确性）
+(* ### 1. 基础工具引理（支撑核心操作正确性） *)
 (* 1.1 空值列索引一致性引理（确保row_null_cols与row_cols匹配） *)
 Lemma row_null_idx_consistent : ∀ (row : DB_Row),
   row.(row_valid) →
@@ -218,7 +218,7 @@ Proof.
   apply map_lookup_some; auto.
 Qed.
 
-### 2. 性能优化引理（支撑优化后操作的正确性）
+(* ### 2. 性能优化引理（支撑优化后操作的正确性） *)
 (* 2.1 批量插入行ID唯一性引理（确保批量插入后行ID仍唯一） *)
 Lemma table_insert_null_batch_id_unique : ∀ (t : DB_Table) (rows : list DB_Row) (col : string),
   t.(table_valid) →
@@ -236,7 +236,7 @@ Proof.
   - (* 均为原表行 *) apply id_unique; auto.
 Qed.
 
-### 3. 错误处理引理（支撑安全操作的正确性）
+(* ### 3. 错误处理引理（支撑安全操作的正确性） *)
 (* 3.1 表不存在时同步操作不变引理 *)
 Lemma db_sync_null_batch_none : ∀ (db : DistributedDB) (n : string) (tname : string) (cols : list string),
   db_table_safe db tname = None →
@@ -248,7 +248,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备） ======================== *)
-### 1. 分布式数据库空值设计ZDD合法性（工程案例核心）
+(* ### 1. 分布式数据库空值设计ZDD合法性（工程案例核心） *)
 Theorem db_null_zdd_valid : DB⊢(DB_System, DB_Null_Requirement).
 Proof.
   unfold ZDD_Valid, DB_System, DB_Null_Requirement, ZDD_Metadata_DistDB.
@@ -297,7 +297,7 @@ Proof.
   - apply CaseA_SetTheory.empty_necessary_for_nat_generation.
 Qed.
 
-### 2. 批量空值插入操作正确性（优化后操作的合法性）
+(* ### 2. 批量空值插入操作正确性（优化后操作的合法性） *)
 Theorem table_insert_null_batch_valid : ∀ (t : DB_Table) (rows : list DB_Row) (col : string),
   t.(table_valid) →
   ∀ r ∈ rows, r.(row_valid) →
@@ -317,7 +317,7 @@ Proof.
         -- apply table_insert_null_batch_id_unique; auto. (* 行ID唯一 *)
 Qed.
 
-### 3. 分布式批量同步一致性（优化后同步操作的一致性）
+(* ### 3. 分布式批量同步一致性（优化后同步操作的一致性） *)
 Theorem db_sync_null_batch_consistent : ∀ (db : DistributedDB) (n : string) (tname : string) (cols : list string),
   n ∈ db.(db_nodes) →
   (db_sync_null_batch db n tname cols).(db_consistent) = db.(db_consistent).
@@ -330,7 +330,7 @@ Proof.
   - apply db.(db_consistent); auto. (* 非同步表保持原一致性 *)
 Qed.
 
-### 4. 空值查询与非空数据无交集（保留原核心性质）
+(* ### 4. 空值查询与非空数据无交集（保留原核心性质） *)
 Theorem null_query_disjoint_non_null : ∀ (t : DB_Table) (col : string),
   let null_rows := table_query_null t col in
   let non_null_rows := map (fun r => r.(row_id)) (filter (fun r => ¬row_null_at r col) t.(table_rows)) in

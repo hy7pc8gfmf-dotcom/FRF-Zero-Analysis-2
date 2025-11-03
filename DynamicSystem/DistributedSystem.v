@@ -1,4 +1,4 @@
-# DynamicSystem/DistributedSystem.v
+(* # DynamicSystem/DistributedSystem.v *)
 (* 模块定位：FRF 2.0动态系统下分布式系统初始态案例核心（二级场景层），聚焦“初始一致态”作为分布式“0”，补全缺失函数、去除隐含假设，满足DynamicZero双核心（时间不变性+全局可达性）
    核心优化：1. 复用Serialization模块序列化函数，删除重复定义；2. 修正类型混淆（Chain→DistributedState），统一类型体系；3. 补全证明断层，显式化隐含引理；4. 优化节点ID去重逻辑，避免重复节点；5. 强化故障节点场景覆盖，无逻辑遗漏
    依赖约束：一级基础层（FRF_MetaTheory/FRF2_CrossSystem/SelfContainedLib）+ CaseA_SetTheory + Serialization模块；适配Coq 8.18.0 + Mathlib 3.74.0 *)
@@ -27,7 +27,7 @@ Open Scope cs_null_scope.
 Open Scope R_scope.
 
 (* ======================== 定义前置（无重复、可机械执行，依赖均为已证定义） ======================== *)
-### 1. 核心数据结构（去除隐含假设，明确合法性约束）
+(* ### 1. 核心数据结构（去除隐含假设，明确合法性约束） *)
 (* 1.1 分布式节点（保留原结构，强化node_valid约束） *)
 Record DistributedNode : Type := {
   node_id : string;          (* 唯一ID（非空） *)
@@ -47,7 +47,7 @@ Record DistributedState : Type := {
 }.
 Arguments DistributedState : clear implicits.
 
-### 2. 辅助定义（补全逻辑前提，统一接口）
+(* ### 2. 辅助定义（补全逻辑前提，统一接口） *)
 (* 2.1 创世节点与初始态（明确初始一致态为分布式“0”） *)
 Definition is_genesis_node (n : DistributedNode) : Prop := n.(node_state) = 0 ∧ n.(node_id) = "genesis_node_0".
 
@@ -79,7 +79,7 @@ Definition get_node_by_id (s : DistributedState) (id : string) : option Distribu
 Definition valid_communicating_nodes (s : DistributedState) : list DistributedNode :=
   filter (fun n => n.(can_comm)) s.(nodes). (* 过滤正常通信节点 *)
 
-### 3. 同构映射函数（对接CaseA_SetTheory，无类型冲突）
+(* ### 3. 同构映射函数（对接CaseA_SetTheory，无类型冲突） *)
 (* 3.1 集合元素→分布式节点（严格类型转换，无模糊） *)
 Definition set_to_node (elem : ZFC.set) : option DistributedNode :=
   match ZFC.set_to_3tuple elem with
@@ -119,7 +119,7 @@ Qed.
 Definition set_to_state_transition {n : nat} (s1 s2 : ZFC.set) (state : DistributedState) : Prop :=
   D_trans(1, state) = state_of_set (ZFC.union s1 s2).
 
-### 4. 分布式动态系统（修正类型错误，覆盖故障场景）
+(* ### 4. 分布式动态系统（修正类型错误，覆盖故障场景） *)
 Definition DistributedSystem : TimeVaryingSystem := {|
   State := DistributedState;
   Time := nat;               (* 时间=通信轮次（离散） *)
@@ -150,7 +150,7 @@ Definition DistributedSystem : TimeVaryingSystem := {|
 |}.
 Arguments DistributedSystem : clear implicits.
 
-### 5. 分布式动态零态（严格对接DynamicZero，补全证明）
+(* ### 5. 分布式动态零态（严格对接DynamicZero，补全证明） *)
 Definition distributed_initial_zero : DynamicZero DistributedSystem :=
   exist _ genesis_state
     (conj 
@@ -174,14 +174,14 @@ Definition distributed_initial_zero : DynamicZero DistributedSystem :=
     ).
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 序列化函数正确性引理（复用跨模块已证结果）
+(* ### 1. 序列化函数正确性引理（复用跨模块已证结果） *)
 Lemma string_to_bytes_inj : ∀ s1 s2 : string, string_to_bytes s1 = string_to_bytes s2 → s1 = s2.
 Proof. apply Serialization.string_to_bytes_inj. Qed.
 
 Lemma R_to_bytes_compat : ∀ r : R, string_to_bytes (string_of_R r) = R_to_bytes r.
 Proof. reflexivity. Qed.
 
-### 2. 初始态时间不变性引理（补全证明）
+(* ### 2. 初始态时间不变性引理（补全证明）
 Lemma genesis_state_immutable : ∀ t : nat,
   D_trans(S t, genesis_state) = genesis_state.
 Proof.
@@ -192,7 +192,7 @@ Proof.
   reflexivity.
 Qed.
 
-### 3. 通信轮次结合律引理（补全依赖证明）
+(* ### 3. 通信轮次结合律引理（补全依赖证明） *)
 Lemma comm_nodes_preserved : ∀ s1 s2 : DistributedState,
   s1 = D_trans(1, s2) → valid_communicating_nodes s1 = valid_communicating_nodes s2.
 Proof.
@@ -220,7 +220,7 @@ Proof.
       rewrite H_comm, H_avg, IH, IH2. reflexivity.
 Qed.
 
-### 4. 状态回滚引理（补全故障节点场景）
+(* ### 4. 状态回滚引理（补全故障节点场景） *)
 Lemma state_rollback_genesis : ∀ s : DistributedState, ∀ rollback_steps : nat,
   rollback_steps = length (filter (λ n, ¬is_genesis_node n) s.(nodes)) →
   D_trans(rollback_steps, s) = ⟨0⟩_dist.
@@ -238,7 +238,7 @@ Proof.
       apply H_unique in IH; auto.
 Qed.
 
-### 5. 回滚轮次唯一性引理（补全证明）
+(* ### 5. 回滚轮次唯一性引理（补全证明） *)
 Lemma rollback_time_unique : ∀ s : DistributedState, ∀ t1 t2 : nat,
   D_trans(t1, s) = ⟨0⟩_dist → D_trans(t2, s) = ⟨0⟩_dist → t1 = t2.
 Proof.
@@ -248,7 +248,7 @@ Proof.
   rewrite H, H0. reflexivity.
 Qed.
 
-### 6. 同构映射保操作引理（对接集合论）
+(* ### 6. 同构映射保操作引理（对接集合论） *)
 Lemma state_of_set_preserve_genesis : ∀ s : ZFC.set,
   ZFC.set_eq s vn_zero → state_of_set s = genesis_state.
 Proof.
@@ -263,7 +263,7 @@ Proof.
 Qed.
 
 (* ======================== 核心定理（形式化/逻辑/证明三重完备） ======================== *)
-### 1. 初始态功能必要性（FRF核心：无创世态则无合法系统）
+(* ### 1. 初始态功能必要性（FRF核心：无创世态则无合法系统） *)
 Theorem genesis_necessary_for_system : ∀ s : DistributedState,
   s.(nodes_non_empty) ∧ s.(node_id_unique) ∧ 
   (forall n ∈ s.(nodes), exists n_prev ∈ s.(nodes), (n_prev.(can_comm) → n.(node_state) = n_prev.(node_state)) ∨ is_genesis_node n) →
@@ -280,7 +280,7 @@ Proof.
       - apply Hconsistent; auto.
 Qed.
 
-### 2. 初始态身份唯一性（FRF核心：功能+关系决定身份）
+(* ### 2. 初始态身份唯一性（FRF核心：功能+关系决定身份） *)
 Theorem genesis_identity_unique : ∀ G1 G2 : DistributedNode,
   is_genesis_node G1 ∧ is_genesis_node G2 ∧
   G1.(node_id) = G2.(node_id) ∧ G1.(node_state) = G2.(node_state) ∧ G1.(can_comm) = G2.(can_comm) →
@@ -292,7 +292,7 @@ Proof.
   apply functional_extensionality; reflexivity.
 Qed.
 
-### 3. 初始态满足FRF 2.0 DynamicZero（动态零态验证）
+(* ### 3. 初始态满足FRF 2.0 DynamicZero（动态零态验证） *)
 Theorem genesis_is_dynamic_zero : IsDynamicZero DistributedSystem distributed_initial_zero.
 Proof.
   unfold IsDynamicZero, distributed_initial_zero.
@@ -303,7 +303,7 @@ Proof.
     apply proj2_sig (proj2_sig distributed_initial_zero).
 Qed.
 
-### 4. 分布式零系统与集合论零系统同构（跨系统融合）
+(* ### 4. 分布式零系统与集合论零系统同构（跨系统融合） *)
 Theorem distributed_set_zero_isomorphism :
   ∃ f : ZeroMorphism (DynamicZeroSystem DistributedSystem distributed_initial_zero) SetZeroSystem,
   IsIsomorphism ZCat f.
@@ -348,7 +348,7 @@ Qed.
 Where set_state_set_inverse (s : ZFC.set) : f (g s) = s :=
   destruct (ZFC.set_eq s vn_zero); simpl; auto; apply ZFC.set_extensionality; auto.
 
-### 5. 分布式系统合法性（动态系统规范验证）
+(* ### 5. 分布式系统合法性（动态系统规范验证） *)
 Theorem distributed_system_valid : TimeVaryingSystemValid DistributedSystem.
 Proof.
   unfold TimeVaryingSystemValid, DistributedSystem.

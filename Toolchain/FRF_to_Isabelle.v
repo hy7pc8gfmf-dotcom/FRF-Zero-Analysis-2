@@ -1,4 +1,4 @@
-# Toolchain/FRF_to_Isabelle.v
+(* # Toolchain/FRF_to_Isabelle.v *)
 (* 模块定位：FRF 2.0 跨工具链核心模块，实现 Coq → Isabelle/HOL 形式化翻译，
    核心优化：1. 新增未知类型哈希-原类型映射机制，解决追溯难题；
             2. 显式绑定FRFTerm类型参数，消除类型模糊；
@@ -25,7 +25,7 @@ Require Import Mathlib.Logic.IndefiniteDescription.
 Require Import Mathlib.Reflection.TypeDec.
 
 (* ======================== 定义前置（形式化完备，无模糊，机械可执行） ======================== *)
-### 1. 核心辅助类型（新增未知类型追溯机制核心结构）
+(* ### 1. 核心辅助类型（新增未知类型追溯机制核心结构） *)
 (* 1.1 未知类型映射条目：记录哈希与原类型的对应关系 *)
 Record UnknownTypeMapEntry : Type := {
   utm_hash : nat;                  (* 未知类型哈希值 *)
@@ -49,7 +49,7 @@ Arguments IsabelleTranslationResult : clear implicits.
 Definition BatchIsabelleTranslation : Type := option (IsabelleSyntax * UnknownTypeMap).
 Arguments BatchIsabelleTranslation : clear implicits.
 
-### 2. 核心项类型定义（FRFTerm，显式绑定类型参数，解决类型不匹配）
+(* ### 2. 核心项类型定义（FRFTerm，显式绑定类型参数，解决类型不匹配） *)
 Inductive FRFTerm : Type :=
   | TypeTerm : Type → FRFTerm                                  (* 基础类型项（nat/R/list等） *)
   | PropTerm : Prop → FRFTerm                                  (* 命题项（公理/定理内容） *)
@@ -66,7 +66,7 @@ Inductive FRFTerm : Type :=
 Arguments FRFTerm : clear implicits.
 Arguments ZeroMorphismTerm {_ _} _ : clear implicits.
 
-### 3. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞）
+(* ### 3. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞） *)
 Lemma FRFTerm_ind :
   ∀ P : FRFTerm → Prop,
     (* 基础情况：原子项 *)
@@ -96,7 +96,7 @@ Proof.
     apply HMatrix; apply FRFTerm_ind; auto.
 Qed.
 
-### 4. 辅助函数（新增：类型字符串化、哈希映射核心工具）
+(* ### 4. 辅助函数（新增：类型字符串化、哈希映射核心工具） *)
 (* 4.1 原类型字符串化：将Coq Type转换为可还原的字符串，支撑追溯 *)
 Fixpoint string_of_raw_type (T : Type) : string :=
   match T with
@@ -132,7 +132,7 @@ Definition merge_utm (utm1 utm2 : UnknownTypeMap) : UnknownTypeMap :=
   utm1 ++ filter (fun e => ¬exists e' ∈ utm1, e'.(utm_hash) = e.(utm_hash)) utm2.
 Arguments merge_utm : clear implicits.
 
-### 5. 字符串处理函数（优化：支持未知类型追溯，无模糊丢弃，符号统一）
+(* ### 5. 字符串处理函数（优化：支持未知类型追溯，无模糊丢弃，符号统一） *)
 (* 5.1 FRFTerm类型判别（安全无副作用，支撑后续翻译分支） *)
 Definition is_type_term (t : FRFTerm) : bool := match t with TypeTerm _ => true | _ => false end.
 Definition is_prop_term (t : FRFTerm) : bool := match t with PropTerm _ => true | _ => false end.
@@ -225,13 +225,13 @@ Definition extract_zero_morphism {S T : FRF2_CrossSystem.ZeroSystem}
   (t : FRFTerm) : option (FRF2_CrossSystem.ZeroMorphism S T) :=
   match t with ZeroMorphismTerm {S} {T} f => Some f | _ => None end.
 
-### 6. 翻译核心类型（统一Toolchain模块接口，无歧义）
+(* ### 6. 翻译核心类型（统一Toolchain模块接口，无歧义） *)
 Definition IsabelleSyntax : Type := string.
 Definition IsabelleTranslation : Type := option IsabelleSyntax.
 Arguments IsabelleSyntax : clear implicits.
 Arguments IsabelleTranslation : clear implicits.
 
-### 7. Isabelle公共导入（补全缺失定义，适配Isabelle语法）
+(* ### 7. Isabelle公共导入（补全缺失定义，适配Isabelle语法） *)
 Definition isabelle_common_imports : IsabelleSyntax :=
   "theory FRF_TranslatedFromCoq
 imports
@@ -253,7 +253,7 @@ Definition utm_to_isabelle_comment (utm : UnknownTypeMap) : IsabelleSyntax :=
 "\n(* ============================================================================================== *)".
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-### 1. 字符串分割正确性（复用Mathlib已证引理，无重复证明）
+(* ### 1. 字符串分割正确性（复用Mathlib已证引理，无重复证明） *)
 Lemma split_on_correct : ∀ (s sep target : string),
   String.contains s target →
   target ∈ StringSplitter.split sep s.
@@ -270,7 +270,7 @@ Proof.
       apply IHt in H_contain; apply StringSplitter.split_cons_head_neq_out.
 Qed.
 
-### 2. FRFTerm提取正确性（确保提取结果与原项类型匹配）
+(* ### 2. FRFTerm提取正确性（确保提取结果与原项类型匹配） *)
 Lemma extract_formal_system_correct : ∀ (S : FRF_MetaTheory.FormalSystem),
   extract_formal_system (FormalSystemTerm S) = Some S.
 Proof. intros S; reflexivity. Qed.
@@ -278,12 +278,12 @@ Lemma extract_zero_morphism_correct : ∀ (S T : FRF2_CrossSystem.ZeroSystem) (f
   extract_zero_morphism (ZeroMorphismTerm f) = Some f.
 Proof. intros S T f; reflexivity. Qed.
 
-### 3. 翻译保类型一致性（同类型项翻译后字符串相同，避免Isabelle类型错误）
+(* ### 3. 翻译保类型一致性（同类型项翻译后字符串相同，避免Isabelle类型错误） *)
 Lemma string_of_frf_type_consistent : ∀ T1 T2 : Type,
   T1 = T2 → fst (string_of_frf_type_with_utm T1) = fst (string_of_frf_type_with_utm T2).
 Proof. intros T1 T2 H_eq; rewrite H_eq; reflexivity. Qed.
 
-### 4. 未知类型映射唯一性（确保哈希与原类型一一对应，无冲突）
+(* ### 4. 未知类型映射唯一性（确保哈希与原类型一一对应，无冲突） *)
 Lemma utm_hash_unique : ∀ T1 T2 : Type,
   hash T1 = hash T2 → fst (string_of_frf_type_with_utm T1) = fst (string_of_frf_type_with_utm T2).
 Proof.
@@ -293,7 +293,7 @@ Proof.
   reflexivity.
 Qed.
 
-### 5. 命题翻译递归辅助引理（支撑复合命题翻译正确性）
+(* ### 5. 命题翻译递归辅助引理（支撑复合命题翻译正确性） *)
 Lemma coq_prop_to_isabelle_rec : ∀ P Q : Prop,
   let (p_str, p_utm) := coq_prop_to_isabelle_with_utm P in
   let (q_str, q_utm) := coq_prop_to_isabelle_with_utm Q in
@@ -306,13 +306,13 @@ Proof.
 Qed.
 
 (* ======================== 核心翻译函数（逻辑严谨，保性质，证明完备，支持追溯） ======================== *)
-### 1. 辅助函数：未覆盖场景统一处理（容错无崩溃，支撑批量翻译）
+(* ### 1. 辅助函数：未覆盖场景统一处理（容错无崩溃，支撑批量翻译） *)
 Definition handle_uncovered (desc : string) : IsabelleTranslationResult := {|
   itr_syntax := "";
   itr_utm := [];
 |}.
 
-### 2. FRFTerm→Isabelle语法（核心映射，无泛型Type，带映射表）
+(* ### 2. FRFTerm→Isabelle语法（核心映射，无泛型Type，带映射表） *)
 Definition frf_term_to_isabelle_with_utm (t : FRFTerm) : IsabelleTranslationResult := {|
   itr_syntax := fst (string_of_frf_term_with_utm t);
   itr_utm := snd (string_of_frf_term_with_utm t);
@@ -325,7 +325,7 @@ Lemma frf_term_to_isabelle_with_utm_correct : ∀ t : FRFTerm,
   res.(itr_utm) = snd (string_of_frf_term_with_utm t).
 Proof. intros t; reflexivity. Qed.
 
-### 3. 形式系统翻译（修复参数类型，保结构，无字段遗漏，收集映射表）
+(* ### 3. 形式系统翻译（修复参数类型，保结构，无字段遗漏，收集映射表） *)
 Definition coq_formal_system_to_isabelle_with_utm (S : FRF_MetaTheory.FormalSystem) : IsabelleTranslationResult :=
   let carrier_term := TypeTerm (FRF_MetaTheory.carrier S) in
   let (carrier_str, carrier_utm) := string_of_frf_term_with_utm carrier_term in
@@ -368,7 +368,7 @@ Where split_list (l : list (string * UnknownTypeMap)) : (list string * list Unkn
   end.
 Arguments coq_formal_system_to_isabelle_with_utm {_} : clear implicits.
 
-### 4. 零系统翻译（保核心性质，无类型冲突，名称唯一，收集映射表）
+(* ### 4. 零系统翻译（保核心性质，无类型冲突，名称唯一，收集映射表） *)
 Definition coq_zero_system_to_isabelle_with_utm (ZS : FRF2_CrossSystem.ZeroSystem) : IsabelleTranslationResult :=
   let obj_term := TypeTerm (FRF2_CrossSystem.ZS_obj ZS) in
   let (obj_str, obj_utm) := string_of_frf_term_with_utm obj_term in
@@ -394,7 +394,7 @@ Definition coq_zero_system_to_isabelle_with_utm (ZS : FRF2_CrossSystem.ZeroSyste
   end.
 Arguments coq_zero_system_to_isabelle_with_utm {_} : clear implicits.
 
-### 5. 零态射翻译（修复高阶函数参数，保运算+保零，无结构丢失，收集映射表）
+(* ### 5. 零态射翻译（修复高阶函数参数，保运算+保零，无结构丢失，收集映射表） *)
 Definition coq_zero_morphism_to_isabelle_with_utm (S T : FRF2_CrossSystem.ZeroSystem) (f : FRF2_CrossSystem.ZeroMorphism S T) : IsabelleTranslationResult :=
   let dom_term := TypeTerm (FRF2_CrossSystem.ZS_obj S) in
   let codom_term := TypeTerm (FRF2_CrossSystem.ZS_obj T) in
@@ -418,7 +418,7 @@ Definition coq_zero_morphism_to_isabelle_with_utm (S T : FRF2_CrossSystem.ZeroSy
   end.
 Arguments coq_zero_morphism_to_isabelle_with_utm {_ _ _} : clear implicits.
 
-### 6. 命题翻译（保逻辑结构：全称/存在/析取/等价，无逻辑丢失，收集映射表）
+(* ### 6. 命题翻译（保逻辑结构：全称/存在/析取/等价，无逻辑丢失，收集映射表） *)
 Fixpoint coq_prop_to_isabelle_with_utm (P : Prop) : (option IsabelleSyntax * UnknownTypeMap) :=
   match P with
   | ∀ x : A, Q x => 
@@ -482,7 +482,7 @@ Fixpoint coq_prop_to_isabelle_with_utm (P : Prop) : (option IsabelleSyntax * Unk
   end.
 Arguments coq_prop_to_isabelle_with_utm {_} : clear implicits.
 
-### 7. Coq定理→Isabelle Theorem（含自动化证明脚本，适配Isabelle语法，收集映射表）
+(* ### 7. Coq定理→Isabelle Theorem（含自动化证明脚本，适配Isabelle语法，收集映射表） *)
 Definition coq_theorem_to_isabelle_with_utm (thmName : string) (thmProp : Prop) : (option IsabelleSyntax * UnknownTypeMap) :=
   let (leanProp_opt, utm) := coq_prop_to_isabelle_with_utm thmProp in
   (match leanProp_opt with
@@ -496,7 +496,7 @@ Definition coq_theorem_to_isabelle_with_utm (thmName : string) (thmProp : Prop) 
    end, utm).
 Arguments coq_theorem_to_isabelle_with_utm _ _ : clear implicits.
 
-### 8. Isabelle文件批量生成（修复seq参数错误，批量处理，容错稳定，含映射表）
+(* ### 8. Isabelle文件批量生成（修复seq参数错误，批量处理，容错稳定，含映射表） *)
 Definition generate_isabelle_file_with_utm (sysList : list FRF2_CrossSystem.ZeroSystem) (thmList : list Prop) : BatchIsabelleTranslation :=
   (* 1. 批量翻译零系统，收集语法和映射表 *)
   let sysTranslations := map coq_zero_system_to_isabelle_with_utm sysList in
@@ -525,7 +525,7 @@ Definition generate_isabelle_file_with_utm (sysList : list FRF2_CrossSystem.Zero
 .
 
 (* ======================== 核心定理（证明完备，无Admitted，逻辑闭环） ======================== *)
-### 1. 形式系统翻译保公理集（所有Coq公理均被Isabelle保留）
+(* ### 1. 形式系统翻译保公理集（所有Coq公理均被Isabelle保留） *)
 Theorem coq_formal_system_axioms_preserved : ∀ (S : FRF_MetaTheory.FormalSystem) (ax : FRF_MetaTheory.Axiom),
   ax ∈ FRF_MetaTheory.axioms S →
   match coq_formal_system_to_isabelle_with_utm S with
@@ -552,7 +552,7 @@ Proof.
   apply split_on_correct with (sep := ", ") (target := axStr) (s := isaSys.(itr_syntax)); auto.
 Qed.
 
-### 2. 零系统翻译保核心性质（左单位律/右单位律/唯一性均被Isabelle保留）
+(* ### 2. 零系统翻译保核心性质（左单位律/右单位律/唯一性均被Isabelle保留） *)
 Theorem coq_zero_system_properties_preserved : ∀ (ZS : FRF2_CrossSystem.ZeroSystem),
   match coq_zero_system_to_isabelle_with_utm ZS with
   | Some isaZS =>
@@ -582,7 +582,7 @@ Proof.
   split; [split; [exact leftIdIn | exact rightIdIn] | exact uniqueIn].
 Qed.
 
-### 3. 翻译正确性（Coq可证命题→Isabelle可证，无逻辑断层）
+(* ### 3. 翻译正确性（Coq可证命题→Isabelle可证，无逻辑断层） *)
 Theorem coq_provable_implies_isabelle_provable : ∀ (P : Prop),
   FRF_MetaTheory.axiom_valid FRF_MetaTheory.FRF_System P →
   ∃ (isaP : IsabelleSyntax) (utm : UnknownTypeMap),
@@ -606,7 +606,7 @@ Proof.
   exists isaP utm; split; [reflexivity | split; [auto | reflexivity]].
 Qed.
 
-### 4. 零系统同构翻译正确性（保逆态射，无逻辑跳跃）
+(* ### 4. 零系统同构翻译正确性（保逆态射，无逻辑跳跃） *)
 Theorem coq_isomorphism_to_isabelle_correct : ∀ (S T : FRF2_CrossSystem.ZeroSystem) (f : FRF2_CrossSystem.ZeroMorphism S T),
   FRF2_CrossSystem.IsIsomorphism ZCat f →
   match (coq_prop_to_isabelle_with_utm (FRF2_CrossSystem.IsIsomorphism ZCat f), coq_zero_system_to_isabelle_with_utm S, coq_zero_system_to_isabelle_with_utm T) with
@@ -645,7 +645,7 @@ Proof.
   split; [reflexivity | reflexivity].
 Qed.
 
-### 5. 跨系统同构翻译实例（集合论→量子系统，机械可证）
+(* ### 5. 跨系统同构翻译实例（集合论→量子系统，机械可证） *)
 Theorem coq_set_quantum_iso_to_isabelle :
   let S := CaseA_SetTheory.SetZeroSystem in
   let T := CaseE_QuantumVacuum.QuantumZeroSystem in
@@ -671,7 +671,7 @@ Proof.
   compute; split; [reflexivity | reflexivity].
 Qed.
 
-### 6. 未知类型映射表正确性（哈希与原类型一一对应，支撑追溯）
+(* ### 6. 未知类型映射表正确性（哈希与原类型一一对应，支撑追溯） *)
 Theorem utm_correct : ∀ T : Type,
   let (t_str, utm) := string_of_frf_type_with_utm T in
   (∀ entry ∈ utm, entry.(utm_original_type) = string_of_raw_type T ∧ entry.(utm_translated_str) = t_str) ∧

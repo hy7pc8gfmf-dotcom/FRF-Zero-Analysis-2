@@ -1,4 +1,4 @@
-# CategoryTheory/ZeroObjectPreservedByEquivalence.v
+(* # CategoryTheory/ZeroObjectPreservedByEquivalence.v *)
 (* 模块定位：二级场景层辅助模块，证明“等价函子保持零对象”核心性质
    支撑场景：CaseD_CategoryTheory.v的量子范畴零对象（真空态）验证
    重构优化核心：
