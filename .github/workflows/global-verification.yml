@@ -148,19 +148,18 @@ jobs:
         
         mkdir -p verification-reports
         
-        # 生成详细报告
-        cat > verification-reports/REPORT.md << EOF
-# FRF 2.0 形式化验证报告
-
-**验证时间**: $(date)
-**环境**: Ubuntu 22.04 + Coq 8.18.0
-**Coq版本**: $(coqc --version | head -1)
-
-## 编译统计
-- 总Coq文件: $total_files
-- 成功编译: $compiled_files
-EOF
-
+        # 生成详细报告 - 使用多个echo命令避免YAML多行字符串问题
+        echo "# FRF 2.0 形式化验证报告" > verification-reports/REPORT.md
+        echo "" >> verification-reports/REPORT.md
+        echo "**验证时间**: $(date)" >> verification-reports/REPORT.md
+        echo "**环境**: Ubuntu 22.04 + Coq 8.18.0" >> verification-reports/REPORT.md
+        coq_version=$(coqc --version | head -1)
+        echo "**Coq版本**: $coq_version" >> verification-reports/REPORT.md
+        echo "" >> verification-reports/REPORT.md
+        echo "## 编译统计" >> verification-reports/REPORT.md
+        echo "- 总Coq文件: $total_files" >> verification-reports/REPORT.md
+        echo "- 成功编译: $compiled_files" >> verification-reports/REPORT.md
+        
         if [ $total_files -gt 0 ]; then
           success_rate=$((compiled_files * 100 / total_files))
           echo "- 成功率: $success_rate%" >> verification-reports/REPORT.md
