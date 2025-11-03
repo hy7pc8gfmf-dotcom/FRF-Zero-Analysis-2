@@ -1,4 +1,4 @@
-# CS_Null/FRF_CS_Null_Common.v
+(* # CS_Null/FRF_CS_Null_Common.v *)
 (* 模块定位：跨编程语言空值FRF通用基础模块（一级基础层）
    重构目标：1. 修复PythonSys分支cross_system_null的类型适配问题，消除隐性语义冲突
             2. 新增引理验证类型一致性，补全类型转换验证体系

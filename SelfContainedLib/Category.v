@@ -1,4 +1,4 @@
-# SelfContainedLib/Category.v
+(* # SelfContainedLib/Category.v *)
 (* 模块定位：全系统范畴论核心结构唯一源头（一级基础模块），解决与CategoryTheory.Core.v的定义重复冲突
    优化核心：1. 保留所有核心结构原始定义（PreCategory/Functor等），作为全系统唯一依赖源头
             2. 统一记法兼容（同时支持Core.v的简洁记法与原范畴标注记法），无符号歧义

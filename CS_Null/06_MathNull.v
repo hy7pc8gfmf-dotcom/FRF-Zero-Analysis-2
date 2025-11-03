@@ -1,4 +1,4 @@
-# CS_Null/MathNull.v
+(* # CS_Null/MathNull.v *)
 (* 模块定位：数学计算场景空值（NaN/Inf/0值语义冲突）FRF验证核心（二级场景层），聚焦“数学空值”作为工程化“0”的特殊语义（无效计算标记、边界值处理），严格遵循“一级基础层→二级场景层→三级集成层”架构，仅依赖一级基础模块，无跨场景依赖/冗余导入，全量保留数学空值核心功能（运算/判定/转换/修复） *)
 Require Import FRF_CS_Null_Common.      (* 一级基础层：统一空值基础定义（PropertyCategory/CS_FormalSystem等） *)
 Require Import FRF_MetaTheory.                 (* 一级基础层：FRF元理论接口（FunctionalRole/ConceptIdentity等） *)

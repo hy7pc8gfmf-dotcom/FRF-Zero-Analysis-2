@@ -1,4 +1,4 @@
-# SelfContainedLib/Algebra.v
+(* # SelfContainedLib/Algebra.v *)
 (* 模块定位：一级基础模块，提供自包含代数核心定义（自然数加法、幺半群、群）与公理体系  
    适配标准：Coq 8.18.0 + Mathlib 3.74.0，严格对接Mathlib代数接口，无循环依赖  
    核心优化：1. 统一monoid_id_unique_aux参数顺序（对齐CaseB_Algebra.v）；2. 显式标注公理依赖；3. 保持全量功能与符号一致性  

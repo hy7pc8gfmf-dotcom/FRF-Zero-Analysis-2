@@ -1,4 +1,4 @@
-# CS_Null/JavaNull.v
+(* # CS_Null/JavaNull.v *)
 (* 模块定位：Java语言空值（null）形式化验证核心（二级场景层）
    核心优化：1. 补全NPE触发概率=1.0的构造性证明（绑定“方法指针缺失→必抛NPE”语义）；
             2. 新增method_ptr_exists辅助定义，支撑概率量化的逻辑闭环；

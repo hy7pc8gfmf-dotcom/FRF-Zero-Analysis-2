@@ -1,4 +1,4 @@
-# CS_Null/RustNull.v
+(* # CS_Null/RustNull.v *)
 (* 模块定位：二级场景层 - Rust安全空值（Option<T>）形式化验证核心，依赖一级基础层（FRF_CS_Null_Common/FRF_MetaTheory/SelfContainedLib），无跨场景依赖；
    核心优化：补全`rust_none_identity_unique`证明链条，明确关联FRF定义性关系网络，确保功能角色与关系网络绑定；
    形式化标准：基于Coq 8.18.0 + Mathlib 3.74.0，所有推导可机械执行，依赖均为已证定理/定义，无自然语言模糊表述；

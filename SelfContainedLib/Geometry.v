@@ -1,4 +1,4 @@
-# SelfContainedLib/Geometry.v
+(* # SelfContainedLib/Geometry.v *)
 (* 模块定位：一级基础模块，提供自包含几何核心定义（球面流形、双曲流形、度规、曲率），无外部依赖，严格对接量子模块（如CurvedSpacetimeQFT.v）与范畴模块，支撑弯曲时空量子场分析 *)
 Require Import Coq.Reals.Reals.
 Require Import Coq.Vectors.Vector.

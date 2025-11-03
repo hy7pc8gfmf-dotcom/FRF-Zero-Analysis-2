@@ -1,4 +1,4 @@
-# CS_Null/FRF_CS_Null.v
+(* # CS_Null/FRF_CS_Null.v *)
 (* 模块定位：跨编程语言空值（Rust None/C++ NULL/Java null/Python None）的FRF整合分析层（三级集成层），聚焦“空值”作为工程化“0”的跨系统对比，严格遵循“一级基础层→二级场景层→三级集成层”架构，仅依赖一级基础层（FRF_CS_Null_Common/FRF_MetaTheory）与二级场景层（各语言空值模块），无循环依赖，全量保留跨系统空值对比功能（安全评分/相似度/FRF原则验证），补全FRF核心主张双向性证明 *)
 Require Import CS_Null.FRF_CS_Null_Common.  (* 一级基础层：统一空值基础定义 *)
 Require Import CS_Null.RustNull.            (* 二级场景层：Rust空值模块 *)

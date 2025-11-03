@@ -1,4 +1,4 @@
-# CS_Null/PythonNull.v
+(* # CS_Null/PythonNull.v *)
 (* 模块定位：二级场景层 - Python语言空值（null[PythonSys][T]）形式化验证核心
    重构核心：1. 对齐公共模块记法：删除自定义`None[ T ]`，统一使用`null[PythonSys][T]`（源自FRF_CS_Null_Common.v）
             2. 消除记法冗余：移除模块内冲突记法定义，严格依赖公共模块`cs_null_scope`
