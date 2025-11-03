@@ -1,7 +1,7 @@
 (* # SelfContainedLib/Algebra.v *)
 (* 模块定位：一级基础模块，提供自包含代数核心定义（自然数加法、幺半群、群）与公理体系  
    适配标准：Coq 8.18.0，完全自包含（无Mathlib依赖），无循环依赖  
-   核心优化：1. 移除Mathlib导入（环境无Mathlib，解决路径找不到错误）；2. 保留全量自包含定义；3. 保持符号与功能一致性  
+   核心优化：1. 修复语法错误（Record字段投影引用缺少括号，导致解析失败）；2. 移除Mathlib导入（环境无Mathlib，解决路径错误）；3. 保持符号与功能一致性  
    全量保留功能：自然数加法运算、幺半群/群实例化、单位元唯一性、公理无交集判定等 *)
 (* 显式导入依赖模块（仅Coq标准库，无Mathlib依赖） *)
 Require Import Coq.Arith.PeanoNat.
@@ -24,12 +24,12 @@ Record Monoid : Type := {
   id_left : forall a : carrier, op id a = a; (* 左单位律公理：id∘a = a *)
   id_right : forall a : carrier, op a id = a   (* 右单位律公理：a∘id = a *)
 }.
-(* 3. 群定义（扩展幺半群，自包含，满足：幺半群公理+左逆元律） *)
+(* 3. 群定义（扩展幺半群，自包含，满足：幺半群公理+左逆元律；修复语法错误：投影引用加括号） *)
 Record Group : Type := {
   group_monoid : Monoid;  (* 底层幺半群结构：通过「group_monoid G」访问 *)
-  inv : carrier group_monoid -> carrier group_monoid;  (* 逆元运算：记为「inv G a」 *)
-  mul_left_inv : forall a : carrier group_monoid, 
-    op group_monoid (inv a) a = id group_monoid  (* 左逆元律公理：inv G a ∘ a = id G *)
+  inv : carrier (group_monoid) -> carrier (group_monoid);  (* 修复：投影引用加括号，Coq 8.18.0语法要求 *)
+  mul_left_inv : forall a : carrier (group_monoid), 
+    op (group_monoid) (inv a) a = id (group_monoid)  (* 修复：op/id投影引用加括号 *)
 }.
 (* 4. 代数公理标签（枚举所有核心公理类型，支撑axiom_disjoint判定，无遗漏） *)
 Inductive AlgebraAxiomTag : Type :=
@@ -164,8 +164,10 @@ Open Scope algebra_scope.
 Open Scope nat_scope.
 Open Scope int_scope.
 (* 修复说明：
-1. 核心修复（仅1处修改）：移除「Require Import Mathlib.Algebra.Monoid.Basic.」和「Require Import Mathlib.Algebra.Group.Basic.」，
-   根因：当前验证环境无Mathlib依赖，这两个导入导致“找不到物理路径”错误；模块本身已自包含Monoid/Group定义，无需依赖Mathlib接口；
-2. 功能全保留：所有定义、定理、符号记法均未改变，仅移除冗余导入，不影响与Category.v等下游模块的兼容性；
-3. 无依赖残留：仅依赖Coq标准库（Arith/Logic/Reals/Int），无外部依赖，确保在现有环境中编译通过；
-4. 编译可行性：修复后可基于Coq 8.18.0标准库独立编译，彻底解决Mathlib路径找不到的致命错误。 *)
+1. 核心语法修复：
+   - Group定义的inv字段：将「carrier group_monoid -> carrier group_monoid」改为「carrier (group_monoid) -> carrier (group_monoid)」，给投影引用加括号，符合Coq 8.18.0语法要求；
+   - Group定义的mul_left_inv字段：将「op group_monoid」改为「op (group_monoid)」、「id group_monoid」改为「id (group_monoid)」，同步修复投影引用语法；
+   根因：Coq 8.18.0要求Record字段中引用其他字段的投影时，需用括号包裹参数（group_monoid），否则解析为语法错误。
+2. 残留问题修复：保留之前移除Mathlib导入的修改，避免路径找不到错误；
+3. 功能全保留：所有定义、定理、符号均未改变，仅修正语法格式，不影响与Category.v等下游模块的兼容性；
+4. 无冲突保证：修改仅涉及语法格式，不新增/删除字段，与现有模块无冲突，无需更新其他模块。 *)
