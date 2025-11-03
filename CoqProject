@@ -1,30 +1,32 @@
 # ===========================================
 # FRF Formal Verification Framework - CoqProject
-# 简化版本：确保路径映射与Makefile和CI一致
+# 稳定版本：简化路径映射，确保与Makefile和CI一致
 # ===========================================
 
-# 核心路径映射（与Makefile保持一致）
+# 核心路径映射（与Makefile和CI完全一致）
 -R . FRF
 -Q SelfContainedLib SelfContainedLib
--Q theories FRF.Theories  
+-Q theories FRF.Theories
 -Q CS_Null FRF.CS_Null
 -Q Quantum FRF.Quantum
 -Q DynamicSystem FRF.DynamicSystem
 -Q Test FRF.Test
 
-# 编译选项
+# 编译选项（简化且稳定）
 -w -notation-overridden
 -q
 
-# 依赖包
+# 依赖包（仅使用确认可用的包）
 -arg -async-proofs
 -arg -off
--arg -native-compiler
--arg -no
+
+# ========================
+# SOURCE FILES (按依赖顺序排列)
+# ========================
 
 # Level 1: 基础库（无依赖）
 SelfContainedLib/Algebra.v
-SelfContainedLib/Category.v  
+SelfContainedLib/Category.v
 SelfContainedLib/Geometry.v
 
 # Level 2: FRF元理论（依赖基础库）
@@ -61,3 +63,32 @@ theories/FRF_Comparative.v
 Test/Test_FRF_MetaTheory.v
 Test/Test_QuantumVacuum.v
 Test/Test_BlockchainSystem.v
+
+# ========================
+# DEPENDENCY NOTES
+# ========================
+# 依赖关系说明：
+# - Level 1: 基础数学结构，无外部依赖
+# - Level 2: 基于基础库构建的FRF元理论
+# - Level 3: 应用FRF理论到具体数学领域
+# - Level 4: 扩展到量子计算和空值分析
+# - Level 5: 集成验证和比较分析
+# - Level 6: 测试和验证用例
+
+# ========================
+# COMPATIBILITY NOTES
+# ========================
+# 兼容性说明：
+# - Coq版本: 8.18.0
+# - 依赖包: coq-mathcomp-ssreflect, coq-equations, coq-bignums
+# - 已验证平台: Ubuntu 22.04
+# - 构建工具: 与Makefile和GitHub Actions CI兼容
+
+# ========================
+# USAGE
+# ========================
+# 使用说明：
+# 1. 使用coq_makefile生成Makefile: coq_makefile -f CoqProject -o Makefile
+# 2. 或者直接使用现有的简化Makefile
+# 3. 在CoqIDE中打开时，加载此CoqProject文件
+# 4. 在CI中使用: coqc -Q ... 使用相同的路径映射
