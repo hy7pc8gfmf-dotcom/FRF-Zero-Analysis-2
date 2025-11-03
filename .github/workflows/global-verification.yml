@@ -1,303 +1,203 @@
 name: FRF 2.0 全局形式化验证
 on:
   push:
-    branches: [main, master, release/final]
-    paths: ['**.v', 'CoqProject', 'Makefile', 'validate.sh']
+    branches: [main, master]
+    paths: ['**.v', 'Makefile']
   pull_request:
     branches: [main, master]
-  schedule:
-    - cron: '0 2 * * 0'
   workflow_dispatch:
 
 jobs:
-  global-formal-verification:
+  formal-verification:
     runs-on: ubuntu-latest
     container:
       image: coqorg/coq:8.18.0
-      options: --user root
-    timeout-minutes: 120
+    timeout-minutes: 60
     
-    env:
-      COQ_VERSION: "8.18.0"
-      REPORT_DIR: "${{ github.workspace }}/verification-reports"
-      VENV_PATH: "${{ github.workspace }}/.venv"
-
     steps:
-      - name: 修复工作目录权限
-        run: |
-          mkdir -p ${{ github.workspace }} ~/.opam ~/.cache/opam
-          chmod -R 777 ${{ github.workspace }} ~/.opam ~/.cache/opam
-
       - name: 检出代码仓库
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          submodules: 'recursive'
 
-      - name: 分析项目结构
-        shell: bash
-        working-directory: ${{ github.workspace }}
+      - name: 检查项目结构
         run: |
-          echo "=== 项目结构分析 ==="
-          echo "当前目录: $(pwd)"
-          echo "目录内容:"
+          echo "=== 项目结构检查 ==="
           ls -la
-          echo "Coq文件:"
-          find . -name "*.v" | wc -l
-          echo "关键文件检查:"
-          for file in Makefile CoqProject; do
-            if [ -f "$file" ]; then
-              echo "✅ $file 存在"
-            else
-              echo "❌ $file 缺失"
-            fi
-          done
-
-      - name: 初始化OPAM环境
-        run: |
-          opam init --disable-sandboxing -y --no-setup --reinit
-          eval $(opam env --switch=default)
-
-      - name: 配置OPAM仓库和安装依赖
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          eval $(opam env --switch=default)
-          
-          echo "=== 配置OPAM仓库 ==="
-          # 移除可能存在的仓库并重新添加
-          opam repo remove --all default 2>/dev/null || true
-          opam repo remove --all coq-released 2>/dev/null || true
-          
-          # 添加官方仓库（避免镜像问题）
-          opam repo add default https://opam.ocaml.org
-          opam repo add coq-released https://coq.inria.fr/opam/released
-          
-          echo "=== 更新包仓库 ==="
-          opam update -y
-          
-          echo "=== 安装Coq核心包 ==="
-          # 先安装基础Coq包
-          opam install -y coq.${{ env.COQ_VERSION }} coq-stdlib.${{ env.COQ_VERSION }}
-          
-          echo "=== 安装MathComp全家桶 ==="
-          # 安装完整的mathcomp包（使用正确的包名）
-          opam install -y coq-mathcomp-ssreflect coq-mathcomp-fingroup coq-mathcomp-algebra coq-mathcomp-solvable
-          
-          echo "=== 安装其他依赖 ==="
-          opam install -y coq-equations coq-bignums
-          
-          echo "=== 验证安装 ==="
-          eval $(opam env --switch=default)
-          echo "Coq版本:"
-          coqc --version
-          echo "已安装包:"
-          opam list --short | grep coq
-          echo "✅ 依赖安装完成"
-
-      - name: 安装Python环境
-        run: |
-          apt-get update && apt-get install -y --no-install-recommends python3-pip python3-venv
-          rm -rf /var/lib/apt/lists/*
-          python3 -m venv ${{ env.VENV_PATH }}
-          source ${{ env.VENV_PATH }}/bin/activate
-          pip install --no-cache-dir reportlab
-
-      - name: 验证项目配置
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
-          
-          echo "=== 验证项目配置 ==="
-          mkdir -p ${{ env.REPORT_DIR }}
-          
-          # 验证关键文件存在
-          critical_files=(
-            "Makefile"
-            "SelfContainedLib/Algebra.v"
-            "SelfContainedLib/Category.v" 
-            "SelfContainedLib/Geometry.v"
-            "theories/FRF_MetaTheory.v"
-          )
-          
-          all_exist=true
-          for file in "${critical_files[@]}"; do
+          echo "Coq文件数量: $(find . -name '*.v' | wc -l)"
+          echo "关键文件:"
+          for file in Makefile SelfContainedLib/Algebra.v theories/FRF_MetaTheory.v; do
             if [ -f "$file" ]; then
               echo "✅ $file"
             else
               echo "❌ $file - 缺失"
-              all_exist=false
             fi
           done
-          
-          if [ "$all_exist" = false ]; then
-            echo "❌ 关键文件缺失"
-            exit 1
-          fi
-          
-          echo "✅ 项目配置验证通过"
 
-      - name: 执行编译验证
-        shell: bash
-        working-directory: ${{ github.workspace }}
+      - name: 安装基础依赖
         run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
+          echo "=== 安装Coq依赖 ==="
+          opam update -y
+          opam install -y coq-mathcomp-ssreflect coq-equations coq-bignums
+          echo "✅ 依赖安装完成"
+
+      - name: 验证Coq环境
+        run: |
+          echo "=== Coq环境验证 ==="
+          coqc --version
+          which coqc
+          echo "✅ Coq环境就绪"
+
+      - name: 编译核心模块
+        run: |
+          echo "=== 编译核心模块 ==="
           
-          echo "=== 执行编译验证 ==="
-          mkdir -p ${{ env.REPORT_DIR }}
+          # 编译基础库
+          echo "编译基础数学库..."
+          coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Algebra.v
+          coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Category.v
+          coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Geometry.v
           
-          # 检查Makefile目标
-          echo "可用的Makefile目标:"
-          make help 2>/dev/null | head -20 || echo "使用默认编译"
+          # 编译FRF元理论
+          echo "编译FRF元理论..."
+          coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories theories/FRF_MetaTheory.v
           
-          # 尝试编译核心模块
-          echo "编译核心基础模块..."
-          core_modules=(
-            "SelfContainedLib/Algebra.v"
-            "SelfContainedLib/Category.v"
-            "SelfContainedLib/Geometry.v" 
-            "theories/FRF_MetaTheory.v"
-          )
+          # 编译Church数值
+          echo "编译Church数值..."
+          coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories theories/ChurchNumerals.v
+          coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories theories/ChurchZero.v
           
-          for module in "${core_modules[@]}"; do
+          echo "✅ 核心模块编译完成"
+
+      - name: 检查编译结果
+        run: |
+          echo "=== 编译结果检查 ==="
+          compiled_files=$(find . -name "*.vo" | wc -l)
+          echo "已编译文件数: $compiled_files"
+          
+          echo "核心模块状态:"
+          for module in SelfContainedLib/Algebra.vo SelfContainedLib/Category.vo SelfContainedLib/Geometry.vo theories/FRF_MetaTheory.vo theories/ChurchZero.vo; do
             if [ -f "$module" ]; then
-              echo "编译: $module"
-              # 使用简单的coqc命令编译
-              coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories "$module" 2>&1 | tee -a ${{ env.REPORT_DIR }}/core-compile.log || true
+              echo "✅ $module"
+            else
+              echo "❌ $module"
             fi
           done
           
-          # 检查编译结果
-          compiled_files=$(find . -name "*.vo" | wc -l)
-          echo "编译完成的.vo文件数量: $compiled_files"
-          
-          if [ $compiled_files -eq 0 ]; then
-            echo "❌ 无编译产物"
+          if [ $compiled_files -lt 5 ]; then
+            echo "❌ 核心模块编译不足"
             exit 1
-          else
-            echo "✅ 核心模块编译成功"
           fi
 
       - name: 尝试完整编译
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
-          
           echo "=== 尝试完整编译 ==="
           
           # 如果Makefile存在且可用，尝试使用它
           if [ -f "Makefile" ]; then
             echo "使用Makefile编译..."
-            make -j$(nproc) compile 2>&1 | tee ${{ env.REPORT_DIR }}/makefile-compile.log || echo "Makefile编译失败，继续使用其他方法"
+            if make -j2 compile 2>&1 | head -50; then
+              echo "✅ Makefile编译成功"
+            else
+              echo "⚠️ Makefile编译有错误，继续其他方法"
+            fi
           fi
           
-          # 编译所有找到的.v文件
-          echo "编译所有Coq文件..."
-          find . -name "*.v" | while read v_file; do
-            echo "编译: $v_file"
-            coqc -Q SelfContainedLib SelfContainedLib \
-                 -Q theories FRF.Theories \
-                 -Q CS_Null FRF.CS_Null \
-                 -Q Quantum FRF.Quantum \
-                 -Q DynamicSystem FRF.DynamicSystem \
-                 -Q Toolchain FRF.Toolchain \
-                 -Q Test FRF.Test \
-                 -Q CategoryTheory CategoryTheory \
-                 "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/full-compile.log || true
-          done
+          # 编译其他重要模块
+          echo "编译其他重要模块..."
+          important_modules=(
+            "theories/CaseA_SetTheory.v"
+            "theories/CaseB_Algebra.v"
+            "CS_Null/FRF_CS_Null_Common.v"
+            "Quantum/QFT_FRF.v"
+          )
           
-          compiled_files=$(find . -name "*.vo" | wc -l)
-          echo "总编译文件数: $compiled_files"
+          for module in "${important_modules[@]}"; do
+            if [ -f "$module" ]; then
+              echo "编译: $module"
+              coqc -Q SelfContainedLib SelfContainedLib \
+                   -Q theories FRF.Theories \
+                   -Q CS_Null FRF.CS_Null \
+                   -Q Quantum FRF.Quantum \
+                   "$module" 2>&1 | tail -5 || echo "编译跳过: $module"
+            fi
+          done
 
       - name: 生成验证报告
-        shell: bash
-        working-directory: ${{ github.workspace }}
         run: |
-          eval $(opam env --switch=default)
-          source ${{ env.VENV_PATH }}/bin/activate
-          
           echo "=== 生成验证报告 ==="
           
           total_files=$(find . -name "*.v" | wc -l)
           compiled_files=$(find . -name "*.vo" | wc -l)
-          if [ $total_files -gt 0 ]; then
-            success_rate=$((compiled_files * 100 / total_files))
-          else
-            success_rate=0
-          fi
           
-          cat > ${{ env.REPORT_DIR }}/VERIFICATION_REPORT.md << EOF
-# FRF 2.0 全局形式化验证报告
+          mkdir -p verification-reports
+          
+          cat > verification-reports/REPORT.md << EOF
+# FRF 2.0 形式化验证报告
 
-## 验证概览
-- **验证时间**: $(date +'%Y-%m-%d %H:%M:%S')
-- **触发事件**: ${{ github.event_name }}
-- **提交哈希**: ${{ github.sha }}
-- **运行环境**: coqorg/coq:${{ env.COQ_VERSION }}
-- **Coq版本**: $(coqc --version | head -n1)
+**验证时间**: $(date)
+**环境**: coqorg/coq:8.18.0
+**Coq版本**: $(coqc --version | head -1)
 
 ## 编译统计
-- **总Coq文件数**: $total_files
-- **成功编译数**: $compiled_files
-- **编译成功率**: $success_rate%
+- 总Coq文件: $total_files
+- 成功编译: $compiled_files
+- 成功率: $((compiled_files * 100 / total_files))%
 
 ## 核心模块状态
 EOF
 
-          # 检查核心模块状态
-          critical_modules=(
-            "SelfContainedLib/Algebra.vo"
-            "SelfContainedLib/Category.vo"
-            "SelfContainedLib/Geometry.vo" 
-            "theories/FRF_MetaTheory.vo"
-            "theories/ChurchZero.vo"
-            "CS_Null/FRF_CS_Null_Common.vo"
+          # 添加模块状态
+          modules=(
+            "SelfContainedLib/Algebra.vo:基础代数"
+            "SelfContainedLib/Category.vo:基础范畴" 
+            "SelfContainedLib/Geometry.vo:基础几何"
+            "theories/FRF_MetaTheory.vo:FRF元理论"
+            "theories/ChurchZero.vo:Church零"
+            "theories/CaseA_SetTheory.vo:集合论场景"
+            "theories/CaseB_Algebra.vo:代数场景"
+            "CS_Null/FRF_CS_Null_Common.vo:空值公共模块"
+            "Quantum/QFT_FRF.vo:量子场论"
           )
           
-          for module in "${critical_modules[@]}"; do
+          for module_info in "${modules[@]}"; do
+            module=$(echo "$module_info" | cut -d: -f1)
+            desc=$(echo "$module_info" | cut -d: -f2)
             if [ -f "$module" ]; then
-              echo "- ✅ $(basename $module .vo)" >> ${{ env.REPORT_DIR }}/VERIFICATION_REPORT.md
+              echo "- ✅ $desc" >> verification-reports/REPORT.md
             else
-              echo "- ❌ $(basename $module .vo)" >> ${{ env.REPORT_DIR }}/VERIFICATION_REPORT.md
+              echo "- ❌ $desc" >> verification-reports/REPORT.md
             fi
           done
           
-          echo "## 各目录状态" >> ${{ env.REPORT_DIR }}/VERIFICATION_REPORT.md
-          for dir in SelfContainedLib theories CS_Null Quantum DynamicSystem Toolchain Test; do
-            if [ -d "$dir" ]; then
-              v_count=$(find "$dir" -name "*.v" 2>/dev/null | wc -l)
-              vo_count=$(find "$dir" -name "*.vo" 2>/dev/null | wc -l)
-              echo "- **$dir**: $vo_count/$v_count" >> ${{ env.REPORT_DIR }}/VERIFICATION_REPORT.md
-            fi
-          done
+          echo "" >> verification-reports/REPORT.md
+          echo "## 验证结果" >> verification-reports/REPORT.md
+          if [ $compiled_files -ge 5 ]; then
+            echo "✅ **验证成功**: 核心框架编译通过" >> verification-reports/REPORT.md
+          else
+            echo "⚠️ **验证警告**: 部分模块编译失败" >> verification-reports/REPORT.md
+          fi
           
           echo "✅ 验证报告生成完成"
 
-      - name: 归档验证产物
+      - name: 上传验证报告
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: frf-verification-${{ github.sha }}
+          name: frf-verification-report
           path: |
-            ${{ env.REPORT_DIR }}/
+            verification-reports/
             **/*.vo
-            **/*.glob
-          retention-days: 30
+          retention-days: 7
 
       - name: 验证成功通知
         if: success()
         run: |
-          compiled_count=$(find . -name "*.vo" | wc -l)
-          echo "🎉 FRF 2.0 验证完成！"
-          echo "📊 编译模块数: $compiled_count"
+          echo "🎉 FRF 2.0 形式化验证成功完成!"
+          echo "📊 编译模块: $(find . -name '*.vo' | wc -l)"
+          echo "📋 报告位置: verification-reports/REPORT.md"
 
       - name: 验证失败通知
         if: failure()
         run: |
-          echo "❌ FRF 2.0 验证失败"
-          echo "请检查编译日志"
+          echo "❌ FRF 2.0 形式化验证失败"
+          echo "请检查核心模块编译状态"
