@@ -1,10 +1,10 @@
 name: FRF 2.0 全局形式化验证
 on:
   push:
-    branches: [main, master, release/final]
-    paths: ['**.v', 'CoqProject', 'Makefile', 'validate.sh']
+    branches: [ main, master, release/final ]
+    paths: [ '**.v', 'CoqProject', 'Makefile', 'validate.sh' ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
   schedule:
     - cron: '0 2 * * 0'
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
       MATHCOMP_VERSION: "1.18.0"
       COQ_VERSION: "8.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
-      COQPATH: "${{ github.workspace }}"
+      COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
       TEMP_DIR: "/__w/_temp/_runner_file_commands"
@@ -30,6 +30,7 @@ jobs:
       VENV_PATH: "${{ github.workspace }}/.venv"
     steps:
       - name: 修复临时目录权限
+        shell: bash
         run: |
           mkdir -p ${{ env.TEMP_DIR }} ~/.opam ~/.cache/opam
           chmod -R 777 /__w/_temp/ ~/.opam ~/.cache/opam
@@ -39,6 +40,7 @@ jobs:
           fetch-depth: 0
           submodules: 'recursive'
       - name: 修复工作目录权限+初始化opam环境
+        shell: bash
         run: |
           mkdir -p ${{ github.workspace }}
           chmod -R 777 ${{ github.workspace }}
@@ -119,9 +121,6 @@ jobs:
             "coq-mathcomp-algebra=${{ env.MATHCOMP_VERSION }}"
             "coq-mathcomp-solvable=${{ env.MATHCOMP_VERSION }}"
             "coq-equations=1.3+8.18"
-            "coq-unimath=20240201"
-            "coq-arith-extra=1.2.0"
-            "coq-geometry=1.0.0"
             "${{ env.COQ_EXTRA_OPAM }}"
           )
           to_install=()
@@ -161,141 +160,125 @@ jobs:
           if ! command -v python &> /dev/null; then
             exit 1
           fi
-      - name: 扫描项目结构
+      - name: 预处理CoqProject文件
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
-          echo "=== 项目结构扫描 ==="
-          find . -type d -name ".*" -prune -o -type d -print | sort
-          echo "=== 所有.v文件 ==="
-          find . -name "*.v" -type f | head -30
-          echo "=== 检查关键目录 ==="
-          for dir in SelfContainedLib theories CaseA_SetTheory CS_Null Quantum DynamicSystem Toolchain Engineering Test; do
-            if [ -d "$dir" ]; then
-              echo "✓ 目录存在: $dir"
-              find "$dir" -name "*.v" | head -5
-            else
-              echo "✗ 目录缺失: $dir"
-            fi
-          done
-      - name: 修复Coq文件语法
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          echo "修复Coq文件语法错误..."
-          find . -name "*.v" -type f -exec bash -c '
-            for file; do
-              echo "检查文件: $file"
-              first_line=$(head -n1 "$file")
-              if [[ "$first_line" == \#* ]]; then
-                echo "修复文件: $file - 移除开头的 # 注释"
-                tail -n +2 "$file" > "$file.tmp"
-                if [ ! -s "$file.tmp" ]; then
-                  echo "(* 自动修复的Coq文件 *)" > "$file.tmp"
-                  echo "Require Import Coq.Init.Prelude." >> "$file.tmp"
-                fi
-                mv "$file.tmp" "$file"
-              fi
-            done
-          ' bash {} +
-      - name: 创建合规CoqProject
-        shell: bash
-        working-directory: ${{ github.workspace }}
-        run: |
-          echo "创建合规的CoqProject文件..."
-          cat > CoqProject << 'EOF'
--R . FRF
--R SelfContainedLib FRF.SelfContainedLib
--R theories FRF.Theories
--R CaseA_SetTheory FRF.CaseA_SetTheory
--R CS_Null FRF.CS_Null
--R Quantum FRF.Quantum
--R DynamicSystem FRF.DynamicSystem
--R Toolchain FRF.Toolchain
--R Test FRF.Test
-
--arg -w
--arg -notation-overridden
--arg -redundant-canonical-projection  
--arg -unused-intro-pattern
--arg -deprecated
--arg -async-proofs
--arg -async-proofs-tac-j 1
--arg -q
-
-SelfContainedLib/Algebra.v
-SelfContainedLib/Category.v
-SelfContainedLib/Geometry.v
-theories/FRF_MetaTheory.v
-theories/FRF_PhilosophicalValidation.v
-theories/FRF_Comparative.v
-theories/ChurchNumerals.v
-theories/ChurchZero.v
-theories/CaseA_SetTheory.v
-theories/CaseB_Algebra.v
-theories/CaseB_Algebra_SelfContained.v
-theories/CaseC_TypeTheory.v
-theories/CaseD_CategoryTheory.v
-theories/CaseD_Category_SelfContained.v
-theories/CaseF_Logic.v
-CS_Null/FRF_CS_Null_Common.v
-CS_Null/RustNull.v
-CS_Null/CxxNull.v
-CS_Null/JavaNull.v
-CS_Null/PythonNull.v
-CS_Null/MathNull.v
-CS_Null/FRF_CS_Null.v
-Quantum/QFT_FRF.v
-Quantum/CaseE_QuantumVacuum.v
-Quantum/CurvedSpacetimeQFT.v
-DynamicSystem/Utils/Serialization.v
-DynamicSystem/TimeVaryingSystem.v
-DynamicSystem/DistributedSystem.v
-DynamicSystem/BlockchainSystem.v
-DynamicSystem/ControlSystem.v
-Toolchain/FRF_to_Agda.v
-Toolchain/FRF_to_Isabelle.v
-Toolchain/FRF_to_Lean.v
-Test/Test_FRF_MetaTheory.v
-Test/Test_QuantumVacuum.v
-Test/Test_BlockchainSystem.v
-EOF
-          echo "生成的CoqProject内容:"
-          cat CoqProject
-      - name: 生成验证Makefile
+          mkdir -p ${{ env.REPORT_DIR }}/debug
+          if [ -f "CoqProject" ]; then
+            cp CoqProject ${{ env.REPORT_DIR }}/debug/CoqProject_original
+            sed 's/#.*$//' CoqProject > CoqProject.no_comment
+            grep -v '^$' CoqProject.no_comment > CoqProject.non_empty
+            grep -v "coq=8.19.0" CoqProject.non_empty > CoqProject.clean
+            mv CoqProject.clean CoqProject
+            cp CoqProject ${{ env.REPORT_DIR }}/debug/CoqProject_processed
+          else
+            echo "-R theories FRF" > CoqProject
+            echo "-R lib Lib" >> CoqProject
+            echo "-R extensions Extensions" >> CoqProject
+            find theories/ lib/ extensions/ -name "*.v" >> CoqProject
+            cp CoqProject ${{ env.REPORT_DIR }}/debug/CoqProject_generated
+          fi
+      - name: 生成全局验证Makefile
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          echo "生成Makefile..."
-          if [ -f "CoqProject" ]; then
-            echo "使用CoqProject生成Makefile"
-            coq_makefile -f CoqProject -o Makefile
+          mkdir -p ${{ env.REPORT_DIR }}/debug
+          if [ ! -f "CoqProject" ]; then
+            echo "错误：未找到CoqProject文件" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            exit 1
           fi
-          if [ $? -ne 0 ] || [ ! -f "Makefile" ]; then
-            echo "CoqProject方法失败，创建通用Makefile"
-            cat > Makefile << 'EOF'
-COQC = coqc
-COQFLAGS = -q -w -notation-overridden -w -redundant-canonical-projection -w -unused-intro-pattern -w -deprecated -async-proofs -async-proofs-tac-j 1
-
-VFILES = SelfContainedLib/Algebra.v SelfContainedLib/Category.v SelfContainedLib/Geometry.v theories/FRF_MetaTheory.v theories/FRF_PhilosophicalValidation.v theories/FRF_Comparative.v theories/ChurchNumerals.v theories/ChurchZero.v theories/CaseA_SetTheory.v theories/CaseB_Algebra.v theories/CaseB_Algebra_SelfContained.v theories/CaseC_TypeTheory.v theories/CaseD_CategoryTheory.v theories/CaseD_Category_SelfContained.v theories/CaseF_Logic.v CS_Null/FRF_CS_Null_Common.v CS_Null/RustNull.v CS_Null/CxxNull.v CS_Null/JavaNull.v CS_Null/PythonNull.v CS_Null/MathNull.v CS_Null/FRF_CS_Null.v Quantum/QFT_FRF.v Quantum/CaseE_QuantumVacuum.v Quantum/CurvedSpacetimeQFT.v DynamicSystem/Utils/Serialization.v DynamicSystem/TimeVaryingSystem.v DynamicSystem/DistributedSystem.v DynamicSystem/BlockchainSystem.v DynamicSystem/ControlSystem.v Toolchain/FRF_to_Agda.v Toolchain/FRF_to_Isabelle.v Toolchain/FRF_to_Lean.v Test/Test_FRF_MetaTheory.v Test/Test_QuantumVacuum.v Test/Test_BlockchainSystem.v
-
-all: $(VFILES:.v=.vo)
-
-%.vo: %.v
-	$(COQC) $(COQFLAGS) $<
-
-clean:
-	rm -f *.vo *.glob
-	find . -name "*.vo" -delete
-	find . -name "*.glob" -delete
-
-.PHONY: all clean
-EOF
+          echo "CoqProject文件内容：" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          cat CoqProject >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          echo "开始生成Makefile（第1次尝试：直接调用coq_makefile）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          makefile_success=0
+          if [ -f "Makefile.template" ]; then
+            coq_makefile -f CoqProject -o Makefile -extra Makefile.template 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
+          else
+            coq_makefile -f CoqProject -o Makefile 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
           fi
-          echo "Makefile内容:"
-          cat Makefile
+          if [ $makefile_success -eq 1 ]; then
+            echo "第1次尝试成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          else
+            echo "第1次尝试失败，开始手动提取参数和文件（第2次尝试）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            ARGS=()
+            FILES=()
+            while IFS= read -r line; do
+              trimmed_line=$(echo "$line" | xargs)
+              if [ -z "$trimmed_line" ]; then
+                continue
+              fi
+              first_char=$(echo "$trimmed_line" | cut -c1)
+              if [ "$first_char" = "-" ]; then
+                ARGS+=("$trimmed_line")
+                echo "提取参数：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              elif [[ "$trimmed_line" == *.v ]]; then
+                if [ -f "$trimmed_line" ]; then
+                  FILES+=("$trimmed_line")
+                  echo "提取有效文件：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                else
+                  echo "跳过不存在的文件：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                fi
+              else
+                echo "跳过未知行：$trimmed_line" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              fi
+            done < CoqProject
+            echo "提取到的参数列表：${ARGS[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "提取到的文件列表：${FILES[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            if [ ${#ARGS[@]} -eq 0 ] && [ ${#FILES[@]} -eq 0 ]; then
+              echo "未提取到有效参数和文件，尝试自动生成（第3次尝试）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              ARGS=("-R theories FRF" "-R lib Lib" "-R extensions Extensions")
+              FILES=($(find theories/ lib/ extensions/ -name "*.v"))
+              echo "自动生成参数：${ARGS[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              echo "自动生成文件：${FILES[*]}" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            fi
+            if [ ${#ARGS[@]} -gt 0 ] || [ ${#FILES[@]} -gt 0 ]; then
+              coq_makefile "${ARGS[@]}" "${FILES[@]}" -o Makefile 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
+              if [ $makefile_success -eq 1 ]; then
+                echo "第2次尝试成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+              else
+                echo "第2次尝试失败，调整参数格式（第3次尝试：路径加引号）" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                ARGS_QUOTED=()
+                for arg in "${ARGS[@]}"; do
+                  if [[ "$arg" == -R* || "$arg" == -Q* ]]; then
+                    parts=($arg)
+                    if [ ${#parts[@]} -eq 3 ]; then
+                      ARGS_QUOTED+=("${parts[0]} '${parts[1]}' '${parts[2]}'")
+                    else
+                      ARGS_QUOTED+=("$arg")
+                    fi
+                  else
+                    ARGS_QUOTED+=("$arg")
+                  fi
+                done
+                FILES_QUOTED=()
+                for file in "${FILES[@]}"; do
+                  FILES_QUOTED+=("'$file'")
+                done
+                eval "coq_makefile ${ARGS_QUOTED[*]} ${FILES_QUOTED[*]} -o Makefile" 2>> ${{ env.REPORT_DIR }}/debug/makefile_log.txt && makefile_success=1
+                if [ $makefile_success -eq 1 ]; then
+                  echo "第3次尝试成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                else
+                  echo "第3次尝试失败" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+                fi
+              fi
+            fi
+          fi
+          if [ $makefile_success -eq 0 ]; then
+            echo "coq_makefile所有尝试失败，输出调试信息" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "当前目录：$(pwd)" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "目录内容：$(ls -l)" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "theories目录内容：$(ls -l theories 2>/dev/null)" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            exit 1
+          fi
+          if ! grep -q "${{ env.GLOBAL_TARGET }}" Makefile; then
+            echo "Makefile中未找到目标 '${{ env.GLOBAL_TARGET }}'，自动添加" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+            echo "${{ env.GLOBAL_TARGET }}: all.v" >> Makefile
+          fi
+          echo "Makefile生成成功" >> ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          cp Makefile ${{ env.REPORT_DIR }}/debug/Makefile_generated
       - name: 执行全局形式化验证
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -303,87 +286,138 @@ EOF
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
-          echo "开始全局形式化验证..."
-          export COQPATH="${{ github.workspace }}"
-          
-          echo "尝试使用Makefile编译..."
-          if [ -f "Makefile" ]; then
-            make -j2 all 2>&1 | tee ${{ env.REPORT_DIR }}/make-compile.log
-            if [ $? -eq 0 ]; then
-              echo "Makefile编译成功"
-              exit 0
+          echo "开始并行编译验证（核心数：$(nproc)）" >> ${{ env.REPORT_DIR }}/global-compile.log
+          make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee -a ${{ env.REPORT_DIR }}/global-compile.log
+          echo "编译完成，开始检查产物" >> ${{ env.REPORT_DIR }}/global-compile.log
+          failed_files=()
+          while IFS= read -r v_file; do
+            trimmed_v=$(echo "$v_file" | xargs)
+            if [ -z "$trimmed_v" ]; then
+              continue
+            fi
+            vo_file="${trimmed_v%.v}.vo"
+            if [ ! -f "$vo_file" ]; then
+              failed_files+=("$vo_file")
+              echo "缺失产物：$vo_file（对应源文件：$trimmed_v）" >> ${{ env.REPORT_DIR }}/global-compile.log
             else
-              echo "Makefile编译失败，尝试逐个文件编译"
+              echo "成功产物：$vo_file" >> ${{ env.REPORT_DIR }}/global-compile.log
             fi
-          fi
-          
-          echo "逐个编译.v文件..."
-          compiled_count=0
-          total_files=0
-          
-          vfiles="SelfContainedLib/Algebra.v SelfContainedLib/Category.v SelfContainedLib/Geometry.v theories/FRF_MetaTheory.v theories/FRF_PhilosophicalValidation.v theories/FRF_Comparative.v theories/ChurchNumerals.v theories/ChurchZero.v theories/CaseA_SetTheory.v theories/CaseB_Algebra.v theories/CaseB_Algebra_SelfContained.v theories/CaseC_TypeTheory.v theories/CaseD_CategoryTheory.v theories/CaseD_Category_SelfContained.v theories/CaseF_Logic.v CS_Null/FRF_CS_Null_Common.v CS_Null/RustNull.v CS_Null/CxxNull.v CS_Null/JavaNull.v CS_Null/PythonNull.v CS_Null/MathNull.v CS_Null/FRF_CS_Null.v Quantum/QFT_FRF.v Quantum/CaseE_QuantumVacuum.v Quantum/CurvedSpacetimeQFT.v DynamicSystem/Utils/Serialization.v DynamicSystem/TimeVaryingSystem.v DynamicSystem/DistributedSystem.v DynamicSystem/BlockchainSystem.v DynamicSystem/ControlSystem.v Toolchain/FRF_to_Agda.v Toolchain/FRF_to_Isabelle.v Toolchain/FRF_to_Lean.v Test/Test_FRF_MetaTheory.v Test/Test_QuantumVacuum.v Test/Test_BlockchainSystem.v"
-          
-          for v_file in $vfiles; do
-            if [ -f "$v_file" ]; then
-              total_files=$((total_files + 1))
-              echo "编译文件: $v_file"
-              if coqc -q -w -notation-overridden -w -redundant-canonical-projection -w -unused-intro-pattern -w -deprecated -async-proofs -async-proofs-tac-j 1 "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/individual-compile.log; then
-                compiled_count=$((compiled_count + 1))
-                echo "✓ $v_file" >> ${{ env.REPORT_DIR }}/success.log
+          done < <(grep -E '^[^#].*\.v$' CoqProject)
+          if [ ${#failed_files[@]} -ne 0 ]; then
+            echo "以下文件验证失败，尝试单独编译缺失产物" >> ${{ env.REPORT_DIR }}/global-compile.log
+            for vo_file in "${failed_files[@]}"; do
+              v_file="${vo_file%.vo}.v"
+              if [ -f "$v_file" ]; then
+                echo "单独编译：$v_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+                coqc -Q theories FRF -Q lib Lib -Q extensions Extensions "$v_file" 2>> ${{ env.REPORT_DIR }}/global-compile.log
+                if [ -f "$vo_file" ]; then
+                  echo "单独编译成功：$vo_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+                  failed_files=($(filter-out "$vo_file" "${failed_files[@]}"))
+                else
+                  echo "单独编译失败：$vo_file" >> ${{ env.REPORT_DIR }}/global-compile.log
+                fi
               else
-                echo "✗ $v_file" >> ${{ env.REPORT_DIR }}/errors.log
+                echo "源文件不存在：$v_file" >> ${{ env.REPORT_DIR }}/global-compile.log
               fi
-            fi
-          done
-          
-          echo "检查编译产物..."
-          compiled_files=$(find . -name "*.vo" | wc -l)
-          echo "总文件数: $total_files"
-          echo "成功编译文件数: $compiled_files"
-          
-          if [ $compiled_files -eq 0 ]; then
-            echo "没有成功编译的文件"
+            done
+          fi
+          if [ ${#failed_files[@]} -ne 0 ]; then
+            echo "最终验证失败的文件：" >> ${{ env.REPORT_DIR }}/global-compile.log
+            printf '%s\n' "${failed_files[@]}" >> ${{ env.REPORT_DIR }}/global-compile.log
             exit 1
           fi
-          
-          if [ $compiled_files -lt $((total_files / 2)) ]; then
-            echo "编译成功率低于50%"
-            exit 1
-          fi
-          
-          echo "编译验证完成"
-      - name: 生成验证报告
+          echo "所有文件编译验证完成" >> ${{ env.REPORT_DIR }}/global-compile.log
+      - name: 全局逻辑一致性校验
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
-          total_files=$(find . -name "*.v" | wc -l)
-          success_files=$(find . -name "*.vo" | wc -l)
-          echo "# FRF 2.0 全局形式化验证报告" > ${{ env.REPORT_DIR }}/report.md
-          echo "验证时间: $(date)" >> ${{ env.REPORT_DIR }}/report.md
-          echo "Coq版本: $(coqc --version | head -1)" >> ${{ env.REPORT_DIR }}/report.md
-          echo "总文件数: $total_files" >> ${{ env.REPORT_DIR }}/report.md
-          echo "成功验证: $success_files" >> ${{ env.REPORT_DIR }}/report.md
-          if [ $total_files -gt 0 ]; then
-            echo "验证率: $((success_files * 100 / total_files))%" >> ${{ env.REPORT_DIR }}/report.md
+          mkdir -p ${{ env.REPORT_DIR }}
+          echo "开始逻辑一致性检查（分步执行，避免单次加载过多文件）" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+          vo_dirs=("theories" "lib" "extensions")
+          all_vo=()
+          for dir in "${vo_dirs[@]}"; do
+            if [ -d "$dir" ]; then
+              vo_files=$(find "$dir" -name "*.vo")
+              if [ -n "$vo_files" ]; then
+                all_vo+=($vo_files)
+                echo "检查目录 $dir 的产物：${vo_files[*]}" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+                coqchk -silent -norecursive $vo_files 2>> ${{ env.REPORT_DIR }}/global-coqchk.log
+                if [ ${PIPESTATUS[0]} -ne 0 ]; then
+                  echo "目录 $dir 的逻辑一致性检查失败" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+                  exit 1
+                fi
+              else
+                echo "目录 $dir 无.vo文件" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+              fi
+            else
+              echo "目录 $dir 不存在" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+            fi
+          done
+          if [ ${#all_vo[@]} -gt 0 ]; then
+            echo "全量逻辑一致性检查（最终验证）" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+            coqchk -silent -norecursive "${all_vo[@]}" 2>> ${{ env.REPORT_DIR }}/global-coqchk.log
+            if [ ${PIPESTATUS[0]} -ne 0 ]; then
+              echo "全量逻辑一致性检查失败" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+              exit 1
+            fi
           fi
-          echo "## 已验证模块" >> ${{ env.REPORT_DIR }}/report.md
-          find . -name "*.vo" -type f >> ${{ env.REPORT_DIR }}/report.md
-      - name: 归档验证结果
+          echo "逻辑一致性检查通过" >> ${{ env.REPORT_DIR }}/global-coqchk.log
+      - name: 生成结构化验证报告
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          eval $(opam env --switch=default)
+          source ${{ env.VENV_PATH }}/bin/activate
+          cat > ${{ env.REPORT_DIR }}/SUMMARY.md <<EOF
+          # FRF 2.0 全局形式化验证报告
+          验证时间: $(date +'%Y-%m-%d %H:%M:%S')
+          触发事件: ${{ github.event_name }}
+          提交哈希: ${{ github.sha }}
+          运行容器: coqorg/coq:${{ env.COQ_VERSION }}
+          Coq版本: $(coqc --version | head -n1)
+          MathComp版本: ${{ env.MATHCOMP_VERSION }}
+          编译核心数: $(nproc)
+          总待验证文件数: $(grep -E '^[^#].*\.v$' CoqProject | wc -l)
+          成功验证文件数: $(find theories/ lib/ extensions/ -name "*.vo" | wc -l)
+          逻辑一致性: 校验通过
+          EOF
+          core_modules=(
+            "theories/FRF_MetaTheory.vo"
+            "theories/Equivalence.vo"
+            "lib/Algebra.vo"
+            "extensions/Quantum/QFT_FRF.vo"
+          )
+          for mod in "${core_modules[@]}"; do
+            if [ -f "$mod" ]; then
+              echo "核心模块: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            else
+              echo "核心模块缺失: $mod" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+            fi
+          done
+          echo "详细日志" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "编译日志: global-compile.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "逻辑一致性检查日志: global-coqchk.log" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "Makefile生成调试日志: debug/makefile_log.txt" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "CoqProject原始文件: debug/CoqProject_original" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+          echo "CoqProject处理后文件: debug/CoqProject_processed" >> ${{ env.REPORT_DIR }}/SUMMARY.md
+      - name: 归档验证产物与报告
         uses: actions/upload-artifact@v4
         with:
-          name: frf-verification-${{ github.sha }}
+          name: frf-2.0-verification-results-${{ github.sha }}
           path: |
-            ${{ env.REPORT_DIR }}/*
+            ${{ env.REPORT_DIR }}/**/*
             **/*.vo
             **/*.glob
             Makefile
             CoqProject
-          retention-days: 30
-      - name: 验证成功
-        if: success()
-        run: echo "FRF 2.0 验证成功完成"
-      - name: 验证失败
+            ${{ env.VENV_PATH }}/lib/python*/site-packages/*.dist-info
+          retention-days: 90
+      - name: 验证失败紧急通知
+        shell: bash
         if: failure()
-        run: echo "FRF 2.0 验证失败"
+        run: |
+          echo "FRF 2.0 全局形式化验证失败"
+          cat ${{ env.REPORT_DIR }}/debug/makefile_log.txt
+          cat ${{ env.REPORT_DIR }}/global-compile.log
