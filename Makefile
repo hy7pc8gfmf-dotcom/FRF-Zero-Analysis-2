@@ -302,13 +302,13 @@ test: compile validate
 	done
 
 # Level-based testing targets
-test-base: $(SELF_CONTAINED_ORDERED) $(FRF_BASE_ORDERED)
+test-base: $(SELF_CONTAINED_ORDERED:.v=.vo) $(FRF_BASE_ORDERED:.v=.vo) $(CATEGORY_BASE_ORDERED:.v=.vo)
 	@echo "✅ Level 1 base modules compilation verified!"
 
-test-scene: $(THEORIES_ORDERED) $(QUANTUM_ORDERED) $(CS_NULL_ORDERED) $(DYNAMIC_SYSTEM_ORDERED) $(TOOLCHAIN_ORDERED) $(CATEGORY_EXT_ORDERED)
+test-scene: $(THEORIES_ORDERED:.v=.vo) $(QUANTUM_ORDERED:.v=.vo) $(CS_NULL_ORDERED:.v=.vo) $(DYNAMIC_SYSTEM_ORDERED:.v=.vo) $(TOOLCHAIN_ORDERED:.v=.vo) $(CATEGORY_EXT_ORDERED:.v=.vo)
 	@echo "✅ Level 2 scene modules compilation verified!"
 
-test-integration: $(INTEGRATION_ORDERED) $(TEST_ORDERED)
+test-integration: $(INTEGRATION_ORDERED:.v=.vo) $(TEST_ORDERED:.v=.vo)
 	@echo "✅ Level 3 integration modules compilation verified!"
 
 # ========================
