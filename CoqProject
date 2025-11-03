@@ -7,11 +7,16 @@
 -Q Toolchain FRF.Toolchain          # 工具层：跨工具链翻译，导入时用「Require Import FRF.Toolchain.FRF_to_Agda」
 -Q Test FRF.Test                    # 测试层：验证用例，导入时用「Require Import FRF.Test.Test_FRF_MetaTheory」
 
-# 编译参数优化：明确警告过滤、异步证明配置（兼容CI环境）
--arg -w -notation-overridden,-redundant-canonical-projection,-unused-intro-pattern,-deprecated
--arg -async-proofs full             # 异步证明全启用（提升CI编译速度）
--arg -async-proofs-queue-size 10    # 队列大小适配CI核心数
--arg -q                             # 抑制冗余启动信息
+# 编译参数优化：修复参数格式，每个警告单独一行
+-arg -w -notation-overridden
+-arg -w -redundant-canonical-projection
+-arg -w -unused-intro-pattern
+-arg -w -deprecated
+-arg -async-proofs
+-arg -full
+-arg -async-proofs-queue-size
+-arg 10
+-arg -q
 
 # 按「基础层→核心层→扩展层→工具层→测试层」排序（确保依赖顺序正确）
 # 1. 基础层（无外部依赖）
