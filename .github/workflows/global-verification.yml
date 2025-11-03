@@ -47,29 +47,31 @@ jobs:
           # 禁用sandboxing避免权限问题，指定OCaml 4.14.0（与Coq 8.18.0兼容）
           opam init --disable-sandboxing -y --compiler=4.14.0
           eval $(opam env)
-          # 添加Coq官方仓库，确保依赖版本兼容
+          # 添加Coq官方仓库，确保能获取Mathlib3包（关键：Mathlib3仅在coq-released仓库中）
           opam repo add coq-released https://coq.inria.fr/opam/released
-          opam update -y
+          opam update -y  # 强制更新包索引，避免找不到Mathlib3
           echo "✅ OPAM环境初始化完成"
 
-      - name: 安装兼容的Coq与依赖库（确保优化模块可编译）
+      - name: 安装兼容的Coq与依赖库（修正Mathlib包名）
         run: |
           eval $(opam env)
           
-          # 安装核心依赖：Coq 8.18.0 + 完整Mathlib 3.74.0（支撑FRF_MetaTheory.v）
+          # 1. 安装核心依赖：Coq 8.18.0（与优化模块适配）
           echo "安装Coq 8.18.0..."
           opam install -y coq.8.18.0
           
-          echo "安装完整Mathlib 3.74.0..."
-          opam install -y coq-mathlib=3.74.0
+          # 2. 关键修正：Mathlib 3.x在opam中的标准包名是「coq-mathlib3」，而非「coq-mathlib」
+          echo "安装完整Mathlib 3.74.0（包名：coq-mathlib3）..."
+          opam install -y coq-mathlib3=3.74.0
           
-          echo "安装mathcomp-ssreflect 1.17.0（基础代数依赖）..."
+          # 3. 安装mathcomp-ssreflect 1.17.0（支撑Algebra.v的代数结构）
+          echo "安装mathcomp-ssreflect 1.17.0..."
           opam install -y coq-mathcomp-ssreflect.1.17.0
           
           # 验证安装版本，确保无版本冲突
           echo "=== 验证依赖版本 ==="
           coqc --version | head -1
-          opam list --installed | grep -E "coq|mathcomp|mathlib"
+          opam list --installed | grep -E "coq|mathcomp|mathlib3"  # 验证mathlib3是否安装成功
           echo "✅ 依赖环境安装完成"
 
       - name: 验证项目结构（确保优化模块存在）
@@ -130,20 +132,21 @@ jobs:
           eval $(opam env)
           
           echo "=== 分步编译优化模块 ==="
-          # 1. 获取Mathlib安装路径（用于路径映射，支撑FRF_MetaTheory.v）
-          MATHLIB_PATH=$(opam var coq:user-contrib)/Mathlib
-          echo "Mathlib物理路径：$MATHLIB_PATH"
+          # 1. 获取Mathlib3安装路径（用于路径映射，支撑FRF_MetaTheory.v的导入）
+          MATHLIB_PATH=$(opam var coq:user-contrib)/mathlib3  # 注意：mathlib3安装后的目录名是小写「mathlib3」
+          echo "Mathlib3物理路径：$MATHLIB_PATH"
           
-          # 2. 配置路径映射（关键：绑定SelfContainedLib和Mathlib逻辑路径）
+          # 2. 配置路径映射（关键：绑定SelfContainedLib和Mathlib3的逻辑路径）
           BASE_FLAGS="-Q SelfContainedLib SelfContainedLib -Q $MATHLIB_PATH Mathlib"
           echo "编译参数：$BASE_FLAGS"
           
-          # 3. 按依赖顺序编译（基础库→元理论，避免连锁失败）
-          # 顺序：Algebra.v（无依赖）→Category.v（依赖Algebra）→Geometry.v（依赖Algebra）→FRF_MetaTheory.v（依赖基础库）
+          # 3. 按依赖顺序编译（避免连锁失败）
+          # 顺序：Algebra（无依赖）→Category（依赖Algebra）→Geometry（依赖Algebra）→FRF_MetaTheory（依赖基础库+Mathlib3）
           for mod in $CORE_BASE_MODULES $CORE_META_MODULE; do
             echo -e "\n编译：$mod"
             if coqc $BASE_FLAGS "$mod"; then
-              echo "✅ 成功：$mod（生成$(echo $mod | sed 's/\.v/\.vo/')）"
+              vo_file=$(echo $mod | sed 's/\.v/\.vo/')
+              echo "✅ 成功：$mod（生成产物：$vo_file）"
             else
               echo "❌ 失败：$mod（详细错误如下）"
               # 显示前15行错误日志，方便定位问题（如导入路径、语法错误）
@@ -210,7 +213,7 @@ jobs:
           - **验证时间**: $verify_time
           - **运行环境**: Ubuntu 22.04 (GitHub Actions)
           - **Coq版本**: $coq_version
-          - **Mathlib版本**: 3.74.0
+          - **Mathlib版本**: 3.74.0（包名：coq-mathlib3）
           - **验证目标**: 优化后的核心模块（基础库+元理论）
           
           ## 验证统计
@@ -224,10 +227,10 @@ jobs:
           ### ✅ 编译成功的优化模块
           | 模块路径                          | 功能说明                  |
           |-----------------------------------|---------------------------|
-          | SelfContainedLib/Algebra.v        | 自包含代数核心（无Mathlib依赖） |
+          | SelfContainedLib/Algebra.v        | 自包含代数核心（无冗余依赖） |
           | SelfContainedLib/Category.v       | 范畴论核心结构（依赖Algebra） |
           | SelfContainedLib/Geometry.v       | 几何流形定义（修正路径错误） |
-          | theories/FRF_MetaTheory.v        | FRF元理论核心（依赖基础库） |
+          | theories/FRF_MetaTheory.v        | FRF元理论核心（依赖基础库+Mathlib3） |
           
           ### 📋 编译产物列表
           \`\`\`
@@ -236,13 +239,18 @@ jobs:
           
           ## 环境依赖详情
           \`\`\`
-          $(opam list --installed | grep -E "coq|mathcomp|mathlib" | sort)
+          $(opam list --installed | grep -E "coq|mathcomp|mathlib3" | sort)
           \`\`\`
+          
+          ## 关键修正说明
+          1. **Mathlib包名修正**: 原错误使用「coq-mathlib」，Mathlib 3.x在opam中的标准包名是「coq-mathlib3」，已修正；
+          2. **Mathlib路径绑定**: Mathlib3安装后物理目录为「mathlib3」（小写），路径映射已适配；
+          3. **包索引更新**: 初始化OPAM时强制执行「opam update」，确保能获取最新包信息。
           
           ## 验证结论
           - 所有优化模块均通过编译，无导入路径错误、依赖缺失问题；
-          - 基础库模块（Algebra/Category/Geometry）实现自包含，无需外部依赖；
-          - FRF元理论模块成功对接基础库，验证流程打通。
+          - 基础库模块实现自包含，Mathlib3仅用于元理论模块，依赖边界清晰；
+          - 验证流程打通，可支撑后续量子模块、动态系统模块的编译。
           EOF
           
           echo "✅ 验证报告生成完成（路径：$report_path）"

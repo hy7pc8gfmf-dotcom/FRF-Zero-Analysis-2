@@ -90,11 +90,12 @@ jobs:
         eval $(opam env)
         echo "=== 应用代码修复 ==="
         
-        # 创建简化的Algebra.v
+        # 创建简化的Algebra.v - 修复Nat模块导入
         cat > SelfContainedLib/Algebra.v << 'EOF'
         (* 简化版本: SelfContainedLib/Algebra.v *)
         From Coq Require Import Utf8.
         From Coq Require Import FunctionalExtensionality.
+        From Coq Require Import Arith.Arith.
         
         Module Type BasicAlgebra.
           Parameter T : Type.
@@ -125,10 +126,11 @@ jobs:
         Proof. reflexivity. Qed.
         EOF
         
-        # 创建简化的Category.v
+        # 创建简化的Category.v - 修复导入
         cat > SelfContainedLib/Category.v << 'EOF'
         (* 简化版本: SelfContainedLib/Category.v *)
         From Coq Require Import Utf8.
+        From Coq Require Import FunctionalExtensionality.
         From SelfContainedLib Require Import Algebra.
         
         Module Type BasicCategory.
@@ -177,6 +179,7 @@ jobs:
           echo "✅ Algebra.v 编译成功"
         else
           echo "❌ Algebra.v 编译失败"
+          coqc $BASE_FLAGS SelfContainedLib/Algebra.v 2>&1
           exit 1
         fi
         
@@ -185,6 +188,7 @@ jobs:
           echo "✅ Category.v 编译成功"
         else
           echo "❌ Category.v 编译失败"
+          coqc $BASE_FLAGS SelfContainedLib/Category.v 2>&1
           exit 1
         fi
 
