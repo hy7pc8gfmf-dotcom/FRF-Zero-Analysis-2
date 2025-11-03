@@ -124,21 +124,27 @@ jobs:
           
           mkdir -p verification-reports
           
-          cat > verification-reports/REPORT.md << 'EOF'
-# FRF 2.0 形式化验证报告
-
-**验证时间**: $(date)
-**环境**: coqorg/coq:8.18.0
-**Coq版本**: $(coqc --version | head -1)
-
-## 编译统计
-- 总Coq文件: $total_files
-- 成功编译: $compiled_files
-- 成功率: $((compiled_files * 100 / total_files))%
-
-## 核心模块状态
-EOF
-
+          # 使用多个echo命令生成报告，避免heredoc问题
+          echo "# FRF 2.0 形式化验证报告" > verification-reports/REPORT.md
+          echo "" >> verification-reports/REPORT.md
+          echo "**验证时间**: $(date)" >> verification-reports/REPORT.md
+          echo "**环境**: coqorg/coq:8.18.0" >> verification-reports/REPORT.md
+          echo "**Coq版本**: $(coqc --version | head -1)" >> verification-reports/REPORT.md
+          echo "" >> verification-reports/REPORT.md
+          echo "## 编译统计" >> verification-reports/REPORT.md
+          echo "- 总Coq文件: $total_files" >> verification-reports/REPORT.md
+          echo "- 成功编译: $compiled_files" >> verification-reports/REPORT.md
+          
+          if [ $total_files -gt 0 ]; then
+            success_rate=$((compiled_files * 100 / total_files))
+            echo "- 成功率: $success_rate%" >> verification-reports/REPORT.md
+          else
+            echo "- 成功率: 0%" >> verification-reports/REPORT.md
+          fi
+          
+          echo "" >> verification-reports/REPORT.md
+          echo "## 核心模块状态" >> verification-reports/REPORT.md
+          
           # 添加模块状态
           modules=(
             "SelfContainedLib/Algebra.vo:基础代数"
@@ -182,8 +188,9 @@ EOF
       - name: 验证成功通知
         if: success()
         run: |
+          compiled_count=$(find . -name "*.vo" | wc -l)
           echo "🎉 FRF 2.0 形式化验证成功完成!"
-          echo "📊 编译模块: $(find . -name '*.vo' | wc -l)"
+          echo "📊 编译模块: $compiled_count"
           echo "📋 报告位置: verification-reports/REPORT.md"
 
       - name: 验证失败通知
