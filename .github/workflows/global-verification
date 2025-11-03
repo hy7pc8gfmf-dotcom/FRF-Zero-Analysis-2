@@ -19,7 +19,7 @@ jobs:
       MATHCOMP_VERSION: "1.18.0"
       COQ_VERSION: "8.18.0"
       COQ_EXTRA_OPAM: "coq-bignums"
-      COQPATH: "${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
+      COQPATH: "${{ github.workspace }}/SelfContainedLib:${{ github.workspace }}/theories:${{ github.workspace }}/CS_Null:${{ github.workspace }}/Quantum:${{ github.workspace }}/DynamicSystem"
       GLOBAL_TARGET: "all"
       REPORT_DIR: "${{ github.workspace }}/verification-reports"
       TEMP_DIR: "/__w/_temp/_runner_file_commands"
@@ -172,17 +172,21 @@ jobs:
           if ! command -v python &> /dev/null; then
             exit 1
           fi
-      - name: 预处理CoqProject文件
+      - name: 预处理CoqProject文件（保留核心路径绑定）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           if [ -f "CoqProject" ]; then
-            echo "使用超强预处理方法清理CoqProject文件..."
-            grep -v -E "^(#|opam install|.*coq=|.*启用|.*保持|.*增加)" CoqProject | grep -v "^$" > CoqProject.clean
-            grep -E "^-R|^-Q|^-I|^[^#].*\.v$" CoqProject.clean > CoqProject.ultraclean
-            mv CoqProject.ultraclean CoqProject
-            echo "CoqProject文件预处理完成"
-          fi
+            echo "清理CoqProject冗余注释与空行..."
+            # 仅过滤注释和空行，保留所有-Q/-R/-arg绑定及.v文件路径
+            grep -v -E "^#|^$" CoqProject > CoqProject.clean
+            mv CoqProject.clean CoqProject
+            echo "CoqProject预处理完成，核心配置如下："
+            grep -E "^-Q|^-R|^-arg" CoqProject
+            else
+            echo "错误：未找到CoqProject文件"
+            exit 1
+            fi
       - name: 生成全局验证Makefile
         shell: bash
         working-directory: ${{ github.workspace }}
@@ -226,62 +230,65 @@ jobs:
           else
             echo "Makefile生成成功"
           fi
-      - name: 执行全局形式化验证
+      - name: 执行全局形式化验证（按依赖顺序编译）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           mkdir -p ${{ env.REPORT_DIR }}
-          echo "开始编译验证..."
           echo "设置Coq路径..."
-          export COQPATH="${{ github.workspace }}/theories:${{ github.workspace }}/lib:${{ github.workspace }}/extensions"
-          echo "查找所有Coq文件..."
-          find theories -name "*.v" > all_coq_files.txt
-          echo "找到的Coq文件:"
-          cat all_coq_files.txt
-          echo "编译所有找到的Coq文件..."
-          while IFS= read -r v_file; do
-            if [ -f "$v_file" ]; then
-              echo "编译文件: $v_file"
-              coqc -q "$v_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/compile-all.log
-            else
-              echo "文件不存在: $v_file"
-            fi
-          done < all_coq_files.txt
+          export COQPATH="${{ env.COQPATH }}"
+          echo "基于优化后的CoqProject生成Makefile..."
+          coq_makefile -f CoqProject -o Makefile
+          if [ $? -ne 0 ]; then
+          echo "Makefile生成失败"
+          exit 1
+          fi
+          echo "按依赖顺序编译（并行核心数：$(nproc)）..."
+          make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/compile-all.log
           echo "检查编译产物..."
-          compiled_files=$(find theories -name "*.vo" | wc -l)
-          echo "成功编译文件数: $compiled_files"
-          if [ $compiled_files -eq 0 ]; then
-            echo "没有成功编译的文件，尝试使用Makefile..."
-            if [ -f "Makefile" ]; then
-              make -j$(nproc) ${{ env.GLOBAL_TARGET }} 2>&1 | tee ${{ env.REPORT_DIR }}/makefile-compile.log
-              compiled_files=$(find theories -name "*.vo" | wc -l)
+          # 检查所有核心模块是否生成.vo文件（基础层+核心层关键模块）
+          critical_modules=(
+          "SelfContainedLib/Algebra.vo"
+          "theories/FRF_MetaTheory.vo"
+          "theories/CaseB_Algebra.vo"
+          "CS_Null/FRF_CS_Null.vo"
+          "Quantum/QFT_FRF.vo"
+          )
+          for mod in "${critical_modules[@]}"; do
+            if [ ! -f "$mod" ]; then
+              echo "错误：核心模块 $mod 未编译成功"
+              exit 1
             fi
-          fi
-          if [ $compiled_files -eq 0 ]; then
-            echo "没有成功编译的文件"
-            exit 1
-          fi
+          done
+          total_compiled=$(find . -name "*.vo" | wc -l)
+          total_v=$(find . -name "*.v" | grep -v "test" | grep -v "mock" | wc -l)
+          echo "总待验证.v文件数: $total_v"
+          echo "成功编译.vo文件数: $total_compiled"
           echo "编译验证完成"
-      - name: 全局逻辑一致性校验
+      - name: 全局逻辑一致性校验（核心模块全量校验）
         shell: bash
         working-directory: ${{ github.workspace }}
         run: |
           eval $(opam env --switch=default)
           source ${{ env.VENV_PATH }}/bin/activate
           echo "开始逻辑一致性检查..."
-          find theories -name "*.vo" 2>/dev/null > vo_files.list
-          if [ -s vo_files.list ]; then
-            echo "检查前3个模块一致性..."
-            head -3 vo_files.list | while read vo_file; do
-              echo "检查模块: $vo_file"
-              coqchk -silent "$vo_file" 2>&1 | tee -a ${{ env.REPORT_DIR }}/global-coqchk.log
-            done
-            echo "逻辑一致性检查完成"
-          else
+          # 收集所有核心模块的.vo文件（排除测试模块）
+          find . -name "*.vo" -not -path "./Test/*" > vo_files.list
+          if [ ! -s vo_files.list ]; then
             echo "未找到任何.vo文件，跳过逻辑一致性检查"
+            exit 1
           fi
+          echo "全量校验核心模块一致性（共 $(wc -l < vo_files.list) 个模块）..."
+          coqchk -silent -R . FRF $(cat vo_files.list) 2>&1 | tee -a ${{ env.REPORT_DIR }}/global-coqchk.log
+          # 检查coqchk退出码（0=无冲突，非0=存在逻辑冲突）
+          if [ $? -ne 0 ]; then
+            echo "错误：核心模块存在逻辑一致性冲突"
+            cat ${{ env.REPORT_DIR }}/global-coqchk.log
+            exit 1
+          fi
+          echo "逻辑一致性检查通过"
       - name: 生成结构化验证报告
         shell: bash
         working-directory: ${{ github.workspace }}
