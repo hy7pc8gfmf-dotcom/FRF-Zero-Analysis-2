@@ -1,5 +1,6 @@
 # Makefile for FRF Formalization Project
 # Comprehensive build system with validation and defect prevention
+# FIXED: Complete logical path mapping aligned with CoqProject
 
 # ========================
 # CONFIGURATION
@@ -7,321 +8,466 @@
 COQC = coqc
 COQCHK = coqchk
 COQDOC = coqdoc
-COQFLAGS = -Q . FRF -Q SelfContainedLib SelfContainedLib -Q CS_Null CS_Null -Q CategoryTheory CategoryTheory
-# 目录定义（包含所有模块目录，无遗漏）
+
+# FIXED: Complete logical path mapping aligned with CoqProject
+COQFLAGS = -Q . FRF \
+           -Q SelfContainedLib SelfContainedLib \
+           -Q theories FRF.Theories \
+           -Q CS_Null FRF.CS_Null \
+           -Q Quantum FRF.Quantum \
+           -Q DynamicSystem FRF.DynamicSystem \
+           -Q Toolchain FRF.Toolchain \
+           -Q Test FRF.Test \
+           -Q CategoryTheory CategoryTheory
+
+# FIXED: Complete directory definitions
 SRC_ROOT = .
 SELF_CONTAINED_DIR = SelfContainedLib
-CS_NULL_DIR = CS_Null
 THEORIES_DIR = theories
+CS_NULL_DIR = CS_Null
 QUANTUM_DIR = Quantum
+DYNAMIC_SYSTEM_DIR = DynamicSystem
+TOOLCHAIN_DIR = Toolchain
+TEST_DIR = Test
 CATEGORY_THEORY_DIR = CategoryTheory
-# 所有源文件（遍历所有目录，确保无遗漏）
+
+# FIXED: Complete source file scanning
 SRC = \
 	$(wildcard $(SELF_CONTAINED_DIR)/*.v) \
-	$(wildcard $(CS_NULL_DIR)/*.v) \
 	$(wildcard $(THEORIES_DIR)/*.v) \
+	$(wildcard $(CS_NULL_DIR)/*.v) \
 	$(wildcard $(QUANTUM_DIR)/*.v) \
+	$(wildcard $(DYNAMIC_SYSTEM_DIR)/*.v) \
+	$(wildcard $(DYNAMIC_SYSTEM_DIR)/Utils/*.v) \
+	$(wildcard $(TOOLCHAIN_DIR)/*.v) \
+	$(wildcard $(TEST_DIR)/*.v) \
 	$(wildcard $(CATEGORY_THEORY_DIR)/*.v)
-# 构建产物
+
+# Build artifacts
 VO_FILES = $(SRC:.v=.vo)
 GLOB_FILES = $(SRC:.v=.glob)
 V_D_FILES = $(SRC:.v=.v.d)
+
 # ========================
-# 编译顺序（严格按依赖层级，避免循环）
-# 一级基础层 → 二级场景层 → 三级集成层
+# COMPILATION ORDER (strict dependency hierarchy)
 # ========================
-# 1. 一级基础层：SelfContainedLib（代数/范畴/几何）
+# 1. Level 1: SelfContainedLib (Algebra/Category/Geometry)
 SELF_CONTAINED_ORDERED = \
 	$(SELF_CONTAINED_DIR)/Algebra.v \
 	$(SELF_CONTAINED_DIR)/Category.v \
 	$(SELF_CONTAINED_DIR)/Geometry.v
-# 2. 一级基础层：FRF元理论 + 跨语言空值公共模块
+
+# 2. Level 1: FRF MetaTheory + Cross-language null common modules
 FRF_BASE_ORDERED = \
 	$(THEORIES_DIR)/FRF_MetaTheory.v \
 	$(CS_NULL_DIR)/FRF_CS_Null_Common.v
-# 3. 二级场景层：CategoryTheory基础模块
+
+# 3. Level 1: CategoryTheory base modules
 CATEGORY_BASE_ORDERED = \
 	$(CATEGORY_THEORY_DIR)/Core.v \
 	$(CATEGORY_THEORY_DIR)/Equivalence.v
-# 4. 二级场景层：核心场景模块（CaseA-E、Church数、量子真空）
+
+# 4. Level 2: Core scenario modules (CaseA-E, Church numerals, quantum vacuum)
 THEORIES_ORDERED = \
 	$(THEORIES_DIR)/CaseA_SetTheory.v \
+	$(THEORIES_DIR)/ChurchNumerals.v \
+	$(THEORIES_DIR)/ChurchZero.v \
 	$(THEORIES_DIR)/CaseB_Algebra.v \
 	$(THEORIES_DIR)/CaseB_Algebra_SelfContained.v \
 	$(THEORIES_DIR)/CaseC_TypeTheory.v \
-	$(THEORIES_DIR)/CaseD_Category_SelfContained.v \
 	$(THEORIES_DIR)/CaseD_CategoryTheory.v \
-	$(THEORIES_DIR)/ChurchNumerals.v \
-	$(THEORIES_DIR)/ChurchZero.v \
-	$(THEORIES_DIR)/CaseE_QuantumVacuum.v \
+	$(THEORIES_DIR)/CaseD_Category_SelfContained.v \
+	$(THEORIES_DIR)/CaseF_Logic.v
+
+# 5. Level 2: Quantum modules
+QUANTUM_ORDERED = \
 	$(QUANTUM_DIR)/QFT_FRF.v \
+	$(QUANTUM_DIR)/CaseE_QuantumVacuum.v \
 	$(QUANTUM_DIR)/CurvedSpacetimeQFT.v
-# 5. 二级场景层：CS_Null语言空值模块（依赖FRF_CS_Null_Common）
+
+# 6. Level 2: CS_Null language null modules (depends on FRF_CS_Null_Common)
 CS_NULL_ORDERED = \
 	$(CS_NULL_DIR)/RustNull.v \
-	$(CS_NULL_DIR)/CppNull.v \
 	$(CS_NULL_DIR)/CxxNull.v \
 	$(CS_NULL_DIR)/JavaNull.v \
 	$(CS_NULL_DIR)/PythonNull.v \
 	$(CS_NULL_DIR)/MathNull.v
-# 6. 二级场景层：CategoryTheory扩展模块（依赖Core/Equivalence）
+
+# 7. Level 2: DynamicSystem modules
+DYNAMIC_SYSTEM_ORDERED = \
+	$(DYNAMIC_SYSTEM_DIR)/Utils/Serialization.v \
+	$(DYNAMIC_SYSTEM_DIR)/TimeVaryingSystem.v \
+	$(DYNAMIC_SYSTEM_DIR)/DistributedSystem.v \
+	$(DYNAMIC_SYSTEM_DIR)/BlockchainSystem.v \
+	$(DYNAMIC_SYSTEM_DIR)/ControlSystem.v
+
+# 8. Level 2: Toolchain modules
+TOOLCHAIN_ORDERED = \
+	$(TOOLCHAIN_DIR)/FRF_to_Agda.v \
+	$(TOOLCHAIN_DIR)/FRF_to_Isabelle.v \
+	$(TOOLCHAIN_DIR)/FRF_to_Lean.v
+
+# 9. Level 2: CategoryTheory extension modules
 CATEGORY_EXT_ORDERED = \
 	$(CATEGORY_THEORY_DIR)/ZeroObjectPreservedByEquivalence.v \
 	$(CATEGORY_THEORY_DIR)/TestEquivalence.v
-# 7. 三级集成层：跨领域/哲学验证模块（依赖所有二级模块）
+
+# 10. Level 3: Integration modules (depends on all Level 2 modules)
 INTEGRATION_ORDERED = \
+	$(CS_NULL_DIR)/FRF_CS_Null.v \
 	$(THEORIES_DIR)/FRF_PhilosophicalValidation.v \
-	$(THEORIES_DIR)/FRF_Comparative.v \
-	$(CS_NULL_DIR)/FRF_CS_Null.v
-# 完整编译顺序（串联所有层级）
+	$(THEORIES_DIR)/FRF_Comparative.v
+
+# 11. Level 3: Test modules (depends on all business modules)
+TEST_ORDERED = \
+	$(TEST_DIR)/Test_FRF_MetaTheory.v \
+	$(TEST_DIR)/Test_QuantumVacuum.v \
+	$(TEST_DIR)/Test_BlockchainSystem.v
+
+# Complete compilation order
 FULL_ORDERED_SRC = \
 	$(SELF_CONTAINED_ORDERED) \
 	$(FRF_BASE_ORDERED) \
 	$(CATEGORY_BASE_ORDERED) \
 	$(THEORIES_ORDERED) \
+	$(QUANTUM_ORDERED) \
 	$(CS_NULL_ORDERED) \
+	$(DYNAMIC_SYSTEM_ORDERED) \
+	$(TOOLCHAIN_ORDERED) \
 	$(CATEGORY_EXT_ORDERED) \
-	$(INTEGRATION_ORDERED)
+	$(INTEGRATION_ORDERED) \
+	$(TEST_ORDERED)
+
 FULL_ORDERED_VO = $(FULL_ORDERED_SRC:.v=.vo)
+
 # ========================
-# 主目标（默认全编译+验证）
+# MAIN TARGETS
 # ========================
 .PHONY: all compile clean doc test validate check status help opam-deps check-deps check-version
 .DEFAULT_GOAL := help
+
 all: compile validate
+
 compile: $(FULL_ORDERED_VO)
+
 # ========================
-# 编译规则（按层级定义依赖，确保正确构建）
+# COMPILATION RULES (dependency hierarchy)
 # ========================
-# 1. SelfContainedLib基础模块（无前置依赖）
+# Level 1: SelfContainedLib (no dependencies)
 $(SELF_CONTAINED_DIR)/Algebra.vo: $(SELF_CONTAINED_DIR)/Algebra.v
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(SELF_CONTAINED_DIR)/Category.vo: $(SELF_CONTAINED_DIR)/Category.v $(SELF_CONTAINED_DIR)/Algebra.vo
+
+$(SELF_CONTAINED_DIR)/Category.vo: $(SELF_CONTAINED_DIR)/Category.v
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(SELF_CONTAINED_DIR)/Geometry.vo: $(SELF_CONTAINED_DIR)/Geometry.v $(SELF_CONTAINED_DIR)/Algebra.vo
+
+$(SELF_CONTAINED_DIR)/Geometry.vo: $(SELF_CONTAINED_DIR)/Geometry.v
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-# 2. FRF基础模块（依赖SelfContainedLib）
+
+# Level 1: FRF base modules (depends on SelfContainedLib)
 $(THEORIES_DIR)/FRF_MetaTheory.vo: $(THEORIES_DIR)/FRF_MetaTheory.v $(SELF_CONTAINED_DIR)/Algebra.vo $(SELF_CONTAINED_DIR)/Category.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CS_NULL_DIR)/FRF_CS_Null_Common.vo: $(CS_NULL_DIR)/FRF_CS_Null_Common.v $(THEORIES_DIR)/FRF_MetaTheory.vo $(SELF_CONTAINED_DIR)/Category.vo
+
+$(CS_NULL_DIR)/FRF_CS_Null_Common.vo: $(CS_NULL_DIR)/FRF_CS_Null_Common.v $(THEORIES_DIR)/FRF_MetaTheory.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-# 3. CategoryTheory基础模块（依赖SelfContainedLib.Category）
+
+# Level 1: CategoryTheory base (depends on SelfContainedLib.Category)
 $(CATEGORY_THEORY_DIR)/Core.vo: $(CATEGORY_THEORY_DIR)/Core.v $(SELF_CONTAINED_DIR)/Category.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CATEGORY_THEORY_DIR)/Equivalence.vo: $(CATEGORY_THEORY_DIR)/Equivalence.v $(CATEGORY_THEORY_DIR)/Core.vo $(FRF_CS_Null_Common.vo)
+
+$(CATEGORY_THEORY_DIR)/Equivalence.vo: $(CATEGORY_THEORY_DIR)/Equivalence.v $(CATEGORY_THEORY_DIR)/Core.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-# 4. theories核心场景模块（按依赖链编译）
+
+# Level 2: Core theories (depends on FRF base)
 $(THEORIES_DIR)/CaseA_SetTheory.vo: $(THEORIES_DIR)/CaseA_SetTheory.v $(THEORIES_DIR)/FRF_MetaTheory.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/CaseB_Algebra.vo: $(THEORIES_DIR)/CaseB_Algebra.v $(THEORIES_DIR)/CaseA_SetTheory.vo $(SELF_CONTAINED_DIR)/Algebra.vo
-	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/CaseB_Algebra_SelfContained.vo: $(THEORIES_DIR)/CaseB_Algebra_SelfContained.v $(THEORIES_DIR)/CaseB_Algebra.vo
-	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/CaseC_TypeTheory.vo: $(THEORIES_DIR)/CaseC_TypeTheory.v $(THEORIES_DIR)/CaseA_SetTheory.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
-	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/CaseD_Category_SelfContained.vo: $(THEORIES_DIR)/CaseD_Category_SelfContained.v $(SELF_CONTAINED_DIR)/Category.vo
-	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/CaseD_CategoryTheory.vo: $(THEORIES_DIR)/CaseD_CategoryTheory.v $(THEORIES_DIR)/CaseC_TypeTheory.vo $(CATEGORY_THEORY_DIR)/Core.vo
-	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 $(THEORIES_DIR)/ChurchNumerals.vo: $(THEORIES_DIR)/ChurchNumerals.v $(SELF_CONTAINED_DIR)/Algebra.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 $(THEORIES_DIR)/ChurchZero.vo: $(THEORIES_DIR)/ChurchZero.v $(THEORIES_DIR)/ChurchNumerals.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/CaseE_QuantumVacuum.vo: $(THEORIES_DIR)/CaseE_QuantumVacuum.v $(SELF_CONTAINED_DIR)/Algebra.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+
+$(THEORIES_DIR)/CaseB_Algebra.vo: $(THEORIES_DIR)/CaseB_Algebra.v $(THEORIES_DIR)/CaseA_SetTheory.vo $(SELF_CONTAINED_DIR)/Algebra.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(QUANTUM_DIR)/QFT_FRF.vo: $(QUANTUM_DIR)/QFT_FRF.v $(THEORIES_DIR)/CaseE_QuantumVacuum.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+
+$(THEORIES_DIR)/CaseB_Algebra_SelfContained.vo: $(THEORIES_DIR)/CaseB_Algebra_SelfContained.v $(THEORIES_DIR)/CaseB_Algebra.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(THEORIES_DIR)/CaseC_TypeTheory.vo: $(THEORIES_DIR)/CaseC_TypeTheory.v $(THEORIES_DIR)/CaseA_SetTheory.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(THEORIES_DIR)/CaseD_CategoryTheory.vo: $(THEORIES_DIR)/CaseD_CategoryTheory.v $(THEORIES_DIR)/CaseC_TypeTheory.vo $(CATEGORY_THEORY_DIR)/Core.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(THEORIES_DIR)/CaseD_Category_SelfContained.vo: $(THEORIES_DIR)/CaseD_Category_SelfContained.v $(SELF_CONTAINED_DIR)/Category.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(THEORIES_DIR)/CaseF_Logic.vo: $(THEORIES_DIR)/CaseF_Logic.v $(THEORIES_DIR)/FRF_MetaTheory.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+# Level 2: Quantum modules
+$(QUANTUM_DIR)/QFT_FRF.vo: $(QUANTUM_DIR)/QFT_FRF.v $(SELF_CONTAINED_DIR)/Algebra.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(QUANTUM_DIR)/CaseE_QuantumVacuum.vo: $(QUANTUM_DIR)/CaseE_QuantumVacuum.v $(QUANTUM_DIR)/QFT_FRF.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 $(QUANTUM_DIR)/CurvedSpacetimeQFT.vo: $(QUANTUM_DIR)/CurvedSpacetimeQFT.v $(QUANTUM_DIR)/QFT_FRF.vo $(SELF_CONTAINED_DIR)/Geometry.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-# 5. CS_Null语言空值模块（依赖FRF_CS_Null_Common）
-$(CS_NULL_DIR)/RustNull.vo: $(CS_NULL_DIR)/RustNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+
+# Level 2: CS_Null modules (depends on FRF_CS_Null_Common)
+$(CS_NULL_DIR)/RustNull.vo: $(CS_NULL_DIR)/RustNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CS_NULL_DIR)/CppNull.vo: $(CS_NULL_DIR)/CppNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+
+$(CS_NULL_DIR)/CxxNull.vo: $(CS_NULL_DIR)/CxxNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CS_NULL_DIR)/CxxNull.vo: $(CS_NULL_DIR)/CxxNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+
+$(CS_NULL_DIR)/JavaNull.vo: $(CS_NULL_DIR)/JavaNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CS_NULL_DIR)/JavaNull.vo: $(CS_NULL_DIR)/JavaNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
+
+$(CS_NULL_DIR)/PythonNull.vo: $(CS_NULL_DIR)/PythonNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CS_NULL_DIR)/PythonNull.vo: $(CS_NULL_DIR)/PythonNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo $(THEORIES_DIR)/FRF_MetaTheory.vo
-	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 $(CS_NULL_DIR)/MathNull.vo: $(CS_NULL_DIR)/MathNull.v $(CS_NULL_DIR)/FRF_CS_Null_Common.vo $(SELF_CONTAINED_DIR)/Algebra.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-# 6. CategoryTheory扩展模块（依赖基础模块+场景模块）
-$(CATEGORY_THEORY_DIR)/ZeroObjectPreservedByEquivalence.vo: $(CATEGORY_THEORY_DIR)/ZeroObjectPreservedByEquivalence.v $(CATEGORY_THEORY_DIR)/Equivalence.v $(THEORIES_DIR)/CaseD_CategoryTheory.vo
+
+# Level 2: DynamicSystem modules
+$(DYNAMIC_SYSTEM_DIR)/Utils/Serialization.vo: $(DYNAMIC_SYSTEM_DIR)/Utils/Serialization.v
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(DYNAMIC_SYSTEM_DIR)/TimeVaryingSystem.vo: $(DYNAMIC_SYSTEM_DIR)/TimeVaryingSystem.v $(THEORIES_DIR)/FRF_MetaTheory.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(DYNAMIC_SYSTEM_DIR)/DistributedSystem.vo: $(DYNAMIC_SYSTEM_DIR)/DistributedSystem.v $(DYNAMIC_SYSTEM_DIR)/TimeVaryingSystem.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(DYNAMIC_SYSTEM_DIR)/BlockchainSystem.vo: $(DYNAMIC_SYSTEM_DIR)/BlockchainSystem.v $(DYNAMIC_SYSTEM_DIR)/Utils/Serialization.vo $(DYNAMIC_SYSTEM_DIR)/TimeVaryingSystem.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(DYNAMIC_SYSTEM_DIR)/ControlSystem.vo: $(DYNAMIC_SYSTEM_DIR)/ControlSystem.v $(DYNAMIC_SYSTEM_DIR)/TimeVaryingSystem.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+# Level 2: Toolchain modules
+$(TOOLCHAIN_DIR)/FRF_to_Agda.vo: $(TOOLCHAIN_DIR)/FRF_to_Agda.v
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(TOOLCHAIN_DIR)/FRF_to_Isabelle.vo: $(TOOLCHAIN_DIR)/FRF_to_Isabelle.v
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(TOOLCHAIN_DIR)/FRF_to_Lean.vo: $(TOOLCHAIN_DIR)/FRF_to_Lean.v
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+# Level 2: CategoryTheory extensions
+$(CATEGORY_THEORY_DIR)/ZeroObjectPreservedByEquivalence.vo: $(CATEGORY_THEORY_DIR)/ZeroObjectPreservedByEquivalence.v $(CATEGORY_THEORY_DIR)/Equivalence.vo $(THEORIES_DIR)/CaseD_CategoryTheory.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 $(CATEGORY_THEORY_DIR)/TestEquivalence.vo: $(CATEGORY_THEORY_DIR)/TestEquivalence.v $(CATEGORY_THEORY_DIR)/ZeroObjectPreservedByEquivalence.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-# 7. 集成层模块（依赖所有二级模块）
+
+# Level 3: Integration modules
+$(CS_NULL_DIR)/FRF_CS_Null.vo: $(CS_NULL_DIR)/FRF_CS_Null.v $(CS_NULL_DIR)/RustNull.vo $(CS_NULL_DIR)/CxxNull.vo $(CS_NULL_DIR)/JavaNull.vo $(CS_NULL_DIR)/PythonNull.vo $(CS_NULL_DIR)/MathNull.vo
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 $(THEORIES_DIR)/FRF_PhilosophicalValidation.vo: $(THEORIES_DIR)/FRF_PhilosophicalValidation.v $(THEORIES_DIR)/FRF_MetaTheory.vo $(THEORIES_DIR)/ChurchZero.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(THEORIES_DIR)/FRF_Comparative.vo: $(THEORIES_DIR)/FRF_Comparative.v $(THEORIES_DIR)/FRF_PhilosophicalValidation.v $(THEORIES_DIR)/CaseD_CategoryTheory.vo
+
+$(THEORIES_DIR)/FRF_Comparative.vo: $(THEORIES_DIR)/FRF_Comparative.v $(THEORIES_DIR)/FRF_PhilosophicalValidation.vo $(THEORIES_DIR)/CaseD_CategoryTheory.vo
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
-$(CS_NULL_DIR)/FRF_CS_Null.vo: $(CS_NULL_DIR)/FRF_CS_Null.v $(CS_NULL_DIR)/RustNull.vo $(CS_NULL_DIR)/CppNull.vo $(CS_NULL_DIR)/JavaNull.vo $(CS_NULL_DIR)/PythonNull.vo $(CS_NULL_DIR)/MathNull.vo
+
+# Level 3: Test modules
+$(TEST_DIR)/Test_FRF_MetaTheory.vo: $(TEST_DIR)/Test_FRF_MetaTheory.v
 	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(TEST_DIR)/Test_QuantumVacuum.vo: $(TEST_DIR)/Test_QuantumVacuum.v
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
+$(TEST_DIR)/Test_BlockchainSystem.vo: $(TEST_DIR)/Test_BlockchainSystem.v
+	cd $(SRC_ROOT) && $(COQC) $(COQFLAGS) $<
+
 # ========================
-# 验证与测试（覆盖所有模块）
+# VALIDATION & TESTING
 # ========================
 validate: compile
-	@echo "🔍 正在通过 coqchk 验证所有证明的独立性..."
+	@echo "🔍 Validating all proofs with coqchk..."
 	$(COQCHK) -silent $(VO_FILES)
-	@echo "✅ 所有 $(words $(VO_FILES)) 个模块的证明均通过独立验证！"
+	@echo "✅ All $(words $(VO_FILES)) modules passed independent validation!"
+
 test: compile validate
-	@echo "✅ 全项目编译成功！"
-	@echo "✅ FRF 框架全维度验证完成！"
-	@echo "📋 已验证模块清单："
+	@echo "✅ Full project compilation successful!"
+	@echo "✅ FRF framework full-dimensional validation completed!"
+	@echo "📋 Verified module list:"
 	@for vo in $(FULL_ORDERED_VO); do \
 		base=$$(basename $$vo .vo); \
 		echo "  - $$base.v"; \
 	done
-# 按层级测试目标
+
+# Level-based testing targets
 test-base: $(SELF_CONTAINED_ORDERED) $(FRF_BASE_ORDERED)
-	@echo "✅ 一级基础层模块编译验证完成！"
-test-scene: $(THEORIES_ORDERED) $(CS_NULL_ORDERED) $(CATEGORY_EXT_ORDERED)
-	@echo "✅ 二级场景层模块编译验证完成！"
-test-integration: $(INTEGRATION_ORDERED)
-	@echo "✅ 三级集成层模块编译验证完成！"
+	@echo "✅ Level 1 base modules compilation verified!"
+
+test-scene: $(THEORIES_ORDERED) $(QUANTUM_ORDERED) $(CS_NULL_ORDERED) $(DYNAMIC_SYSTEM_ORDERED) $(TOOLCHAIN_ORDERED) $(CATEGORY_EXT_ORDERED)
+	@echo "✅ Level 2 scene modules compilation verified!"
+
+test-integration: $(INTEGRATION_ORDERED) $(TEST_ORDERED)
+	@echo "✅ Level 3 integration modules compilation verified!"
+
 # ========================
-# 质量检查（确保无遗漏编译）
+# QUALITY CHECKS
 # ========================
 check: $(VO_FILES)
-	@echo "✅ 所有 Coq 模块验证通过："
-	@echo "  - 一级基础层：$(words $(SELF_CONTAINED_ORDERED) $(FRF_BASE_ORDERED)) 个模块"
-	@echo "  - 二级场景层：$(words $(THEORIES_ORDERED) $(CS_NULL_ORDERED) $(CATEGORY_EXT_ORDERED)) 个模块"
-	@echo "  - 三级集成层：$(words $(INTEGRATION_ORDERED)) 个模块"
+	@echo "✅ All Coq modules verified:"
+	@echo "  - Level 1 Base: $(words $(SELF_CONTAINED_ORDERED) $(FRF_BASE_ORDERED) $(CATEGORY_BASE_ORDERED)) modules"
+	@echo "  - Level 2 Scene: $(words $(THEORIES_ORDERED) $(QUANTUM_ORDERED) $(CS_NULL_ORDERED) $(DYNAMIC_SYSTEM_ORDERED) $(TOOLCHAIN_ORDERED) $(CATEGORY_EXT_ORDERED)) modules"
+	@echo "  - Level 3 Integration: $(words $(INTEGRATION_ORDERED) $(TEST_ORDERED)) modules"
 	@echo ""
-	@echo "📊 编译状态检查："
-	@declare -A dirs=([$(SELF_CONTAINED_DIR)]=1 [$(CS_NULL_DIR)]=1 [$(THEORIES_DIR)]=1 [$(QUANTUM_DIR)]=1 [$(CATEGORY_THEORY_DIR)]=1)
+	@echo "📊 Compilation status check:"
+	@declare -A dirs=([$(SELF_CONTAINED_DIR)]=1 [$(THEORIES_DIR)]=1 [$(CS_NULL_DIR)]=1 [$(QUANTUM_DIR)]=1 [$(DYNAMIC_SYSTEM_DIR)]=1 [$(TOOLCHAIN_DIR)]=1 [$(TEST_DIR)]=1 [$(CATEGORY_THEORY_DIR)]=1)
 	@all_ok=1
 	@for dir in $${!dirs[@]}; do \
-		v_count=$$(ls $$dir/*.v 2>/dev/null | wc -l); \
-		vo_count=$$(ls $$dir/*.vo 2>/dev/null | wc -l); \
+		v_count=$$(find $$dir -name "*.v" 2>/dev/null | wc -l); \
+		vo_count=$$(find $$dir -name "*.vo" 2>/dev/null | wc -l); \
 		if [ $$v_count -ne $$vo_count ]; then \
-			echo "❌ $$dir 目录：$$vo_count/$$v_count 个模块编译成功"; \
+			echo "❌ $$dir directory: $$vo_count/$$v_count modules compiled"; \
 			all_ok=0; \
 		else \
-			echo "✅ $$dir 目录：$$vo_count/$$v_count 个模块编译成功"; \
+			echo "✅ $$dir directory: $$vo_count/$$v_count modules compiled"; \
 		fi; \
 	done
 	@if [ $$all_ok -eq 1 ]; then \
-		echo "✅ 全目录编译无遗漏！"; \
+		echo "✅ All directories compiled without omissions!"; \
 	else \
 		exit 1; \
 	fi
+
 status:
-	@echo "📁 项目目录结构："
-	@echo "  - 一级基础层：$(SELF_CONTAINED_DIR)、$(THEORIES_DIR)/FRF_MetaTheory.v、$(CS_NULL_DIR)/FRF_CS_Null_Common.v"
-	@echo "  - 二级场景层：$(THEORIES_DIR)/Case*、$(CS_NULL_DIR)/*Null.v、$(QUANTUM_DIR)、$(CATEGORY_THEORY_DIR)"
-	@echo "  - 三级集成层：$(THEORIES_DIR)/FRF_*.v、$(CS_NULL_DIR)/FRF_CS_Null.v"
+	@echo "📁 Project directory structure:"
+	@echo "  - Level 1 Base: $(SELF_CONTAINED_DIR), $(THEORIES_DIR)/FRF_MetaTheory.v, $(CS_NULL_DIR)/FRF_CS_Null_Common.v, $(CATEGORY_THEORY_DIR)/Core"
+	@echo "  - Level 2 Scene: $(THEORIES_DIR)/Case*, $(CS_NULL_DIR)/*Null.v, $(QUANTUM_DIR), $(DYNAMIC_SYSTEM_DIR), $(TOOLCHAIN_DIR), $(CATEGORY_THEORY_DIR)/Extensions"
+	@echo "  - Level 3 Integration: $(THEORIES_DIR)/FRF_*.v, $(CS_NULL_DIR)/FRF_CS_Null.v, $(TEST_DIR)"
 	@echo ""
-	@echo "📦 已编译模块："
+	@echo "📦 Compiled modules:"
 	@if ls $(VO_FILES) 2>/dev/null >/dev/null; then \
 		ls $(VO_FILES) 2>/dev/null | sed 's/^/  /' | head -10; \
 		if [ $(words $(VO_FILES)) -gt 10 ]; then \
-			echo "  ... 及其他 $(($(words $(VO_FILES))-10)) 个模块"; \
+			echo "  ... and other $(($(words $(VO_FILES))-10)) modules"; \
 		fi; \
 	else \
-		echo "  无（请先运行 'make compile'）"; \
+		echo "  None (run 'make compile' first)"; \
 	fi
 	@echo ""
-	@echo "📈 编译进度：$(words $(filter %.vo,$(FULL_ORDERED_VO)))/$(words $(FULL_ORDERED_VO))"
+	@echo "📈 Compilation progress: $(words $(filter %.vo,$(FULL_ORDERED_VO)))/$(words $(FULL_ORDERED_VO))"
+
 # ========================
-# 文档生成（覆盖所有模块）
+# DOCUMENTATION
 # ========================
 doc:
-	@echo "📚 正在生成 HTML 文档（含所有模块）..."
-	$(COQDOC) --html -d html -title "FRF 形式化验证框架文档" $(COQFLAGS) $(SRC)
-	@echo "✅ HTML 文档已生成至 html/ 目录"
+	@echo "📚 Generating HTML documentation (all modules)..."
+	$(COQDOC) --html -d html -title "FRF Formal Verification Framework Documentation" $(COQFLAGS) $(SRC)
+	@echo "✅ HTML documentation generated in html/ directory"
+
 doc-pdf:
-	@echo "📚 正在生成 PDF 文档（含所有模块）..."
-	$(COQDOC) --latex -o frf_formalization.tex -title "FRF 形式化验证框架" $(COQFLAGS) $(SRC)
+	@echo "📚 Generating PDF documentation (all modules)..."
+	$(COQDOC) --latex -o frf_formalization.tex -title "FRF Formal Verification Framework" $(COQFLAGS) $(SRC)
 	pdflatex frf_formalization.tex >/dev/null 2>&1
-	pdflatex frf_formalization.tex >/dev/null 2>&1 # 二次编译处理引用
-	@echo "✅ PDF 文档已生成：frf_formalization.pdf"
+	pdflatex frf_formalization.tex >/dev/null 2>&1 # Second pass for references
+	@echo "✅ PDF documentation generated: frf_formalization.pdf"
+
 # ========================
-# 清理目标（移除所有构建产物）
+# CLEANING
 # ========================
 clean:
-	@echo "🧹 正在清理构建产物..."
+	@echo "🧹 Cleaning build artifacts..."
 	rm -f $(VO_FILES) $(GLOB_FILES) $(V_D_FILES)
 	rm -f $(SELF_CONTAINED_DIR)/*.vo $(SELF_CONTAINED_DIR)/*.glob $(SELF_CONTAINED_DIR)/*.v.d
-	rm -f $(CS_NULL_DIR)/*.vo $(CS_NULL_DIR)/*.glob $(CS_NULL_DIR)/*.v.d
 	rm -f $(THEORIES_DIR)/*.vo $(THEORIES_DIR)/*.glob $(THEORIES_DIR)/*.v.d
+	rm -f $(CS_NULL_DIR)/*.vo $(CS_NULL_DIR)/*.glob $(CS_NULL_DIR)/*.v.d
 	rm -f $(QUANTUM_DIR)/*.vo $(QUANTUM_DIR)/*.glob $(QUANTUM_DIR)/*.v.d
+	rm -f $(DYNAMIC_SYSTEM_DIR)/*.vo $(DYNAMIC_SYSTEM_DIR)/*.glob $(DYNAMIC_SYSTEM_DIR)/*.v.d
+	rm -f $(DYNAMIC_SYSTEM_DIR)/Utils/*.vo $(DYNAMIC_SYSTEM_DIR)/Utils/*.glob $(DYNAMIC_SYSTEM_DIR)/Utils/*.v.d
+	rm -f $(TOOLCHAIN_DIR)/*.vo $(TOOLCHAIN_DIR)/*.glob $(TOOLCHAIN_DIR)/*.v.d
+	rm -f $(TEST_DIR)/*.vo $(TEST_DIR)/*.glob $(TEST_DIR)/*.v.d
 	rm -f $(CATEGORY_THEORY_DIR)/*.vo $(CATEGORY_THEORY_DIR)/*.glob $(CATEGORY_THEORY_DIR)/*.v.d
 	rm -rf html
 	rm -f frf_formalization.tex frf_formalization.pdf frf_formalization.aux frf_formalization.log
-	@echo "✅ 清理完成！"
+	@echo "✅ Cleanup completed!"
+
 distclean: clean
-	@echo "🧹 正在深度清理..."
-	rm -f $(SELF_CONTAINED_DIR)/*~ $(CS_NULL_DIR)/*~ $(THEORIES_DIR)/*~ $(QUANTUM_DIR)/*~ $(CATEGORY_THEORY_DIR)/*~
+	@echo "🧹 Deep cleaning..."
+	rm -f $(SELF_CONTAINED_DIR)/*~ $(THEORIES_DIR)/*~ $(CS_NULL_DIR)/*~ $(QUANTUM_DIR)/*~ $(DYNAMIC_SYSTEM_DIR)/*~ $(TOOLCHAIN_DIR)/*~ $(TEST_DIR)/*~ $(CATEGORY_THEORY_DIR)/*~
 	rm -f *~
-	@echo "✅ 深度清理完成！"
+	@echo "✅ Deep cleanup completed!"
+
 # ========================
-# CI/CD 支持（适配自动化流水线）
+# CI/CD SUPPORT
 # ========================
 ci: check-version check-deps all test
-	@echo "🚀 CI 流水线执行成功！所有模块编译、验证、测试均通过！"
+	@echo "🚀 CI pipeline executed successfully! All modules compiled, validated, and tested!"
+
 ci-fast: check-version check-deps compile check
-	@echo "⚡ 快速 CI 检查完成！编译与依赖验证通过！"
+	@echo "⚡ Fast CI check completed! Compilation and dependency validation passed!"
+
 # ========================
-# 依赖管理（确保环境与依赖正确）
+# DEPENDENCY MANAGEMENT
 # ========================
 opam-deps:
-	@echo "📦 正在安装依赖包..."
+	@echo "📦 Installing dependency packages..."
 	opam install coq=8.18.0 coq-mathlib=3.74.0 coq-mathcomp-ssreflect coq-unimath
-	@echo "✅ 依赖安装完成！"
+	@echo "✅ Dependencies installed!"
+
 check-deps:
-	@echo "🔍 正在验证模块依赖关系..."
-	# 验证一级基础层依赖
-	@if ! grep -q "Require Import SelfContainedLib.Algebra" $(THEORIES_DIR)/FRF_MetaTheory.v; then echo "❌ FRF_MetaTheory 未依赖 SelfContainedLib.Algebra"; exit 1; fi
-	@if ! grep -q "Require Import FRF_MetaTheory" $(CS_NULL_DIR)/FRF_CS_Null_Common.v; then echo "❌ FRF_CS_Null_Common 未依赖 FRF_MetaTheory"; exit 1; fi
-	# 验证二级场景层依赖
-	@if ! grep -q "Require Import FRF_CS_Null_Common" $(CS_NULL_DIR)/RustNull.v; then echo "❌ RustNull 未依赖 FRF_CS_Null_Common"; exit 1; fi
-	@if ! grep -q "Require Import SelfContainedLib.Geometry" $(QUANTUM_DIR)/CurvedSpacetimeQFT.v; then echo "❌ CurvedSpacetimeQFT 未依赖 SelfContainedLib.Geometry"; exit 1; fi
-	# 验证三级集成层依赖
-	@if ! grep -q "Require Import CaseD_CategoryTheory" $(THEORIES_DIR)/FRF_Comparative.v; then echo "❌ FRF_Comparative 未依赖 CaseD_CategoryTheory"; exit 1; fi
-	@if ! grep -q "Require Import RustNull" $(CS_NULL_DIR)/FRF_CS_Null.v; then echo "❌ FRF_CS_Null 未依赖 RustNull"; exit 1; fi
-	@echo "✅ 所有模块依赖关系验证正确！"
+	@echo "🔍 Verifying module dependencies..."
+	# Verify Level 1 dependencies
+	@if ! grep -q "Require Import SelfContainedLib.Algebra" $(THEORIES_DIR)/FRF_MetaTheory.v; then echo "❌ FRF_MetaTheory not depending on SelfContainedLib.Algebra"; exit 1; fi
+	@if ! grep -q "Require Import FRF_MetaTheory" $(CS_NULL_DIR)/FRF_CS_Null_Common.v; then echo "❌ FRF_CS_Null_Common not depending on FRF_MetaTheory"; exit 1; fi
+	# Verify Level 2 dependencies
+	@if ! grep -q "Require Import FRF_CS_Null_Common" $(CS_NULL_DIR)/RustNull.v; then echo "❌ RustNull not depending on FRF_CS_Null_Common"; exit 1; fi
+	@if ! grep -q "Require Import SelfContainedLib.Geometry" $(QUANTUM_DIR)/CurvedSpacetimeQFT.v; then echo "❌ CurvedSpacetimeQFT not depending on SelfContainedLib.Geometry"; exit 1; fi
+	# Verify Level 3 dependencies
+	@if ! grep -q "Require Import CaseD_CategoryTheory" $(THEORIES_DIR)/FRF_Comparative.v; then echo "❌ FRF_Comparative not depending on CaseD_CategoryTheory"; exit 1; fi
+	@if ! grep -q "Require Import RustNull" $(CS_NULL_DIR)/FRF_CS_Null.v; then echo "❌ FRF_CS_Null not depending on RustNull"; exit 1; fi
+	@echo "✅ All module dependency relationships verified correctly!"
+
 check-version:
-	@echo "🔍 正在验证 Coq 版本..."
-	@coqc --version | grep -q "8.18.0" || (echo "❌ 请使用 Coq 8.18.0（当前版本：$(shell coqc --version | head -n1 | awk '{print $$2}')）"; exit 1)
-	@echo "✅ Coq 版本验证通过（8.18.0）！"
+	@echo "🔍 Verifying Coq version..."
+	@coqc --version | grep -q "8.18.0" || (echo "❌ Please use Coq 8.18.0 (current version: $(shell coqc --version | head -n1 | awk '{print $$2}'))"; exit 1)
+	@echo "✅ Coq version verified (8.18.0)!"
+
 # ========================
-# 帮助信息（详细说明所有目标）
+# HELP
 # ========================
 help:
 	@echo "=================================================="
-	@echo "📌 FRF 形式化验证框架 Makefile（Coq 8.18.0 适配版）"
+	@echo "📌 FRF Formal Verification Framework Makefile (Coq 8.18.0)"
 	@echo "=================================================="
-	@echo "基础目标："
-	@echo "  all         - 编译所有模块 + 验证证明（默认目标）"
-	@echo "  compile     - 编译所有模块（按层级依赖顺序）"
-	@echo "  validate    - 用 coqchk 验证所有证明的独立性"
-	@echo "  test        - 完整编译 + 验证 + 输出模块清单"
+	@echo "Basic targets:"
+	@echo "  all         - Compile all modules + validate proofs (default)"
+	@echo "  compile     - Compile all modules (hierarchical dependency order)"
+	@echo "  validate    - Validate all proofs with coqchk"
+	@echo "  test        - Complete compilation + validation + module list"
 	@echo ""
-	@echo "分层测试目标："
-	@echo "  test-base   - 仅编译验证一级基础层模块"
-	@echo "  test-scene  - 仅编译验证二级场景层模块"
-	@echo "  test-integration - 仅编译验证三级集成层模块"
+	@echo "Level-based testing:"
+	@echo "  test-base   - Compile/verify Level 1 base modules only"
+	@echo "  test-scene  - Compile/verify Level 2 scene modules only"
+	@echo "  test-integration - Compile/verify Level 3 integration modules only"
 	@echo ""
-	@echo "质量检查目标："
-	@echo "  check       - 检查所有目录的编译完整性"
-	@echo "  status      - 显示当前编译进度和模块结构"
-	@echo "  check-deps  - 验证模块间依赖关系正确性"
-	@echo "  check-version - 验证 Coq 版本（必须 8.18.0）"
+	@echo "Quality checks:"
+	@echo "  check       - Check compilation completeness for all directories"
+	@echo "  status      - Show current compilation progress and module structure"
+	@echo "  check-deps  - Verify inter-module dependency relationships"
+	@echo "  check-version - Verify Coq version (must be 8.18.0)"
 	@echo ""
-	@echo "文档目标："
-	@echo "  doc         - 生成 HTML 格式文档（含所有模块）"
-	@echo "  doc-pdf     - 生成 PDF 格式文档（含所有模块）"
+	@echo "Documentation:"
+	@echo "  doc         - Generate HTML documentation (all modules)"
+	@echo "  doc-pdf     - Generate PDF documentation (all modules)"
 	@echo ""
-	@echo "清理目标："
-	@echo "  clean       - 移除所有构建产物（.vo/.glob/.pdf 等）"
-	@echo "  distclean   - 深度清理（含临时文件和备份文件）"
+	@echo "Cleaning:"
+	@echo "  clean       - Remove all build artifacts (.vo/.glob/.pdf etc)"
+	@echo "  distclean   - Deep clean (including temp and backup files)"
 	@echo ""
-	@echo "CI/CD 目标："
-	@echo "  ci          - 完整 CI 流水线（版本+依赖+编译+验证+测试）"
-	@echo "  ci-fast     - 快速 CI 检查（版本+依赖+编译+完整性）"
+	@echo "CI/CD:"
+	@echo "  ci          - Full CI pipeline (version+deps+compile+validate+test)"
+	@echo "  ci-fast     - Fast CI check (version+deps+compile+completeness)"
 	@echo ""
-	@echo "依赖管理："
-	@echo "  opam-deps   - 通过 OPAM 安装所需依赖包"
+	@echo "Dependency management:"
+	@echo "  opam-deps   - Install required packages via OPAM"
 	@echo "=================================================="
