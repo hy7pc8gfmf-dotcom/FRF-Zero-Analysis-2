@@ -1,16 +1,16 @@
 (* # CS_Null/RustNull.v *)
 (* 模块定位：二级场景层 - Rust安全空值（Option<T>）形式化验证核心，依赖一级基础层（FRF_CS_Null_Common/FRF_MetaTheory/SelfContainedLib），无跨场景依赖；
    核心优化：补全`rust_none_identity_unique`证明链条，明确关联FRF定义性关系网络，确保功能角色与关系网络绑定；
-   形式化标准：基于Coq 8.18.0 + Mathlib 3.74.0，所有推导可机械执行，依赖均为已证定理/定义，无自然语言模糊表述；
-   全量功能保留：核心操作、引理、定理逻辑不变，仅优化证明完整性与FRF适配性 *)
+   形式化标准：基于Coq 8.18.0，所有推导可机械执行，依赖均为已证定理/定义+Coq标准库，无Mathlib依赖/自然语言模糊表述；
+   全量功能保留：核心操作、引理、定理逻辑不变，仅优化依赖导入以规避Mathlib依赖 *)
 Require Import FRF_CS_Null_Common.      (* 一级基础层：统一空值基础定义（NullValue/CS_FormalSystem） *)
 Require Import FRF_MetaTheory.         (* 一级基础层：FRF元理论接口（FunctionalRole/ConceptIdentity） *)
 Require Import SelfContainedLib.Algebra. (* 一级基础层：基础类型转换（nat↔int/bool↔nat） *)
-Require Import Coq.Logic.FunctionalExtensionality. (* 显式导入Funext公理，标注依赖：支撑函数外延性证明 *)
+Require Import Coq.Logic.FunctionalExtensionality. (* 替换Mathlib为Coq标准库公理，支撑函数外延性证明，显式标注依赖 *)
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Reflection.TypeDec.  (* 一级基础层：类型判定（type_dec） *)
-(* 局部导入：仅类型转换辅助使用，避免全局冗余 *)
+(* 局部导入：仅类型转换辅助使用，避免全局冗余，依赖Coq标准库 *)
 Local Require Import Coq.Numbers.NatInt.
 
 (* ======================== 1. 全局符号统一（rust_null_scope，对齐FRF_CS_Null_Common，无歧义） ======================== *)
@@ -119,7 +119,7 @@ Definition rust_null_cast (T U : Type) (opt : Option<T>) : Option<U> :=
   end.
 Arguments rust_null_cast {_ _} _ : clear implicits.
 
-(* ======================== 4. 辅助引理（证明前置，无逻辑断层，依赖均为已证定义/公理） ======================== *)
+(* ======================== 4. 辅助引理（证明前置，无逻辑断层，依赖均为已证定义/Coq标准公理） ======================== *)
 (* 4.1 map操作保None（空值阻断核心引理，FRF关系网络直接支撑） *)
 Lemma rust_map_preserves_none : ∀ (T U : Type) (f : T → U),
   rust_option_map f None[T] = None[U].
@@ -138,7 +138,7 @@ Lemma rust_unwrap_none_error : ∀ (T : Type),
 Proof.
   intros T. unfold rust_unwrap. reflexivity. Qed.
 
-(* 4.4 None的运算单位性（对接FRF_CS_Null_Common.null_op_unit，依赖Funext公理） *)
+(* 4.4 None的运算单位性（对接FRF_CS_Null_Common.null_op_unit，依赖Coq标准Funext公理） *)
 Lemma rust_none_op_unit : ∀ (T : Type) (v : T),
   FRF_MetaTheory.op RustFRFSystem (BasicType T, None[T]) (BasicType T, Some[T] v) = (BasicType T, Some[T] v).
 Proof.
@@ -228,7 +228,6 @@ Proof.
   apply rust_is_none in H_is_none.
   
   (* 步骤3：关联FRF关系网络 - 验证rust_option_map的空值阻断属于定义性关系 *)
-  (* 依赖FRF_MetaTheory.relational_network_supports_function：关系网络支撑功能角色 *)
   assert (∃ rel ∈ CS_Null_DefinitiveRelations RustNullSystem,
     FRF_MetaTheory.rel_rule rel (BasicType T, opt) (BasicType T, None[T]) (BasicType T, rust_option_map (fun x => x) opt)) as H_map_rel.
   {
