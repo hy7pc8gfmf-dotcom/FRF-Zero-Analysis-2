@@ -112,7 +112,7 @@ Fixpoint var_in_term (n : nat) (t : term) : Prop :=
   | Abs t' => var_in_term (S n) t'
   end.
 
-(* 保持小变量引理 - 修复版本 *)
+(* 保持小变量引理 - 简化版本 *)
 Lemma lift_preserve_small_vars : forall t k,
   (forall n, var_in_term n t -> n < k) -> lift t k = t.
 Proof.
@@ -120,12 +120,14 @@ Proof.
   - (* Var n *)
     simpl. destruct (le_gt_dec k n) as [Hle | Hgt].
     + exfalso. 
+      (* 根据假设，n < k，但这里 k <= n，矛盾 *)
       assert (Hvar: var_in_term n (Var n)).
       { simpl. reflexivity. }
       specialize (H n Hvar).
-      apply (Nat.nle_gt k n) in Hle.
-      * apply Hle. assumption.
-      * apply Nat.lt_gt_cases.
+      (* 现在我们有 n < k 和 k <= n，矛盾 *)
+      apply (Nat.lt_le_trans n k n) in H.
+      * apply (Nat.lt_irrefl n); assumption.
+      * assumption.
     + reflexivity.
   - (* App t1 t2 *)
     simpl. rewrite IH1, IH2.
