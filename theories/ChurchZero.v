@@ -6,7 +6,6 @@ From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.Compare_dec.
 From Coq Require Import Lists.List.
 From Coq Require Import Logic.Eqdep_dec.
-From Coq Require Import Strings.String.  (* 添加string类型支持 *)
 
 (* 临时定义，避免依赖ChurchNumerals模块 *)
 Section ChurchZeroDefinitions.
@@ -67,25 +66,26 @@ Definition church_iter (n f x : term) : term := App (App n f) x.
 Definition IsChurchZero (t : term) : Prop :=
   BetaReduces t church_zero.
 
-(* 简化版本的功能特征和角色定义 - 使用nat代替string避免依赖问题 *)
+(* 简化版本的功能特征和角色定义 - 使用基本类型避免复杂依赖 *)
+Inductive FeatureType : Type :=
+| IteratesZeroTimes.
+
 Record FunctionalFeature : Type := {
-  feature_id : nat;  (* 使用nat代替string *)
-  feature_description : nat -> Prop  (* 简化描述 *)
+  feature_type : FeatureType
 }.
 
 Record FunctionalRole : Type := {
-  role_id : nat;  (* 使用nat代替string *)
+  role_name : string;
   core_features : list FunctionalFeature
 }.
 
 (* Church零的功能特征 *)
 Definition ChurchZeroFunctionalFeature : FunctionalFeature :=
-  {| feature_id := 0; 
-     feature_description := fun n => n = 0 |}.  (* 简化描述 *)
+  {| feature_type := IteratesZeroTimes |}.
 
 (* Church零的功能角色 *)
 Definition ChurchZeroRole : FunctionalRole :=
-  {| role_id := 0;
+  {| role_name := "ChurchZero_Role";
      core_features := [ChurchZeroFunctionalFeature] |}.
 
 (* ======================== 基础引理 ======================== *)
