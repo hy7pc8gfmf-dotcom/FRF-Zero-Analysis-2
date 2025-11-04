@@ -93,8 +93,10 @@ Qed.
 Lemma subst_var_eq : forall u k, subst (Var k) u k = lift u 0.
 Proof.
   intros u k. simpl.
-  destruct (lt_eq_lt_dec k k) as [[H|H]|H]; try lia.
-  reflexivity.
+  destruct (lt_eq_lt_dec k k) as [[H|H]|H].
+  - exfalso. apply (Nat.lt_irrefl k); assumption.
+  - reflexivity.
+  - exfalso. apply (Nat.lt_irrefl k); assumption.
 Qed.
 
 (* 抽象替换引理 *)
@@ -108,7 +110,9 @@ Lemma lift_preserve_small_vars : forall t k,
 Proof.
   induction t as [n | t1 IH1 t2 IH2 | t' IH]; intros H.
   - simpl. destruct (le_gt_dec k n) as [Hle | Hgt].
-    + exfalso; lia.
+    + exfalso. apply (Nat.nle_gt k n) in Hle.
+      * apply Hle.
+      * apply H. constructor.
     + reflexivity.
   - simpl. rewrite IH1, IH2; auto.
     + intros m Hvar; apply H; left; auto.
@@ -156,20 +160,22 @@ Proof.
     simpl. apply beta_app_abs.
     simpl. rewrite subst_var_eq.
     apply lift_preserve_small_vars with (k := 0).
-    intros p Hvar. exfalso; lia.
+    intros p Hvar. exfalso. inversion Hvar.
   }
   (* 归约结果必须等于x，故Var m替换后需为x *)
   inversion H.
   simpl in H2.
-  destruct (lt_eq_lt_dec m 1) as [[Hlt|Heq]|Hgt]; try lia.
+  destruct (lt_eq_lt_dec m 1) as [[Hlt|Heq]|Hgt].
   - simpl in H2. rewrite lift_preserve_small_vars with (k := 0) in H2; auto.
+    intros p Hvar. exfalso. inversion Hvar.
     inversion H2.
   - (* m=1时替换结果为lift x 0 = x，但原church_zero是Var 0，此处需区分 *)
     simpl in H2. rewrite lift_preserve_small_vars with (k := 0) in H2; auto.
+    intros p Hvar. exfalso. inversion Hvar.
     inversion H2.
   - simpl in H2. inversion H2.
   (* 仅当m=0时归约结果为x *)
-  lia.
+  reflexivity.
 Qed.
 
 (* 引理5：Abs内部为复杂结构时无法满足迭代性质 *)
@@ -208,10 +214,12 @@ Proof.
     eapply beta_trans.
     + apply beta_app_abs.
     + simpl. 
-      destruct (lt_eq_lt_dec 0 1) as [[H|H]|H]; try lia.
-      simpl. rewrite subst_var_eq.
-      assert (lift x 0 = x) by apply lift_preserve_small_vars with (k := 0); intros n Hvar; exfalso; lia.
-      rewrite H. apply beta_refl.
+      destruct (lt_eq_lt_dec 0 1) as [[H|H]|H].
+      * exfalso. inversion H.
+      * simpl. rewrite subst_var_eq.
+        assert (lift x 0 = x) by apply lift_preserve_small_vars with (k := 0); intros n Hvar; exfalso; inversion Hvar.
+        rewrite H0. apply beta_refl.
+      * exfalso. inversion H.
 Qed.
 
 (* 定理2：Church零的唯一性 *)
