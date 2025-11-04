@@ -1,10 +1,9 @@
 (* # SelfContainedLib/Geometry.v *)
 (* 模块定位：一级基础模块，提供离散几何核心定义（点、距离、共线性），无外部依赖，支撑下游场景模块
-   修复核心：1. 解决"nat类型为Set，预期类型为nat"错误（补充nat类型导入+明确作用域）；2. 确保与Coq 8.18.0兼容，无导入路径错误
+   修复核心：1. 解决"Arith.Nat逻辑路径无法绑定物理路径"错误；2. 确保与Coq 8.18.0兼容，无导入路径错误
    依赖约束：仅依赖Coq标准库，无循环依赖，不新增/删减功能 *)
 From Coq Require Import Utf8.
-From Coq Require Import Arith.Arith.
-From Coq Require Import Arith.Nat. (* 核心修复：补充Nat模块导入，确保nat类型及相关函数（Nat.max/Nat.abs）正确解析 *)
+From Coq Require Import Arith.Arith.  (* 包含Nat模块的所有功能 *)
 Open Scope nat_scope. (* 确保nat被解析为具体类型，而非Set *)
 
 (* ======================== 核心定义（前置无依赖，功能全保留，仅修复类型解析） ======================== *)
@@ -19,7 +18,7 @@ Module DiscreteGeometry <: BasicGeometry.
   Definition distance (p q : Point) : nat :=
     let (x1, y1) := p in
     let (x2, y2) := q in
-    Nat.max (Nat.abs (x2 - x1)) (Nat.abs (y2 - y1)). (* 依赖Arith.Nat，确保函数正确调用 *)
+    Nat.max (Nat.abs (x2 - x1)) (Nat.abs (y2 - y1)). (* 依赖Arith.Arith，确保函数正确调用 *)
     
   Definition collinear (p q r : Point) : Prop :=
     let (x1, y1) := p in
@@ -34,5 +33,4 @@ Proof. reflexivity. Qed.
 
 (* ======================== 模块导出（无符号冲突，支撑下游模块调用） ======================== *)
 Export BasicGeometry DiscreteGeometry geometry_test.
-Export Nat.max Nat.abs. (* 导出常用函数，避免下游模块重复导入 *)
 Close Scope nat_scope.
