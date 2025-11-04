@@ -66,27 +66,21 @@ Definition church_iter (n f x : term) : term := App (App n f) x.
 Definition IsChurchZero (t : term) : Prop :=
   BetaReduces t church_zero.
 
-(* 简化版本的功能特征和角色定义 - 完全使用基本类型 *)
-Inductive FeatureType : Type :=
-| IteratesZeroTimes.
+(* 简化版本的功能特征和角色定义 - 使用最简单的记录语法 *)
+Record FunctionalFeature : Type := 
+  Build_Feature { feature_kind : nat }.
 
-Record FunctionalFeature : Type := {
-  feature_type : FeatureType
-}.
-
-Record FunctionalRole : Type := {
-  role_id : nat;  (* 使用nat作为角色标识符 *)
-  core_features : list FunctionalFeature
-}.
+Record FunctionalRole : Type := 
+  Build_Role { role_identifier : nat; 
+               role_features : list FunctionalFeature }.
 
 (* Church零的功能特征 *)
 Definition ChurchZeroFunctionalFeature : FunctionalFeature :=
-  {| feature_type := IteratesZeroTimes |}.
+  Build_Feature 0.
 
 (* Church零的功能角色 *)
 Definition ChurchZeroRole : FunctionalRole :=
-  {| role_id := 0;  (* 角色ID为0 *)
-     core_features := [ChurchZeroFunctionalFeature] |}.
+  Build_Role 0 [ChurchZeroFunctionalFeature].
 
 (* ======================== 基础引理 ======================== *)
 (* 引理1：Church零谓词对church_zero成立 *)
