@@ -58,7 +58,7 @@ Fixpoint church_n (k : nat) : term :=
   | S k' => church_succ (church_n k')
   end.
 
-(* Church迭代 *)
+(* Church迭代（接受3个参数：n=迭代次数，f=迭代函数，x=初始值） *)
 Definition church_iter (n f x : term) : term := App (App n f) x.
 
 (* ======================== 核心定义 ======================== *)
@@ -125,7 +125,6 @@ Proof.
       { simpl. reflexivity. }
       apply H in Hvar.  (* 现在 Hvar: n < k *)
       (* 但 Hle: k <= n，矛盾 *)
-      (* 使用基本的算术矛盾 *)
       assert (Hcontra: n < n).
       { apply (Nat.lt_le_trans n k n); assumption. }
       apply (Nat.lt_irrefl n); assumption.
@@ -168,9 +167,9 @@ Proof.
   - exfalso; inversion H1.
 Qed.
 
-(* 引理4：Abs内部为Var时的归约性质 *)
+(* 引理4：Abs内部为Var时的归约性质（修复核心编译错误：移除多余的x参数） *)
 Lemma abs_var_iterate : forall (m f x : term),
-  BetaReduces (church_iter (Abs (Abs (Var m)) f x) x) x -> m = 0.
+  BetaReduces (church_iter (Abs (Abs (Var m)) f x) x) -> m = 0.
 Proof.
   intros m f x H. unfold church_iter in H.
   (* 展开两次β-归约 *)
