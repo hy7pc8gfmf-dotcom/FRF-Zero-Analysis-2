@@ -9,7 +9,7 @@
 Require Import Coq.Logic.FunctionalExtensionality.  (* Coq标准库：函数外延性公理 *)
 Require Import Coq.Strings.String.                  (* Coq标准库：字符串处理 *)
 Require Import Coq.Lists.List.                    (* Coq标准库：列表操作（含NoDup/Disjoint等） *)
-Require Import Coq.Reflection.TypeDec.            (* Coq标准库：类型判定 *)
+(* 删除不存在的依赖: Require Import Coq.Reflection.TypeDec. *)
 Require Import Coq.Reals.Reals.                    (* Coq标准库：实数（支撑权重量化） *)
 Require Import Coq.Lists.ListDec.                 (* Coq标准库：列表判定（支撑NoDup_impl_distinct） *)
 
