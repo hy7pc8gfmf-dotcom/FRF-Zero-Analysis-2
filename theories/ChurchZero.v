@@ -1,4 +1,4 @@
-# theories/ChurchZero.v
+(* theories/ChurchZero.v *)
 (* 模块定位：FRF元理论层核心模块（Level 2），聚焦Church零的"功能唯一性"验证  
    核心优化：1. 完全复用一级模块类型/接口，无重复定义；2. 补全FRF元理论接口字段；3. 确保与ChurchNumerals/FRF_MetaTheory类型兼容  
    依赖约束：一级基础层（ChurchNumerals/FRF_MetaTheory/SelfContainedLib），无循环依赖，编译通过且对接无冲突 *)
