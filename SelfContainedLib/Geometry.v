@@ -79,7 +79,13 @@ Module DiscreteGeometry <: BasicGeometry.
   Definition Point := Point.
   Definition distance := distance.
   Definition collinear := collinear.
+  
+  (* 将测试定理包含在模块内 *)
+  Definition test_origin : Point := origin.
+  Definition test_point_example : Point := test_point.
+  Theorem test_theorem : distance origin test_point = 4.
+  Proof. apply geometry_test. Qed.
 End DiscreteGeometry.
 
 (* ======================== 导出 ======================== *)
-Export DiscreteGeometry geometry_test.
+Export DiscreteGeometry.
