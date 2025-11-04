@@ -5,21 +5,60 @@
             3. 修正命题翻译递归逻辑，确保嵌套场景全覆盖；
             4. 补充全量前置引理，强化证明完备性；
             5. 去除逻辑冲突与过时处理，保持功能全保留；
-   依赖约束：仅一级基础层（FRF_MetaTheory/FRF2_CrossSystem/FRF_CS_Null_Common）+ Mathlib 3.74.0，无循环依赖；
+            6. 所有Mathlib依赖替换为Coq标准库，消除外部库依赖；
+   依赖约束：仅一级基础层（FRF_MetaTheory/FRF2_CrossSystem/FRF_CS_Null_Common）+ Coq标准库，无循环依赖；
    适配环境：Coq 8.18.0 + Agda 2.6.2 + Agda Standard Library 1.7 *)
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Strings.String.
+Require Import Coq.Lists.List.
+Require Import Coq.Reals.Reals.
+Require Import Coq.Logic.IndefiniteDescription.
+Require Import Coq.Numbers.Nat.String.
+Require Import Coq.Reals.String.
 Require Import FRF_MetaTheory.
 Require Import FRF2_CrossSystem.
 Require Import FRF_CS_Null_Common.
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
-Require Import Mathlib.Strings.String.
-Require Import Mathlib.Lists.List.
-Require Import Mathlib.Logic.FunctionalExtensionality.
-Require Import Mathlib.Strings.StringSplitter.
-Require Import Mathlib.Reals.Reals.
-Require Import Mathlib.Data.Nat.String.
-Require Import Mathlib.Data.Real.String.
-Require Import Mathlib.Logic.IndefiniteDescription.
+
+(* ======================== 补充：Coq标准库StringSplitter替代实现（无Mathlib依赖） ======================== *)
+(* 字符串分割核心函数（替代Mathlib.StringSplitter.split） *)
+Fixpoint split (sep : string) (s : string) : list string :=
+  match s with
+  | "" => [""]
+  | String c s' =>
+    if String.equal (String c "") sep then
+      "" :: split sep s'
+    else
+      match split sep s' with
+      | [] => [String c ""]
+      | hd :: tl => (String c hd) :: tl
+      end
+  end.
+
+(* 字符串分割辅助引理（替代Mathlib.StringSplitter相关引理） *)
+Lemma split_cons_head_eq : forall sep c s target,
+  String.contains (String c s) target →
+  (String c "") = sep →
+  target ∈ split sep (String c s) ∨ target = sep.
+Proof.
+  intros sep c s target H_contain H_sep_eq.
+  rewrite H_sep_eq. unfold split.
+  destruct (split sep s) as [hd | hd tl]; auto.
+  - exists hd; split; auto.
+  - exists sep; split; auto.
+Qed.
+
+Lemma split_cons_head_neq : forall sep c s target,
+  String.contains (String c s) target →
+  (String c "") ≠ sep →
+  target ∈ split sep (String c s).
+Proof.
+  intros sep c s target H_contain H_sep_neq.
+  unfold split. destruct (split sep s) as [hd | hd tl]; auto.
+  - exists (String c hd); split; auto.
+  - exists (String c hd); split; auto.
+Qed.
 
 (* ======================== 定义前置（形式化完备，无模糊，机械可执行） ======================== *)
 (* ### 1. 核心项类型定义（FRFTerm，显式绑定类型参数，覆盖全FRF场景） *)
@@ -69,6 +108,9 @@ Definition is_prop_term (t : FRFTerm) : bool := match t with PropTerm _ => true 
 Definition is_zero_morphism_term {S T : FRF2_CrossSystem.ZeroSystem} 
   (f : FRF2_CrossSystem.ZeroMorphism S T) (t : FRFTerm) : bool :=
   match t with ZeroMorphismTerm f' => f = f' | _ => false end.
+
+(* 简化Prop字符串化（替代Mathlib.string_of_prop，Coq标准库无直接实现） *)
+Definition string_of_prop (P : Prop) : string := "Prop_" ++ string_of_nat (hash P).
 
 Fixpoint string_of_frf_type (T : Type) : string :=
   match T with
@@ -127,38 +169,29 @@ Definition AgdaTranslation : Type := option AgdaSyntax.
 Arguments AgdaSyntax : clear implicits.
 Arguments AgdaTranslation : clear implicits.
 
-(* ### 5. 嵌套量化命题辅助定义（补充嵌套场景覆盖）
-Definition is_nested_quant_prop (P : Prop) : bool :=
-  match P with
-  | ∀ x : A, ∃ y : B, _ => true
-  | ∃ x : A, ∀ y : B, _ => true
-  | ∀ x : A, ∀ y : B, _ => true
-  | ∃ x : A, ∃ y : B, _ => true
-  | _ => false
-  end.
-
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-(* ### 1. 字符串分割正确性（复用Mathlib已证引理） *)
+(* ### 1. 字符串分割正确性（基于Coq标准库实现，替代Mathlib.StringSplitter） *)
 Lemma split_on_correct : ∀ (s sep target : string),
   String.contains s target →
-  target ∈ StringSplitter.split sep s.
+  target ∈ split sep s.
 Proof.
   intros s sep target H_contain.
   induction s using String.induction.
   - contradiction H_contain.
   - destruct (String.head s = sep) eqn:H_head.
-    + apply StringSplitter.split_cons_head_eq in H_contain.
+    + apply split_cons_head_eq in H_contain.
       destruct H_contain as [H_in_rest | H_eq]; 
-      [apply IHt in H_in_rest; apply StringSplitter.split_cons_head_eq_out | 
-       apply StringSplitter.split_cons_head_eq_out; exists target; split; auto].
-    + apply StringSplitter.split_cons_head_neq in H_contain.
-      apply IHt in H_contain; apply StringSplitter.split_cons_head_neq_out.
+      [apply IHt in H_in_rest; apply in_cons; auto | 
+       apply in_cons; exists target; split; auto].
+    + apply split_cons_head_neq in H_contain.
+      apply IHt in H_contain; apply in_cons; auto.
 Qed.
 
 (* ### 2. FRFTerm提取正确性 *)
 Lemma extract_formal_system_correct : ∀ (S : FRF_MetaTheory.FormalSystem),
   extract_formal_system (FormalSystemTerm S) = Some S.
 Proof. intros S; reflexivity. Qed.
+
 Lemma extract_zero_morphism_correct : ∀ (S T : FRF2_CrossSystem.ZeroSystem) (f : FRF2_CrossSystem.ZeroMorphism S T),
   extract_zero_morphism (ZeroMorphismTerm f) = Some f.
 Proof. intros S T f; reflexivity. Qed.
@@ -198,6 +231,7 @@ Definition handle_uncovered (desc : string) : AgdaTranslation := None.
 (* ### 2. FRFTerm→Agda基础翻译 *)
 Definition frf_term_to_agda (t : FRFTerm) : AgdaTranslation :=
   Some (string_of_frf_term t).
+
 Lemma frf_term_to_agda_correct : ∀ t : FRFTerm,
   frf_term_to_agda t = Some (string_of_frf_term t).
 Proof. intros t; reflexivity. Qed.
@@ -490,10 +524,8 @@ Export coq_formal_system_to_agda coq_zero_system_to_agda coq_zero_morphism_to_ag
 Export coq_prop_to_agda generate_agda_file agda_common_imports.
 Export coq_formal_system_axioms_preserved coq_zero_system_properties_preserved coq_provable_implies_agda_provable.
 Export coq_nested_quant_prop_to_agda_equiv nested_quant_translation_preserves_logic.
-
 Notation "Coq ⟶ Agda t" := (frf_term_to_agda t) (at level 40) : agda_scope.
 Notation "Coq ⟶ AgdaProp P" := (coq_prop_to_agda P) (at level 40) : agda_scope.
 Notation "generateAgda(sys, thm)" := (generate_agda_file sys thm) (at level 50) : agda_scope.
-
 Open Scope agda_scope.
 Open Scope frf_scope.
