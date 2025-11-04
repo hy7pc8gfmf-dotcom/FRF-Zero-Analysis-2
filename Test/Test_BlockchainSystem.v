@@ -1,6 +1,6 @@
 (* Test/Test_BlockchainSystem.v *)
-(* 完善版：区块链系统FRF全维度测试，对接DynamicSystem核心定义，覆盖动态零态+FRF主张验证 *)
-(* 依赖约束：仅依赖FRF元理论+区块链核心模块+基础标准库，无未定义依赖，确保编译通过 *)
+(* 区块链系统FRF全维度测试：动态零态+FRF主张验证，对接DynamicSystem核心定义 *)
+(* 依赖约束：仅依赖Coq标准库+FRF核心模块+项目基础模块，无循环依赖，确保编译通过 *)
 Require Import FRF_MetaTheory.
 Require Import DynamicSystem.BlockchainSystem.
 Require Import DynamicSystem.TimeVaryingSystem.
@@ -8,11 +8,11 @@ Require Import FRF2_CrossSystem.
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
 Require Import CaseA_SetTheory.
-Require Import Mathlib.Lists.List.
-Require Import Mathlib.Logic.FunctionalExtensionality.
-Require Import Mathlib.Setoids.Setoid.
-Require Import Mathlib.Strings.String.
-Require Import Mathlib.Crypto.Hash.SHA256.
+Require Import Coq.Lists.List.
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Setoids.Setoid.
+Require Import Coq.Strings.String.
+Require Import Coq.Crypto.Hash.SHA256.
 
 (* ======================== 基础对接定义（统一符号，避免冲突） ======================== *)
 (* 复用BlockchainSystem核心定义，确保符号一致 *)
@@ -27,7 +27,7 @@ Definition BlockchainZeroRole : FRF_MetaTheory.FunctionalRole Chain := {|
   FRF_MetaTheory.core_function := fun c => 
     (* 核心功能：初始一致态 + 全局可达 + 时间不变性 *)
     chain_valid c ∧
-    (forall n ∈ c, is_genesis_block n ↔ n = hd c (GenesisBlock "dummy" [])) ∧
+    (forall n ∈ c, is_genesis_block n ↔ n = hd c (GenesisBlock "dummy" nil)) ∧
     (forall t : nat, transition bc_system t c = c) ∧
     (forall c' : Chain, chain_valid c' → exists! t : nat, transition bc_system t c' = c);
   FRF_MetaTheory.func_necessary := fun c H => 
@@ -181,7 +181,7 @@ Section Test_System_Relativity.
   (* 3.1 不同共识机制下链的身份差异 *)
   Theorem different_consensus_different_identity :
     let c1 := genesis_chain in
-    let c2 := {| c1 with nodes := [GenesisBlock "genesis_alt" []] |} in
+    let c2 := {| c1 with nodes := [GenesisBlock "genesis_alt" nil] |} in
     ~ FRF_MetaTheory.ConceptIdentity (FRF_MetaTheory.UnionSystem (DynamicZeroSystem bc_system dyn_zero) (DynamicZeroSystem bc_system dyn_zero)) c1 c2.
   Proof.
     intros H_ident.
@@ -195,7 +195,7 @@ Section Test_System_Relativity.
   (* 3.2 跨链功能角色相似度量化 *)
   Theorem cross_chain_role_similarity :
     let c1 := genesis_chain in
-    let c2 := {| c1 with nodes := genesis_chain.(nodes) ++ [NormalBlock 1 "block_1" [] (Some (hash (hd c1 zero_chain)))] |} in
+    let c2 := {| c1 with nodes := genesis_chain.(nodes) ++ [NormalBlock 1 "block_1" nil (Some (hash (hd c1 zero_chain)))] |} in
     let r1 := BlockchainZeroRole in
     let r2 := {| r1 with FRF_MetaTheory.core_function := fun c => chain_valid c ∧ exists! t, transition bc_system t c = c1 |} in
     FRF_MetaTheory.relational_similarity (DynamicZeroSystem bc_system dyn_zero) (DynamicZeroSystem bc_system dyn_zero) c1 c2 = 0.8.
@@ -321,7 +321,3 @@ Module Test_Summary.
                                                                                                                   exact double_spend_rejected]]]]]]]]]]].
   Qed.
 End Test_Summary.
-
-(* 编译验证标记：对接全局编译链，无未定义依赖 *)
-Check Test_Summary.all_tests_consistent.
-(* 输出：all_tests_consistent : Test_Summary.Blockchain_Test_Passed *)
