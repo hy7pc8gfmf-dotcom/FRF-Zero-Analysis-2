@@ -119,8 +119,13 @@ Proof.
   induction t as [n | t1 IH1 t2 IH2 | t' IH]; intros H.
   - (* Var n *)
     simpl. destruct (le_gt_dec k n) as [Hle | Hgt].
-    + exfalso. apply (H n). simpl. reflexivity.
-      apply Nat.le_ngt in Hle. apply Hle. assumption.
+    + exfalso. 
+      assert (Hvar: var_in_term n (Var n)).
+      { simpl. reflexivity. }
+      specialize (H n Hvar).
+      apply (Nat.nle_gt k n) in Hle.
+      * apply Hle. assumption.
+      * apply Nat.lt_gt_cases.
     + reflexivity.
   - (* App t1 t2 *)
     simpl. rewrite IH1, IH2.
