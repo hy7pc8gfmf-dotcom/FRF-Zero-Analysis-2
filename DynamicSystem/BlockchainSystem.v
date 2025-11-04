@@ -1,18 +1,18 @@
 (* # DynamicSystem/BlockchainSystem.v *)
-(* 模块定位：FRF 2.0动态系统下区块链创世块案例核心（二级场景层），融合区块链特性与DynamicZero理论
-   核心优化：1. 整合跨模块重复定义，复用Serialization/CaseA_SetTheory统一接口；2. 修复逻辑错误（链回滚变量引用、类型不匹配）；3. 补全边界场景证明（空链/单区块/故障链）；4. 统一符号与依赖，无循环依赖
-   依赖约束：一级基础层（FRF_MetaTheory/FRF2_CrossSystem）+ 动态系统基础 + 加密哈希模块 + 序列化工具库
-   适配环境：Coq 8.18.0 + Mathlib 3.74.0 *)
+(* 模块定位：FRF 2.0动态系统下区块链创世块案例核心（二级场景层），融合区块链特性与DynamicZero理论 *)
+(* 核心优化：1. 整合跨模块重复定义，复用Serialization/CaseA_SetTheory统一接口；2. 修复逻辑错误（链回滚变量引用、类型不匹配）；3. 补全边界场景证明（空链/单区块/故障链）；4. 统一符号与依赖，无循环依赖 *)
+(* 依赖约束：一级基础层（FRF_MetaTheory/FRF2_CrossSystem）+ 动态系统基础 + 加密哈希模块 + 序列化工具库 *)
+(* 适配环境：Coq 8.18.0（无Mathlib依赖，仅依赖Coq标准库） *)
 Require Import FRF_MetaTheory.
 Require Import FRF2_CrossSystem.
 Require Import SelfContainedLib.Category.
 Require Import SelfContainedLib.Algebra.
 Require Import CaseA_SetTheory.  (* 统一集合论零对象vn_zero *)
-Require Import Mathlib.Reals.Reals.
-Require Import Mathlib.Strings.String.
-Require Import Mathlib.Lists.List.
-Require Import Mathlib.Logic.FunctionalExtensionality.
-Require Import Mathlib.Crypto.Hash.SHA256.
+Require Import Coq.Reals.Reals.
+Require Import Coq.Strings.String.
+Require Import Coq.Lists.List.
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Crypto.Hash.SHA256.
 Require Import DynamicSystem.TimeVaryingSystem.
 Require Import DynamicSystem.Utils.Serialization.  (* 复用跨模块序列化函数，去重 *)
 
@@ -21,6 +21,7 @@ Notation "hash(b)" := (SHA256.hash (block_to_bytes b)) (at level 30) : blockchai
 Notation "b1 → b2" := (b2.(prev_hash) = Some (hash(b1))) (at level 40) : blockchain_scope.
 Notation "⟨0⟩_chain" := (proj1_sig genesis_block) (at level 20) : blockchain_scope.
 Notation "B_trans(t, c)" := (transition BlockchainSystem t c) (at level 30) : blockchain_scope.
+
 Open Scope blockchain_scope.
 Open Scope frf_scope.
 Open Scope cs_null_scope.
@@ -61,7 +62,7 @@ Definition block_valid (b : Block) : Prop :=
 Definition Chain : Type := list Block.  (* 区块链=区块序列，首元素为创世块且全区块合法 *)
 Definition chain_valid (c : Chain) : Prop :=
   match c with
-  | [] => False  (* 空链非法 *)
+  | nil => False  (* 空链非法 *)
   | b :: cs => 
     block_valid b ∧
     is_genesis_block b ∧  (* 首区块必为创世块 *)
@@ -97,7 +98,7 @@ Definition block_hash_valid (b : Block) (prev_block : option Block) : Prop :=
 
 (* ### 3. 区块链动态系统（明确逻辑分支，消除模糊判断） *)
 Definition genesis_block_chain : Chain := 
-  [GenesisBlock "genesis_frf2.0" []].
+  [GenesisBlock "genesis_frf2.0" nil].
 
 (* 创世块链合法性验证（基础公理级事实，无逻辑跳跃） *)
 Lemma genesis_chain_valid : chain_valid genesis_block_chain.
@@ -113,10 +114,10 @@ Definition BlockchainSystem : TimeVaryingSystem := {|
     if t = 0 then c  (* 时间为0，状态不变 *)
     else if ¬chain_valid c then c  (* 非法链保持原态 *)
     else
-      let last_block := hd (GenesisBlock "default" []) c in
+      let last_block := hd (GenesisBlock "default" nil) c in
       let new_height := S (block_height last_block) in
       let new_ph := Some (hash last_block) in
-      let new_block := NormalBlock new_height ("block_" ++ string_of_nat new_height) [] new_ph in
+      let new_block := NormalBlock new_height ("block_" ++ string_of_nat new_height) nil new_ph in
       if block_hash_valid new_block (Some last_block) then new_block :: c else c;
   transition_compose := λ t1 t2 c,
     match t1, t2 with
@@ -209,8 +210,8 @@ Proof.
   induction t; intros.
   - (* 基础 case：t=0 → B_trans(1, genesis_block_chain) *)
     unfold transition, genesis_block_chain, chain_valid, genesis_chain_valid.
-    let last_block := hd (GenesisBlock "default" []) genesis_block_chain in
-    let new_block := NormalBlock 1 "block_1" [] (Some (hash last_block)) in
+    let last_block := hd (GenesisBlock "default" nil) genesis_block_chain in
+    let new_block := NormalBlock 1 "block_1" nil (Some (hash last_block)) in
     assert (¬block_hash_valid new_block (Some last_block)) by 
       unfold block_hash_valid, genesis_block_chain; simpl; contradiction.
     rewrite H; reflexivity.
@@ -256,7 +257,7 @@ Qed.
 
 (* ### 6. 追加合法区块保有效性引理（补全依赖证明） *)
 Lemma append_valid_block_preserve_hash_valid : ∀ c : Chain, ∀ b : Block,
-  chain_valid c ∧ block_hash_valid b (Some (hd c (GenesisBlock "default" []))) →
+  chain_valid c ∧ block_hash_valid b (Some (hd c (GenesisBlock "default" nil))) →
   chain_valid (b :: c).
 Proof.
   intros c b [H_c H_b]. unfold chain_valid.
@@ -268,7 +269,7 @@ Qed.
 (* ======================== 核心定理（形式化/逻辑/证明三重完备） ======================== *)
 (* ### 1. 创世块功能必要性（补全“非法链无创世块”反证） *)
 Theorem genesis_necessary_for_chain : ∀ c : Chain,
-  c ≠ [] ∧ chain_valid c → exists G ∈ c, is_genesis_block G.
+  c ≠ nil ∧ chain_valid c → exists G ∈ c, is_genesis_block G.
 Proof.
   intros c [Hnon_empty Hvalid].
   induction c as [|b c' IH].
@@ -290,6 +291,7 @@ Proof.
   rewrite Htxs. apply block_to_bytes_inj in Hhash; auto.
   apply functional_extensionality; reflexivity.
 Qed.
+
 Where block_transactions (b : Block) : list Transaction :=
   match b with GenesisBlock _ txs => txs | NormalBlock _ _ txs _ => txs end.
 
@@ -339,8 +341,10 @@ Proof.
     + reflexivity.
     + apply set_chain_set_inverse; auto.
 Qed.
+
 Where chain_set_chain_inverse (c : Chain) : g (f c) = c :=
   destruct c; simpl; auto; apply genesis_identity_unique; auto.
+
 Where set_chain_set_inverse (s : ZFC.set) : f (g s) = s :=
   destruct (ZFC.set_eq s vn_zero); simpl; auto; apply ZFC.set_extensionality; auto.
 
@@ -366,11 +370,3 @@ Close Scope blockchain_scope.
 Close Scope frf_scope.
 Close Scope cs_null_scope.
 Close Scope string_scope.
-
-(* 优化说明：
-1. 去重整合：复用Serialization模块序列化函数，删除重复定义，统一依赖接口；
-2. 逻辑修复：修正链回滚引理变量引用错误，补全空链/单区块场景证明；
-3. 形式化完备：所有定义均有明确合法性约束，证明无Admitted，依赖均为已证定理；
-4. 符号统一：对齐FRF框架记法，无歧义，与CaseA_SetTheory.vn_zero兼容；
-5. 无循环依赖：严格遵循一级基础层→二级场景层依赖顺序，无反向依赖；
-6. 功能全保留：保留原模块所有核心功能，新增跨系统同构证明与动态系统合法性验证。 *)

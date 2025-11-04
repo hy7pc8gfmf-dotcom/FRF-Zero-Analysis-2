@@ -112,7 +112,7 @@ Fixpoint var_in_term (n : nat) (t : term) : Prop :=
   | Abs t' => var_in_term (S n) t'
   end.
 
-(* 保持小变量引理 - 最终简化版本 *)
+(* 保持小变量引理 - 最终版本 *)
 Lemma lift_preserve_small_vars : forall t k,
   (forall n, var_in_term n t -> n < k) -> lift t k = t.
 Proof.
@@ -125,8 +125,10 @@ Proof.
       { simpl. reflexivity. }
       apply H in Hvar.  (* 现在 Hvar: n < k *)
       (* 但 Hle: k <= n，矛盾 *)
-      apply (Nat.le_ngt k n) in Hle.
-      apply Hle; assumption.
+      (* 使用基本的算术矛盾 *)
+      assert (Hcontra: n < n).
+      { apply (Nat.lt_le_trans n k n); assumption. }
+      apply (Nat.lt_irrefl n); assumption.
     + reflexivity.
   - (* App t1 t2 *)
     simpl. rewrite IH1, IH2.
