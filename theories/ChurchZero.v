@@ -104,21 +104,33 @@ Lemma subst_abs : forall t u k,
   subst (Abs t) u k = Abs (subst t (lift u 0) (S k)).
 Proof. reflexivity. Qed.
 
-(* 保持小变量引理 *)
+(* 变量在项中出现的定义 *)
+Fixpoint var_in_term (n : nat) (t : term) : Prop :=
+  match t with
+  | Var m => n = m
+  | App t1 t2 => var_in_term n t1 \/ var_in_term n t2
+  | Abs t' => var_in_term (S n) t'
+  end.
+
+(* 保持小变量引理 - 修复版本 *)
 Lemma lift_preserve_small_vars : forall t k,
-  (forall n, In (Var n) t -> n < k) -> lift t k = t.
+  (forall n, var_in_term n t -> n < k) -> lift t k = t.
 Proof.
   induction t as [n | t1 IH1 t2 IH2 | t' IH]; intros H.
-  - simpl. destruct (le_gt_dec k n) as [Hle | Hgt].
-    + exfalso. apply (Nat.nle_gt k n) in Hle.
-      * apply Hle.
-      * apply H. constructor.
+  - (* Var n *)
+    simpl. destruct (le_gt_dec k n) as [Hle | Hgt].
+    + exfalso. apply (H n). simpl. reflexivity.
+      apply Nat.le_ngt in Hle. apply Hle. assumption.
     + reflexivity.
-  - simpl. rewrite IH1, IH2; auto.
-    + intros m Hvar; apply H; left; auto.
-    + intros m Hvar; apply H; right; auto.
-  - simpl. rewrite IH; auto.
-    intros m Hvar; apply H; right; auto.
+  - (* App t1 t2 *)
+    simpl. rewrite IH1, IH2.
+    + reflexivity.
+    + intros m Hvar. apply H. simpl. left. assumption.
+    + intros m Hvar. apply H. simpl. right. assumption.
+  - (* Abs t' *)
+    simpl. rewrite IH.
+    + reflexivity.
+    + intros m Hvar. apply H. simpl. assumption.
 Qed.
 
 (* 引理2：Var类型无法满足迭代归零性质 *)
@@ -166,13 +178,13 @@ Proof.
   inversion H.
   simpl in H2.
   destruct (lt_eq_lt_dec m 1) as [[Hlt|Heq]|Hgt].
-  - simpl in H2. rewrite lift_preserve_small_vars with (k := 0) in H2; auto.
-    intros p Hvar. exfalso. inversion Hvar.
-    inversion H2.
+  - simpl in H2. rewrite lift_preserve_small_vars with (k := 0) in H2.
+    + inversion H2.
+    + intros p Hvar. exfalso. inversion Hvar.
   - (* m=1时替换结果为lift x 0 = x，但原church_zero是Var 0，此处需区分 *)
-    simpl in H2. rewrite lift_preserve_small_vars with (k := 0) in H2; auto.
-    intros p Hvar. exfalso. inversion Hvar.
-    inversion H2.
+    simpl in H2. rewrite lift_preserve_small_vars with (k := 0) in H2.
+    + inversion H2.
+    + intros p Hvar. exfalso. inversion Hvar.
   - simpl in H2. inversion H2.
   (* 仅当m=0时归约结果为x *)
   reflexivity.
@@ -217,7 +229,9 @@ Proof.
       destruct (lt_eq_lt_dec 0 1) as [[H|H]|H].
       * exfalso. inversion H.
       * simpl. rewrite subst_var_eq.
-        assert (lift x 0 = x) by apply lift_preserve_small_vars with (k := 0); intros n Hvar; exfalso; inversion Hvar.
+        assert (lift x 0 = x).
+        { apply lift_preserve_small_vars with (k := 0).
+          intros n Hvar. exfalso. inversion Hvar. }
         rewrite H0. apply beta_refl.
       * exfalso. inversion H.
 Qed.
