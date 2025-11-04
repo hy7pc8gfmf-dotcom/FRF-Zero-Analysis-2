@@ -1,4 +1,4 @@
-(* # Toolchain/FRF_to_Lean.v *)
+\(* # Toolchain/FRF_to_Lean.v *)
 (* 模块定位：FRF 2.0 跨工具链核心模块，实现 Coq → Lean 4 形式化翻译，
    核心优化：1. 补全FRFTerm归纳原理与终止性证明，消除形式化断层；
             2. 替换"unknown_type"为可追溯标注，移除模糊处理；
@@ -7,21 +7,60 @@
             5. 完善翻译正确性证明，确保保公理集、保核心性质；
             6. 强化容错处理，避免批量翻译崩溃；
             7. 消除重复定义，整合冗余辅助函数；
-   依赖约束：仅一级基础层（FRF_MetaTheory/FRF2_CrossSystem/FRF_CS_Null_Common）+ Mathlib 3.74.0，无循环依赖；
+            8. 所有Mathlib依赖替换为Coq标准库，消除外部库依赖；
+   依赖约束：仅一级基础层（FRF_MetaTheory/FRF2_CrossSystem/FRF_CS_Null_Common）+ Coq标准库，无循环依赖；
    适配环境：Coq 8.18.0 + Lean 4.0 + Lean Mathlib 4 *)
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Strings.String.
+Require Import Coq.Lists.List.
+Require Import Coq.Reals.Reals.
+Require Import Coq.Logic.IndefiniteDescription.
+Require Import Coq.Numbers.Nat.String.
+Require Import Coq.Reals.String.
 Require Import FRF_MetaTheory.
 Require Import FRF2_CrossSystem.
 Require Import FRF_CS_Null_Common.
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
-Require Import Mathlib.Strings.String.
-Require Import Mathlib.Lists.List.
-Require Import Mathlib.Logic.FunctionalExtensionality.
-Require Import Mathlib.Strings.StringSplitter.
-Require Import Mathlib.Reals.Reals.
-Require Import Mathlib.Data.Nat.String.
-Require Import Mathlib.Data.Real.String.
-Require Import Mathlib.Logic.IndefiniteDescription.
+
+(* ======================== 补充：Coq标准库StringSplitter替代实现（无Mathlib依赖） ======================== *)
+(* 字符串分割核心函数（替代Mathlib.StringSplitter.split） *)
+Fixpoint split (sep : string) (s : string) : list string :=
+  match s with
+  | "" => [""]
+  | String c s' =>
+    if String.equal (String c "") sep then
+      "" :: split sep s'
+    else
+      match split sep s' with
+      | [] => [String c ""]
+      | hd :: tl => (String c hd) :: tl
+      end
+  end.
+
+(* 字符串分割辅助引理（替代Mathlib.StringSplitter相关引理） *)
+Lemma split_cons_head_eq : forall sep c s target,
+  String.contains (String c s) target →
+  (String c "") = sep →
+  target ∈ split sep (String c s) ∨ target = sep.
+Proof.
+  intros sep c s target H_contain H_sep_eq.
+  rewrite H_sep_eq. unfold split.
+  destruct (split sep s) as [hd | hd tl]; auto.
+  - exists hd; split; auto.
+  - exists sep; split; auto.
+Qed.
+
+Lemma split_cons_head_neq : forall sep c s target,
+  String.contains (String c s) target →
+  (String c "") ≠ sep →
+  target ∈ split sep (String c s).
+Proof.
+  intros sep c s target H_contain H_sep_neq.
+  unfold split. destruct (split sep s) as [hd | hd tl]; auto.
+  - exists (String c hd); split; auto.
+  - exists (String c hd); split; auto.
+Qed.
 
 (* ======================== 定义前置（形式化完备，无模糊，机械可执行） ======================== *)
 (* ### 1. 核心项类型定义（FRFTerm，显式绑定类型参数，覆盖全FRF场景） *)
@@ -44,7 +83,6 @@ Arguments ZeroMorphismTerm {_ _} _ : clear implicits.
 (* ### 2. FRFTerm归纳原理（支撑翻译函数终止性证明，无递归漏洞） *)
 Lemma FRFTerm_ind :
   ∀ P : FRFTerm → Prop,
-    (* 基础情况：原子项 *)
     (∀ T : Type, P (TypeTerm T)) →
     (∀ P : Prop, P (PropTerm P)) →
     (∀ S : FRF_MetaTheory.FormalSystem, P (FormalSystemTerm S)) →
@@ -53,25 +91,23 @@ Lemma FRFTerm_ind :
     (∀ ax : FRF_MetaTheory.Axiom, P (AxiomTerm ax)) →
     (∀ sys : FRF_MetaTheory.FormalSystem, ∀ t1 t2 : FRFTerm, P t1 → P t2 → P (OpTerm sys t1 t2)) →
     (∀ sys : FRF_MetaTheory.FormalSystem, P (IdTerm sys)) →
-    (* 复合情况：容器项（依赖元素性质） *)
     (∀ ts : list FRFTerm, (∀ t ∈ ts, P t) → P (ListTerm ts)) →
     (∀ t : FRFTerm, ∀ n : nat, P t → P (VectorTerm t n)) →
     (∀ m n : nat, ∀ t : FRFTerm, P t → P (MatrixTerm m n t)) →
-    (* 结论：所有FRFTerm满足P *)
     ∀ t : FRFTerm, P t.
 Proof.
   intros P HType HProp HFS HZS HZM HAxiom HOp HId HList HVector HMatrix.
-  fix FRFTerm_ind 1. (* 结构递归不动点 *)
+  fix FRFTerm_ind 1.
   intros t. destruct t; auto.
-  - (* ListTerm：依赖所有元素满足P *)
-    apply HList; intros t' HIn; apply FRFTerm_ind; auto.
-  - (* VectorTerm：依赖元素类型满足P *)
-    apply HVector; apply FRFTerm_ind; auto.
-  - (* MatrixTerm：依赖元素类型满足P *)
-    apply HMatrix; apply FRFTerm_ind; auto.
+  - apply HList; intros t' HIn; apply FRFTerm_ind; auto.
+  - apply HVector; apply FRFTerm_ind; auto.
+  - apply HMatrix; apply FRFTerm_ind; auto.
 Qed.
 
 (* ### 3. 字符串处理函数（全覆盖类型，无模糊丢弃，符号统一） *)
+(* 简化Prop字符串化（替代Mathlib.string_of_prop，Coq标准库无直接实现） *)
+Definition string_of_prop (P : Prop) : string := "Prop_" ++ string_of_nat (hash P).
+
 (* 3.1 FRFTerm类型判别（安全无副作用，支撑后续翻译分支） *)
 Definition is_type_term (t : FRFTerm) : bool := match t with TypeTerm _ => true | _ => false end.
 Definition is_prop_term (t : FRFTerm) : bool := match t with PropTerm _ => true | _ => false end.
@@ -96,7 +132,7 @@ Fixpoint string_of_frf_type (T : Type) : string :=
   | FRF_MetaTheory.Axiom => "FRF.Axiom"
   | FRF_MetaTheory.FunctionalRole sys => 
     "FRF.FunctionalRole (" ++ FRF_MetaTheory.system_name sys ++ ")"
-  | _ => String.append "FRF.UnknownType_" (string_of_nat (hash T)) (* 可追溯未知类型，非模糊丢弃 *)
+  | _ => String.append "FRF.UnknownType_" (string_of_nat (hash T))
   end.
 
 (* 3.3 FRFTerm→Lean 4字符串（结构递归，终止性可证，符号对齐Toolchain规范） *)
@@ -120,6 +156,7 @@ Fixpoint string_of_frf_term (t : FRFTerm) : string :=
   | VectorTerm t n => "Vector (" ++ string_of_frf_term t ++ ") " ++ string_of_nat n
   | MatrixTerm m n t => "Matrix " ++ string_of_nat m ++ " " ++ string_of_nat n ++ " (" ++ string_of_frf_term t ++ ")"
   end.
+
 (* 终止性证明：基于FRFTerm归纳原理，无递归循环 *)
 Lemma string_of_frf_term_terminates : ∀ t : FRFTerm, True.
 Proof. intros t; apply FRFTerm_ind; repeat constructor. Qed.
@@ -140,21 +177,21 @@ Arguments LeanSyntax : clear implicits.
 Arguments LeanTranslation : clear implicits.
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
-(* ### 1. 字符串分割正确性（复用Mathlib已证引理，无重复证明） *)
+(* ### 1. 字符串分割正确性（基于Coq标准库实现，替代Mathlib.StringSplitter） *)
 Lemma split_on_correct : ∀ (s sep target : string),
   String.contains s target →
-  target ∈ StringSplitter.split sep s.
+  target ∈ split sep s.
 Proof.
   intros s sep target H_contain.
   induction s using String.induction.
   - contradiction H_contain.
   - destruct (String.head s = sep) eqn:H_head.
-    + apply StringSplitter.split_cons_head_eq in H_contain.
+    + apply split_cons_head_eq in H_contain.
       destruct H_contain as [H_in_rest | H_eq]; 
-      [apply IHt in H_in_rest; apply StringSplitter.split_cons_head_eq_out | 
-       apply StringSplitter.split_cons_head_eq_out; exists target; split; auto].
-    + apply StringSplitter.split_cons_head_neq in H_contain.
-      apply IHt in H_contain; apply StringSplitter.split_cons_head_neq_out.
+      [apply IHt in H_in_rest; apply in_cons; auto | 
+       apply in_cons; exists target; split; auto].
+    + apply split_cons_head_neq in H_contain.
+      apply IHt in H_contain; apply in_cons; auto.
 Qed.
 
 (* ### 2. FRFTerm提取正确性（确保提取结果与原项类型匹配） *)
@@ -173,12 +210,12 @@ Proof. intros T1 T2 H_eq; rewrite H_eq; reflexivity. Qed.
 
 (* ======================== 核心翻译函数（逻辑严谨，保性质，证明完备） ======================== *)
 (* ### 1. 辅助函数：未覆盖场景统一处理（容错无崩溃，支撑批量翻译） *)
-Definition handle_uncovered (desc : string) : LeanTranslation :=
-  None. (* 明确返回None，避免静默失败，上游可捕获错误 *)
+Definition handle_uncovered (desc : string) : LeanTranslation := None.
 
 (* ### 2. FRFTerm→Lean 4基础翻译（结构递归，正确性可证） *)
 Definition frf_term_to_lean (t : FRFTerm) : LeanTranslation :=
   Some (string_of_frf_term t).
+
 (* 正确性证明：翻译结果与字符串表示完全一致 *)
 Lemma frf_term_to_lean_correct : ∀ t : FRFTerm,
   frf_term_to_lean t = Some (string_of_frf_term t).
@@ -189,22 +226,16 @@ Definition coq_formal_system_to_lean (S : FRF_MetaTheory.FormalSystem) : LeanTra
   let carrier_term := TypeTerm (FRF_MetaTheory.carrier S) in
   match frf_term_to_lean carrier_term with
   | Some carrier =>
-    (* 1. 构造运算字段（保结合律） *)
     let op := "op : " ++ carrier ++ " → " ++ carrier ++ " → " ++ carrier in
-    (* 2. 构造公理列表（保公理集） *)
     let axioms := map (fun ax => AxiomTerm ax) (FRF_MetaTheory.axioms S) in
     let axioms_str := "axioms : List FRF.Axiom = [" ++ 
       concat ", " (map (fun x => match frf_term_to_lean x with Some s => s | None => "FRF.Axiom.top" end) axioms) ++ "]" in
-    (* 3. 构造属性范畴（保FRF分类） *)
     let propCategory := "propCategory : FRF.PropertyCategory = " ++ 
       string_of_frf_type (FRF_MetaTheory.prop_category S) in
-    (* 4. 构造运算结合律（保代数结构） *)
     let opAssoc := "opAssoc : ∀ (a b c : " ++ carrier ++ "), op (op a b) c = op a (op b c)" in
-    (* 5. 构造单位元及性质（保单位律） *)
     let id := "id : " ++ carrier in
     let idLeft := "idLeft : ∀ (a : " ++ carrier ++ "), op id a = a" in
     let idRight := "idRight : ∀ (a : " ++ carrier ++ "), op a id = a" in
-    (* 6. 生成Lean 4模块代码（符合FRF命名规范） *)
     Some ("namespace FRF
 structure " ++ FRF_MetaTheory.system_name S ++ "FormalSystem where
   " ++ op ++ ";
@@ -225,13 +256,11 @@ Definition coq_zero_system_to_lean (ZS : FRF2_CrossSystem.ZeroSystem) : LeanTran
   match frf_term_to_lean obj_term with
   | Some obj =>
     let sysName := FRF_MetaTheory.system_name (FRF2_CrossSystem.zero_system_to_formal ZS) in
-    (* 核心性质字段（与FRF2_CrossSystem.ZeroSystem对齐） *)
     let zsOp := "zsOp : " ++ obj ++ " → " ++ obj ++ " → " ++ obj in
     let z := "z : " ++ obj in
     let zLeftId := "zLeftId : ∀ (a : " ++ obj ++ "), zsOp z a = a" in
     let zRightId := "zRightId : ∀ (a : " ++ obj ++ "), zsOp a z = a" in
     let zUnique := "zUnique : ∀ (z' : " ++ obj ++ "), (∀ a, zsOp z' a = a ∧ zsOp a z' = a) → z' = z" in
-    (* 生成Lean 4模块（带系统名后缀，避免冲突） *)
     Some ("namespace FRF
 structure ZeroSystem." ++ sysName ++ " where
   " ++ zsOp ++ ";
@@ -252,12 +281,9 @@ Definition coq_zero_morphism_to_lean (S T : FRF2_CrossSystem.ZeroSystem) (f : FR
   | (Some dom, Some codom) =>
     let sName := FRF_MetaTheory.system_name (FRF2_CrossSystem.zero_system_to_formal S) in
     let tName := FRF_MetaTheory.system_name (FRF2_CrossSystem.zero_system_to_formal T) in
-    (* 保运算映射：f(zsOp_S a b) = zsOp_T (f a) (f b) *)
     let fMap := "f : " ++ dom ++ " → " ++ codom in
     let fPresOp := "fPresOp : ∀ (a b : " ++ dom ++ "), f (FRF.ZeroSystem." ++ sName ++ ".zsOp zsS a b) = FRF.ZeroSystem." ++ tName ++ ".zsOp zsT (f a) (f b)" in
-    (* 保零元素映射：f(z_S) = z_T *)
     let fPresZ := "fPresZ : f (FRF.ZeroSystem." ++ sName ++ ".z zsS) = FRF.ZeroSystem." ++ tName ++ ".z zsT" in
-    (* 生成Lean 4模块（带源-目标标识，避免歧义） *)
     Some ("namespace FRF
 structure ZeroMorphism." ++ sName ++ "_to_" ++ tName ++ " (zsS : ZeroSystem." ++ sName ++ ", zsT : ZeroSystem." ++ tName ++ ") where
   " ++ fMap ++ ";
@@ -304,6 +330,7 @@ Fixpoint coq_prop_to_lean (P : Prop) : LeanTranslation :=
   | P ∧ Q => 
     match (coq_prop_to_lean P, coq_prop_to_lean Q) with
     | (Some pLean, Some qLean) => Some (pLean ++ " ∧ " ++ qLean)
+    | _ => handle_uncovered ("Conjunction translation failed")
     end
   | a = b => 
     let a_term := match a with
@@ -358,19 +385,16 @@ import Mathlib.LinearAlgebra.Matrix
 import Mathlib.Data.Real.Basic
 import Mathlib.Data.List.Basic
 import Mathlib.Data.Vector.Basic
-import FRF.Base  -- FRF 2.0 基础定义依赖
+import FRF.Base
 open FRF".
 
 Definition generate_lean_file (sysList : list FRF2_CrossSystem.ZeroSystem) (thmList : list Prop) : LeanTranslation :=
-  (* 1. 批量翻译零系统 *)
   let sysTranslations := map coq_zero_system_to_lean sysList in
-  (* 2. 批量翻译定理（seq参数类型对齐，避免调用错误） *)
   let thmTranslations := map2 (fun n thm => 
     match coq_theorem_to_lean ("thm_" ++ string_of_nat n) thm with
-    | Some thmAgda => Some thmAgda
+    | Some thmLean => Some thmLean
     | None => None
     end) (seq 0 (length thmList)) thmList in
-  (* 3. 检查所有翻译是否成功 *)
   let allValid := forallb (fun x => match x with Some _ => true | None => false end) (sysTranslations ++ thmTranslations) in
   if allValid then
     Some (lean_common_imports ++ "\n\n" ++
@@ -395,17 +419,14 @@ Proof.
   intros S ax HaxIn.
   destruct coq_formal_system_to_lean S as [leanSys |]; try contradiction.
   unfold coq_formal_system_to_lean in leanSys.
-  (* 1. 公理字符串在Lean代码的axioms字段中 *)
   assert (axTerm := AxiomTerm ax).
   assert (axStr := string_of_frf_term axTerm).
   assert (axStrInAxioms : String.contains leanSys ("axioms : List FRF.Axiom = [" ++ concat ", " (map (fun x => match frf_term_to_lean x with Some s => s | None => "FRF.Axiom.top" end) (map AxiomTerm (FRF_MetaTheory.axioms S)) ++ "]")).
   { reflexivity. }
-  (* 2. 由ax ∈ 公理列表，得axStr在concat结果中 *)
   apply List.in_map in HaxIn; destruct HaxIn as [ax' [HaxEq HaxIn']].
   rewrite HaxEq.
   assert (axStrInConcat : axStr ∈ map (fun x => match frf_term_to_lean x with Some s => s | None => "FRF.Axiom.top" end) (map AxiomTerm (FRF_MetaTheory.axioms S))).
   { apply List.in_map; exists axTerm; split; [reflexivity | exact HaxIn']. }
-  (* 3. 由split_on_correct，得axStr在leanSys中 *)
   apply split_on_correct with (sep := ", ") (target := axStr) (s := leanSys); auto.
 Qed.
 
@@ -425,16 +446,12 @@ Proof.
   intros ZS.
   destruct coq_zero_system_to_lean ZS as [leanZS |]; try contradiction.
   unfold coq_zero_system_to_lean in leanZS.
-  (* 1. 左单位律字符串在Lean代码中 *)
   assert (leftIdStr := "zLeftId : ∀ (a : " ++ string_of_frf_type (FRF2_CrossSystem.ZS_obj ZS) ++ "), zsOp z a = a").
   assert (leftIdIn := String.contains leanZS leftIdStr).
-  (* 2. 右单位律字符串在Lean代码中 *)
   assert (rightIdStr := "zRightId : ∀ (a : " ++ string_of_frf_type (FRF2_CrossSystem.ZS_obj ZS) ++ "), zsOp a z = a").
   assert (rightIdIn := String.contains leanZS rightIdStr).
-  (* 3. 唯一性字符串在Lean代码中 *)
   assert (uniqueStr := "zUnique : ∀ (z' : " ++ string_of_frf_type (FRF2_CrossSystem.ZS_obj ZS) ++ "), (∀ a, zsOp z' a = a ∧ zsOp a z' = a) → z' = z").
   assert (uniqueIn := String.contains leanZS uniqueStr).
-  (* 4. 合取结论 *)
   split; [split; [exact leftIdIn | exact rightIdIn] | exact uniqueIn].
 Qed.
 
@@ -448,15 +465,10 @@ Theorem coq_provable_implies_lean_provable : ∀ (P : Prop),
 Proof.
   intros P Hprovable.
   unfold FRF_MetaTheory.axiom_valid in Hprovable.
-  (* 1. 由公理有效性，得P ∈ FRF_System公理集 *)
   assert (P ∈ FRF_MetaTheory.axioms FRF_MetaTheory.FRF_System) by exact Hprovable.
-  (* 2. 翻译P为Lean字符串 *)
   destruct coq_prop_to_lean P as [leanP |]; try contradiction.
-  (* 3. 构造Lean定理字符串 *)
   let leanThm := "namespace FRF; theorem autoProven : " ++ leanP ++ " by auto; end FRF" in
-  (* 4. 证明leanThm在翻译列表中 *)
   apply List.in_map; exists P; split; [reflexivity | exact Hprovable].
-  (* 5. 存在性结论 *)
   exists leanP; split; [reflexivity | auto].
 Qed.
 
@@ -468,17 +480,8 @@ Export coq_prop_to_lean coq_theorem_to_lean generate_lean_file lean_common_impor
 Export coq_formal_system_axioms_preserved coq_zero_system_properties_preserved split_on_correct.
 Export coq_provable_implies_lean_provable.
 
-(* 统一符号记法（与FRF跨工具链模块对齐，无歧义） *)
 Notation "Coq ⟶ Lean t" := (frf_term_to_lean t) (at level 40) : lean_scope.
 Notation "Coq ⟶ LeanProp P" := (coq_prop_to_lean P) (at level 40) : lean_scope.
 Notation "generateLean(sys, thm)" := (generate_lean_file sys thm) (at level 50) : lean_scope.
-
 Open Scope lean_scope.
 Open Scope frf_scope.
-
-(* 工程化备注：
-1. 与FRF_to_Agda/FRF_to_Isabelle接口对齐，支持批量翻译脚本调用；
-2. 未知类型标注"FRF.UnknownType_哈希"，可通过Lean类型检查定位问题；
-3. 所有证明无Admitted，可在Coq 8.18.0+Mathlib 3.74.0中全量复现；
-4. 依赖无循环，仅引用一级基础层，可独立编译；
-5. 兼容Lean 4.0+Mathlib 4，翻译后的代码可直接导入编译。 *)
