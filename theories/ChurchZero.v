@@ -16,19 +16,23 @@ From SelfContainedLib Require Import Algebra.  (* 一级模块：代数基础 *)
 
 (* 修复1：移除未声明的lambda_scope（核心错误点），如需λ记法则显式声明并定义 *)
 (* 声明lambda_scope并定义Church数相关记法（替代未声明的作用域，确保符号可用） *)
-Create Scope lambda_scope.
-Notation "λ A f x . t" := (fun A f x => t) (at level 30, A binder, f binder, x binder) : lambda_scope.
+Declare Scope lambda_scope.
+Delimit Scope lambda_scope with lambda.
+Notation "λ A f x . t" := (fun (A : Type) (f : A -> A) (x : A) => t) 
+  (at level 30, A binder, f binder, x binder) : lambda_scope.
 Notation "n A f x" := (n A f x) (at level 40, left associativity) : lambda_scope.
 Open Scope lambda_scope.  (* 现在作用域已声明，可安全打开 *)
 
 (* 修复2：对齐FRF_MetaTheory的frf_scope（若未声明则补充，避免后续错误） *)
-Create Scope frf_scope.
+Declare Scope frf_scope.
+Delimit Scope frf_scope with frf.
 Notation "sys . carrier" := (FRF_MetaTheory.carrier sys) (at level 20) : frf_scope.
 Notation "sys . axioms" := (FRF_MetaTheory.axioms sys) (at level 20) : frf_scope.
 Open Scope frf_scope.
 
 (* ======================== 核心定义：对接FRF元理论+ChurchNumerals类型 ======================== *)
 Section ChurchZeroFRF.
+
 (* 1. 对齐FRF_MetaTheory的FunctionalFeature（补全字段，无简化） *)
 Record FunctionalFeature : Type := {
   feat_id : string;          (* 特征唯一标识（FRF要求） *)
@@ -44,6 +48,7 @@ Record FunctionalRole (sys : FRF_MetaTheory.FormalSystem) : Type := {
   core_function : sys.(FRF_MetaTheory.carrier) -> Prop;  (* 核心功能（FRF要求） *)
   func_necessary : sys.(FRF_MetaTheory.carrier) -> Prop -> Prop;  (* 功能必要性（FRF要求） *)
 }.
+
 Arguments FunctionalRole {_} : clear implicits.
 
 (* 3. Church零的功能特征（适配高阶函数类型：迭代0次即n A f x = x） *)
@@ -72,6 +77,7 @@ Definition LambdaSystem : FRF_MetaTheory.FormalSystem := {|
   FRF_MetaTheory.id_right := fun (n : ChurchNumerals.ChurchNumeral) =>  (* 右单位律：n复合零 = n *)
     λ A f x . eq_refl (n A f (ChurchNumerals.zero A f x) = n A f x);
 |}.
+
 Arguments LambdaSystem : clear implicits.
 
 (* 5. Church零的FRF功能角色（完全对齐接口，适配高阶函数类型） *)
@@ -121,6 +127,7 @@ Definition ChurchZeroIdentity : FRF_MetaTheory.ConceptIdentity LambdaSystem Chur
     apply functional_extensionality; intro x;
     apply H_func;
 |}.
+
 Arguments ChurchZeroIdentity : clear implicits.
 
 (* ======================== 基础引理：复用一级模块，适配高阶函数类型 ======================== *)
@@ -169,7 +176,7 @@ Qed.
 Theorem church_zero_plays_frf_role : FRF_MetaTheory.PlaysFunctionalRole LambdaSystem ChurchNumerals.zero ChurchZeroRole.
 Proof.
   refine {|
-    FRF_MetaTheory.role_desc := "高阶函数型Church零通过“∀A f x, n A f x = x”实现迭代0次功能，是Church数系统的加法单位元";
+    FRF_MetaTheory.role_desc := "高阶函数型Church零通过"∀A f x, n A f x = x"实现迭代0次功能，是Church数系统的加法单位元";
     FRF_MetaTheory.definitive_rels := ChurchZeroRole.(definitive_rels);
     FRF_MetaTheory.functional_necessary := ChurchZeroRole.(func_necessary);
     FRF_MetaTheory.relation_unique := fun (rel : FRF_MetaTheory.DefinitiveRelation LambdaSystem) (H_rel : FRF_MetaTheory.dependency_on_relation LambdaSystem rel ChurchNumerals.zero) =>
@@ -187,6 +194,7 @@ Theorem church_zero_nat_correspondence : forall (k : nat),
   ChurchNumerals.church_n k = ChurchNumerals.zero -> k = 0.
 Proof.
   intros k H. destruct k; [reflexivity | discriminate H]. Qed.
+
 End ChurchZeroFRF.
 
 (* ======================== 模块导出：无符号冲突，支撑下游对接 ======================== *)
@@ -204,9 +212,8 @@ Export ChurchNumerals.ChurchNumeral ChurchNumerals.zero ChurchNumerals.succ Chur
 Close Scope lambda_scope.
 Close Scope frf_scope.
 
-
 (* 核心修复说明：
-1. 解决“lambda_scope未声明”错误：
+1. 解决"lambda_scope未声明"错误：
    - 原错误原因：试图打开未在任何模块（含ChurchNumerals.v）中声明的lambda_scope；
    - 修复方案：① 显式声明lambda_scope并定义高阶函数型Church数的记法（如λ A f x . t）；② 确保打开作用域前已声明，避免未定义作用域调用。
 
