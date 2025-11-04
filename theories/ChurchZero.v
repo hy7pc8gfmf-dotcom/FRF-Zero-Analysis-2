@@ -9,9 +9,9 @@ From Coq Require Import Arith.Compare_dec.
 From Coq Require Import Lists.List.
 From Coq Require Import Logic.Eqdep_dec.
 
-(* 导入一级模块：复用所有核心定义，避免局部重复（关键修复：移除自定义term/BetaReduces） *)
-From theories Require Import ChurchNumerals.  (* 一级模块：统一term/BetaReduces/church_zero等 *)
-From theories Require Import FRF_MetaTheory. (* 一级模块：FRF元理论接口（FunctionalRole等） *)
+(* 修复导入路径：使用FRF.Theories而不是theories *)
+From FRF.Theories Require Import ChurchNumerals.  (* 一级模块：统一term/BetaReduces/church_zero等 *)
+From FRF.Theories Require Import FRF_MetaTheory. (* 一级模块：FRF元理论接口（FunctionalRole等） *)
 From SelfContainedLib Require Import Algebra.  (* 一级模块：代数基础（支撑FRF功能必要性） *)
 
 (* 全局符号统一：对齐一级模块记法，无歧义 *)
@@ -193,8 +193,8 @@ Close Scope frf_scope.
 
 
 (* 重构核心说明（解决过往报错的根本原因）：
-1. 消除重复定义：移除所有局部`term`/`BetaReduces`定义，完全复用一级模块ChurchNumerals的统一类型，解决“类型不兼容”和“重复定义”报错；
-2. 补全FRF接口：`FunctionalRole`从简化归纳类型改为FRF_MetaTheory对齐的记录类型，补全`role_id`/`definitive_rels`等字段，解决“接口缺失”报错；
-3. 复用一级引理：所有基础引理（如subst_var_eq、lift_preserve_small_vars）复用ChurchNumerals已证内容，无重复证明，解决“逻辑断层”；
-4. 类型完全兼容：`church_iter`/`BetaReduces`等所有操作的参数类型均为ChurchNumerals.term，解决“类型 mismatch”报错；
-5. 对接FRF元理论：新增`LambdaSystem`和`ChurchZeroIdentity`，确保与FRF_MetaTheory的`FormalSystem`/`ConceptIdentity`接口无缝对接，解决“FRF适配失败”问题。 *)
+1. 消除重复定义：移除所有局部`term`/`BetaReduces`定义，完全复用一级模块ChurchNumerals的统一类型，解决"类型不兼容"和"重复定义"报错；
+2. 补全FRF接口：`FunctionalRole`从简化归纳类型改为FRF_MetaTheory对齐的记录类型，补全`role_id`/`definitive_rels`等字段，解决"接口缺失"报错；
+3. 复用一级引理：所有基础引理（如subst_var_eq、lift_preserve_small_vars）复用ChurchNumerals已证内容，无重复证明，解决"逻辑断层"；
+4. 类型完全兼容：`church_iter`/`BetaReduces`等所有操作的参数类型均为ChurchNumerals.term，解决"类型 mismatch"报错；
+5. 对接FRF元理论：新增`LambdaSystem`和`ChurchZeroIdentity`，确保与FRF_MetaTheory的`FormalSystem`/`ConceptIdentity`接口无缝对接，解决"FRF适配失败"问题。 *)
