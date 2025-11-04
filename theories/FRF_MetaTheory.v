@@ -18,13 +18,14 @@ Require Import SelfContainedLib.Category.
 
 (* ======================== 2. 全局符号统一（无歧义，完全保留原记法，避免冲突） ======================== *)
 Create Scope frf_meta_scope.
+
 Notation "w ∈ [0,1]" := (0 ≤ w ∧ w ≤ 1) (at level 25) : frf_meta_scope.
 Notation "sim(f1, f2)" := (edge_feature_similarity f1 f2) (at level 30) : frf_meta_scope.
 Notation "Core(feat)" := (CoreFeature feat) (at level 20) : frf_meta_scope.
 Notation "Edge(feat, w)" := (EdgeFeature feat w) (at level 20) : frf_meta_scope.
 Notation "S ⊢ obj : role" := (PlaysFunctionalRole S obj role) (at level 50) : frf_meta_scope.
-Notation "sys1 ≡_func sys2" := (func_equiv_criterion sys1 sys2) (at level 45) : frf_meta_scope.
-Notation "rel ⪯ S" := (rel_axiom_dep rel ∈ axioms S) (at level 40) : frf_meta_scope.
+(* 删除有问题的记法：Notation "sys1 ≡_func sys2" := (func_equiv_criterion sys1 sys2) (at level 45) : frf_meta_scope. *)
+(* 删除有问题的记法：Notation "rel ⪯ S" := (rel_axiom_dep rel ∈ axioms S) (at level 40) : frf_meta_scope. *)
 
 (* ======================== 3. 定义前置（形式化完备，`carrier`字段显式可见，解决引用错误） ======================== *)
 (* ### 3.1 基础核心定义（完全保留原结构，确保`carrier`可被下游访问） *)
@@ -147,7 +148,6 @@ Arguments PropertyCategory : clear implicits.
 (* ======================== 5. 打开作用域（放在定义之后） ======================== *)
 Open Scope frf_meta_scope.
 Open Scope R_scope.
-(* Open Scope cs_null_scope. *)  (* 注释掉，避免依赖外部作用域 *)
 
 (* ======================== 6. 证明前置（无逻辑断层，依赖Coq标准库引理，无Mathlib残留） ======================== *)
 (* ### 6.1 功能特征与权重引理（无逻辑变更，仅依赖Coq标准库） *)
@@ -297,7 +297,6 @@ Export PropertyCategory.  (* 导出新定义的PropertyCategory *)
 (* 关闭作用域，避免符号冲突 *)
 Close Scope frf_meta_scope.
 Close Scope R_scope.
-(* Close Scope cs_null_scope. *)  (* 注释掉，避免依赖外部作用域 *)
 
 (* 优化说明：
 1. 依赖替换：全量移除Mathlib依赖，替换为Coq标准库（Logic.FunctionalExtensionality、Strings.String等），无残留；
@@ -307,9 +306,8 @@ Close Scope R_scope.
 3. 移除外部依赖：
    - 移除对FRF_CS_Null_Common的依赖
    - 在模块内部定义PropertyCategory类型
-   - 注释掉对cs_null_scope的打开和关闭
 4. 修复语法错误：
-   - 将打开作用域的命令移到所有定义之后
+   - 注释掉有问题的记法定义（使用了未定义的标识符）
    - 确保所有符号在使用前已定义
 5. 无逻辑变更：所有保留的定义、引理、定理的逻辑、功能、记法完全保留；
 6. 完备性保障：
