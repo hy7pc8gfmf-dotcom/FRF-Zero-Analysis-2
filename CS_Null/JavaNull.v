@@ -3,15 +3,15 @@
    核心优化：1. 补全NPE触发概率=1.0的构造性证明（绑定“方法指针缺失→必抛NPE”语义）；
             2. 新增method_ptr_exists辅助定义，支撑概率量化的逻辑闭环；
             3. 新增java_npe_prob_deriv定理，确保概率推导机械可证；
-   依赖约束：仅依赖一级基础模块，无循环依赖，全量保留原功能；
-   适配环境：Coq 8.18.0 + Mathlib 3.74.0 *)
+   依赖约束：仅依赖一级基础模块与Coq标准库，无Mathlib依赖/循环依赖，全量保留原功能；
+   适配环境：Coq 8.18.0（无Mathlib依赖） *)
 Require Import FRF_CS_Null_Common.      (* 一级基础层：统一空值基础定义 *)
 Require Import FRF_MetaTheory.         (* 一级基础层：FRF元理论接口 *)
-Require Import Mathlib.Logic.FunctionalExtensionality. (* 显式导入：支撑函数外延性证明 *)
+Require Import Coq.Logic.FunctionalExtensionality. (* 替换Mathlib为Coq标准库公理 *)
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Reflection.TypeDec.
-Require Import Coq.Reals.Reals.        (* 支撑概率量化 *)
+Require Import Coq.Reals.Reals.        (* 支撑概率量化，Coq标准库模块 *)
 Local Require Import Coq.Numbers.NatInt.
 
 (* ======================== 核心定义（前置无依赖，补充量化支撑定义，对接公共模块） ======================== *)
@@ -333,10 +333,3 @@ Open Scope java_null_scope.
 Open Scope cs_null_scope.
 Open Scope frf_scope.
 Open Scope R_scope.
-
-(* 重构验证标准：
-1. 形式化完备：NPE概率1.0通过“方法指针缺失→必抛NPE”构造性推导，每步可机械执行；
-2. 逻辑完备：覆盖“方法指针判定→调用结果→概率量化”全链条，无隐含假设；
-3. 证明完备：新增定理java_npe_prob_deriv无Admitted，依赖均为已证引理；
-4. 功能全保留：原核心定理均成立，新增定义/定理不影响现有逻辑；
-5. 无冗余冲突：符号统一，无重复定义，与FRF_CS_Null_Common无缝对接。 *)

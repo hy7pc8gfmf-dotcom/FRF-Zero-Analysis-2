@@ -3,7 +3,6 @@
    修复核心：1. 解决"nat有类型Set但期望类型nat"的解析错误；2. 确保与Coq 8.18.0兼容，无导入路径错误
    依赖约束：仅依赖Coq标准库，无循环依赖，不新增/删减功能 *)
 From Coq Require Import Utf8.
-Require Import Coq.Arith.Nat.  (* 精准导入Nat模块，明确nat类型定义，避免解析为Set *)
 Open Scope nat_scope.  (* 确保nat相关运算与类型解析一致 *)
 
 (* ======================== 核心定义（前置无依赖，功能全保留，仅修复类型解析） ======================== *)
