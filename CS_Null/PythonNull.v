@@ -3,17 +3,17 @@
    重构核心：1. 对齐公共模块记法：删除自定义`None[ T ]`，统一使用`null[PythonSys][T]`（源自FRF_CS_Null_Common.v）
             2. 消除记法冗余：移除模块内冲突记法定义，严格依赖公共模块`cs_null_scope`
             3. 适配公共接口：`PythonNoneIdentity`对接`cross_system_null`，确保概念身份定义统一
-            4. 全量功能保留：核心操作（属性访问/调用/运算）逻辑不变，仅更新记法与依赖引用
-   依赖约束：一级基础层（FRF_CS_Null_Common/FRF_MetaTheory/Mathlib）→ 本模块，无循环依赖
-   适配环境：Coq 8.18.0 + Mathlib 3.74.0 *)
+            4. 全量功能保留：核心操作（属性访问/调用/运算）逻辑不变，仅更新依赖为Coq标准库
+   依赖约束：一级基础层（FRF_CS_Null_Common/FRF_MetaTheory/Coq标准库）→ 本模块，无循环依赖
+   适配环境：Coq 8.18.0（无Mathlib依赖） *)
 Require Import FRF_CS_Null_Common.      (* 一级基础层：统一空值记法`null[sys][T]`与基础定义 *)
 Require Import FRF_MetaTheory.         (* 一级基础层：FRF元理论接口（FunctionalRole/ConceptIdentity） *)
-Require Import Mathlib.Logic.FunctionalExtensionality. (* 显式导入必要公理，标注依赖 *)
-Require Import Mathlib.Strings.String.
-Require Import Mathlib.Lists.List.
-Require Import Mathlib.Reflection.TypeDec.  (* 一级基础层：类型判定基础 *)
-(* 局部导入：仅类型转换辅助使用，避免全局冗余 *)
-Local Require Import Mathlib.Numbers.NatInt.
+Require Import Coq.Logic.FunctionalExtensionality. (* 替换Mathlib为Coq标准库公理 *)
+Require Import Coq.Strings.String.      (* 替换Mathlib为Coq标准库字符串模块 *)
+Require Import Coq.Lists.List.         (* 替换Mathlib为Coq标准库列表模块 *)
+Require Import Coq.Reflection.TypeDec.  (* 替换Mathlib为Coq标准库类型判定模块 *)
+(* 局部导入：仅类型转换辅助使用，避免全局冗余，替换Mathlib为Coq标准库 *)
+Local Require Import Coq.Numbers.NatInt.
 
 (* ======================== 1. 全局符号统一（严格对接公共模块，无自定义记法） ======================== *)
 (* 激活公共模块作用域：确保`null[sys][T]`记法生效，删除模块内自定义`None[ T ]`记法 *)
@@ -77,11 +77,11 @@ Definition PythonNoneIdentity (T : CSValueType) : FRF_MetaTheory.ConceptIdentity
 |}.
 Arguments PythonNoneIdentity {_} : clear implicits.
 
-(* ======================== 3. 核心操作（机械可执行，仅更新空值记法，功能全保留） ======================== *)
+(* ======================== 3. 核心操作（机械可执行，仅更新依赖，功能全保留） ======================== *)
 (* 3.1 Python属性访问（`null[PythonSys][T]`访问属性抛错，逻辑不变） *)
 Definition python_get_attr (val : PythonValue) (attr : string) : PythonNullOpResult :=
   match val with
-  | PythonNoneVal => PythonOpError (AttributeError ("'NoneType' object has no attribute '" ++ attr ++ "'")) (* 重构：使用`PythonNoneVal`对应`null[PythonSys][T]` *)
+  | PythonNoneVal => PythonOpError (AttributeError ("'NoneType' object has no attribute '" ++ attr ++ "'")) (* 对应`null[PythonSys][T]` *)
   | PythonObjVal _ attrs => 
     match find (fun (a : string × PythonValue) => fst a = attr) attrs with
     | Some (_, v) => PythonOpSuccess v
@@ -94,7 +94,7 @@ Arguments python_get_attr _ _ : clear implicits.
 (* 3.2 Python函数调用（`null[PythonSys][T]`调用抛错，逻辑不变） *)
 Definition python_call (val : PythonValue) (args : list PythonValue) : PythonNullOpResult :=
   match val with
-  | PythonNoneVal => PythonOpError (CallError ("'NoneType' object is not callable")) (* 重构：使用`PythonNoneVal`对应`null[PythonSys][T]` *)
+  | PythonNoneVal => PythonOpError (CallError ("'NoneType' object is not callable")) (* 对应`null[PythonSys][T]` *)
   | PythonObjVal "function" attrs => 
     PythonOpSuccess (PythonIntVal 42) (* 简化模型：函数对象返回固定结果 *)
   | _ => PythonOpError (CallError ("'non-function' object is not callable"))
@@ -104,7 +104,7 @@ Arguments python_call _ _ : clear implicits.
 (* 3.3 Python动态类型判定（对接`null[PythonSys][T]`，逻辑不变） *)
 Definition python_type_of (val : PythonValue) : string :=
   match val with
-  | PythonNoneVal => "NoneType" (* 重构：`null[PythonSys][T]`对应类型字符串 *)
+  | PythonNoneVal => "NoneType" (* `null[PythonSys][T]`对应类型字符串 *)
   | PythonIntVal _ => "int"
   | PythonStrVal _ => "str"
   | PythonListVal _ => "list"
@@ -112,7 +112,7 @@ Definition python_type_of (val : PythonValue) : string :=
   end.
 Arguments python_type_of _ : clear implicits.
 
-(* 3.4 Python空值判定（重构核心：判定`null[PythonSys][T]`对应的`PythonNoneVal`，无歧义） *)
+(* 3.4 Python空值判定（判定`null[PythonSys][T]`对应的`PythonNoneVal`，无歧义） *)
 Definition python_is_none (val : PythonValue) : bool :=
   match val with
   | PythonNoneVal => true (* 仅`PythonNoneVal`对应`null[PythonSys][T]`，判定唯一 *)
@@ -133,8 +133,8 @@ Definition python_binary_op (op : string) (v1 v2 : PythonValue) : PythonNullOpRe
   end.
 Arguments python_binary_op _ _ _ : clear implicits.
 
-(* ======================== 4. 前置引理（证明前置，无逻辑断层，依赖统一记法） ======================== *)
-(* 4.1 `null[PythonSys][T]`访问属性必抛AttributeError（重构：引用统一记法对应的`PythonNoneVal`） *)
+(* ======================== 4. 前置引理（证明前置，无逻辑断层，依赖Coq标准库） ======================== *)
+(* 4.1 `null[PythonSys][T]`访问属性必抛AttributeError（引用统一记法对应的`PythonNoneVal`） *)
 Lemma python_none_attr_error : ∀ (attr : string),
   python_get_attr PythonNoneVal attr = PythonOpError (AttributeError ("'NoneType' object has no attribute '" ++ attr ++ "'")).
 Proof.
@@ -142,7 +142,7 @@ Proof.
   reflexivity.
 Qed.
 
-(* 4.2 `null[PythonSys][T]`调用必抛CallError（重构：引用统一记法对应的`PythonNoneVal`） *)
+(* 4.2 `null[PythonSys][T]`调用必抛CallError（引用统一记法对应的`PythonNoneVal`） *)
 Lemma python_none_call_error : ∀ (args : list PythonValue),
   python_call PythonNoneVal args = PythonOpError (CallError ("'NoneType' object is not callable")).
 Proof.
@@ -150,7 +150,7 @@ Proof.
   reflexivity.
 Qed.
 
-(* 4.3 `null[PythonSys][T]`参与运算必抛TypeError（重构：覆盖所有`PythonNoneVal`参与的运算场景） *)
+(* 4.3 `null[PythonSys][T]`参与运算必抛TypeError（覆盖所有`PythonNoneVal`参与的运算场景） *)
 Lemma python_none_op_error : ∀ (op : string) (v : PythonValue),
   python_binary_op op PythonNoneVal v = PythonOpError (TypeError ("unsupported operand type(s) for " ++ op ++ ": 'NoneType' and '" ++ python_type_of v ++ "'")) ∧
   python_binary_op op v PythonNoneVal = PythonOpError (TypeError ("unsupported operand type(s) for " ++ op ++ ": '" ++ python_type_of v ++ "' and 'NoneType'")).
@@ -159,7 +159,7 @@ Proof.
   split; reflexivity.
 Qed.
 
-(* 4.4 `null[PythonSys][T]`的唯一性（重构：基于`PythonNoneVal`，依赖公共模块`null_equiv_unique`） *)
+(* 4.4 `null[PythonSys][T]`的唯一性（基于`PythonNoneVal`，依赖公共模块`null_equiv_unique`） *)
 Lemma python_none_unique : ∀ (v1 v2 : PythonValue),
   python_is_none v1 = true ∧ python_is_none v2 = true → v1 = v2.
 Proof.
@@ -178,7 +178,7 @@ Proof.
   - exfalso; contradiction H1. (* v1为非空值：与`H1`矛盾 *)
 Qed.
 
-(* 4.5 `null[PythonSys][T]`的类型无关性（重构：对接公共模块`cross_system_null`，显式依赖） *)
+(* 4.5 `null[PythonSys][T]`的类型无关性（对接公共模块`cross_system_null`，显式依赖） *)
 Lemma python_none_type_agnostic : ∀ (v : PythonValue) (T : CSValueType),
   python_is_none v → null[PythonSys][T] = (T, v).
 Proof.
@@ -187,7 +187,7 @@ Proof.
   - reflexivity. (* `null[PythonSys][T]` = (T, PythonNoneVal)：等式成立 *)
 Qed.
 
-(* ======================== 5. 核心定理（形式化/逻辑/证明三重完备，依赖统一记法） ======================== *)
+(* ======================== 5. 核心定理（形式化/逻辑/证明三重完备，依赖Coq标准库） ======================== *)
 (* 5.1 `null[PythonSys][T]`扮演动态空值角色（FRF角色验证，对接公共模块功能角色） *)
 Theorem python_none_plays_dyn_role : ∀ (T : CSValueType),
   FRF_MetaTheory.PlaysFunctionalRole PythonFRFSystem (null[PythonSys][T]) (CS_Null_FunctionalRole PythonNullSystem).
@@ -265,15 +265,7 @@ Export python_none_attr_error python_none_call_error python_none_op_error.
 Export python_none_unique python_none_type_agnostic python_none_plays_dyn_role.
 Export python_none_identity_unique python_none_no_compile_check.
 Export python_none_errors_predictable PythonNullSystem PythonFRFSystem PythonNoneIdentity.
-
 (* 锁定作用域：确保下游模块引用`null[PythonSys][T]`无歧义 *)
 Close Scope cs_null_scope.
 Close Scope frf_scope.
 Close Scope string_scope.
-
-(* ======================== 重构验证标准（严苛级） ======================== *)
-(* 1. 记法统一：无自定义`None[ T ]`，全模块使用`null[PythonSys][T]`，与FRF_CS_Null_Common.v完全对齐 *)
-(* 2. 编译合规：`coqc CS_Null/PythonNull.v`无“未定义记法”“符号重定义”警告 *)
-(* 3. 形式化完备：所有推导依赖公共模块已证定义/引理（如`cross_system_null`），无自然语言模糊表述 *)
-(* 4. 功能全保留：核心操作（属性访问/调用/运算）行为与重构前一致，仅记法更新 *)
-(* 5. 逻辑透明：`Print Assumptions python_none_identity_unique`仅含显式导入公理（Funext等） *)
