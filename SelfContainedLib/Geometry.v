@@ -11,18 +11,20 @@ Module Type BasicGeometry.
 End BasicGeometry.
 
 Module DiscreteGeometry <: BasicGeometry.
-  Definition Point := nat * nat.
+  (* 使用显式类型注释避免解析歧义 *)
+  Definition Point : Type := prod nat nat.
   
   Definition distance (p q : Point) : nat :=
-    let (x1, y1) := p in
-    let (x2, y2) := q in
-    Nat.max (Nat.abs (Nat.sub x2 x1)) (Nat.abs (Nat.sub y2 y1)).
+    match p, q with
+    | (x1, y1), (x2, y2) =>
+        Nat.max (Nat.abs (x2 - x1)) (Nat.abs (y2 - y1))
+    end.
     
   Definition collinear (p q r : Point) : Prop :=
-    let (x1, y1) := p in
-    let (x2, y2) := q in
-    let (x3, y3) := r in
-    Nat.mul (Nat.sub x2 x1) (Nat.sub y3 y1) = Nat.mul (Nat.sub x3 x1) (Nat.sub y2 y1).
+    match p, q, r with
+    | (x1, y1), (x2, y2), (x3, y3) =>
+        (x2 - x1) * (y3 - y1) = (x3 - x1) * (y2 - y1)
+    end.
 End DiscreteGeometry.
 
 (* ======================== 验证定理 ======================== *)
