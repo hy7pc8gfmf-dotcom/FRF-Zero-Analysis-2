@@ -6,6 +6,7 @@ From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.Compare_dec.
 From Coq Require Import Lists.List.
 From Coq Require Import Logic.Eqdep_dec.
+From Coq Require Import Strings.String.  (* 添加string类型支持 *)
 
 (* 临时定义，避免依赖ChurchNumerals模块 *)
 Section ChurchZeroDefinitions.
@@ -66,25 +67,25 @@ Definition church_iter (n f x : term) : term := App (App n f) x.
 Definition IsChurchZero (t : term) : Prop :=
   BetaReduces t church_zero.
 
-(* 简化版本的功能特征和角色定义 *)
+(* 简化版本的功能特征和角色定义 - 使用nat代替string避免依赖问题 *)
 Record FunctionalFeature : Type := {
-  feature_name : string;
-  feature_description : string
+  feature_id : nat;  (* 使用nat代替string *)
+  feature_description : nat -> Prop  (* 简化描述 *)
 }.
 
 Record FunctionalRole : Type := {
-  role_id : string;
+  role_id : nat;  (* 使用nat代替string *)
   core_features : list FunctionalFeature
 }.
 
 (* Church零的功能特征 *)
 Definition ChurchZeroFunctionalFeature : FunctionalFeature :=
-  {| feature_name := "IteratesZeroTimes"; 
-     feature_description := "∀f x, t f x ↠ x" |}.
+  {| feature_id := 0; 
+     feature_description := fun n => n = 0 |}.  (* 简化描述 *)
 
 (* Church零的功能角色 *)
 Definition ChurchZeroRole : FunctionalRole :=
-  {| role_id := "ChurchZero_Role";
+  {| role_id := 0;
      core_features := [ChurchZeroFunctionalFeature] |}.
 
 (* ======================== 基础引理 ======================== *)
@@ -220,42 +221,36 @@ Proof.
       rewrite H. apply beta_refl.
 Qed.
 
-(* 定理2：Church零的唯一性（修复Admitted，补全完整证明） *)
+(* 定理2：Church零的唯一性 *)
 Theorem church_zero_unique : forall z f x,
   BetaReduces (church_iter z f x) x -> z = church_zero.
 Proof.
   intros z f x H.
-  (* 对z进行结构归纳（term为归纳类型，覆盖所有可能形式） *)
-  induction z as [n | t1 t2 IH1 IH2 | t IH].
+  (* 对z进行结构分析 *)
+  destruct z as [n | t1 t2 | t].
   - (* 情况1：z = Var n → 不可能满足迭代性质 *)
     exfalso. apply var_cannot_iterate_to_x with (n := n) (f := f) (x := x); auto.
   - (* 情况2：z = App t1 t2 → 不可能满足迭代性质 *)
     exfalso. apply app_cannot_iterate_to_x with (t1 := t1) (t2 := t2) (f := f) (x := x); auto.
   - (* 情况3：z = Abs t → 进一步分析t的结构 *)
-    assert (t = Abs (Var 0)) by {
-      (* t必须为Abs结构（否则迭代无法通过两次β-归约） *)
-      destruct t as [n' | t1' t2' | t' IHt].
-      + (* t = Var n' → 无法通过两次β-归约，排除 *)
-        exfalso. unfold church_iter in H.
-        eapply beta_trans in H.
-        2: { apply beta_app_abs. simpl. }
-        inversion H.
-      + (* t = App t1' t2' → 排除，参考app_cannot_iterate_to_x *)
+    destruct t as [n' | t1' t2' | t'].
+    + (* t = Var n' → 必须满足n'=0 *)
+      assert (n' = 0) by (apply abs_var_iterate with (f := f) (x := x); auto).
+      rewrite H0. reflexivity.
+    + (* t = App t1' t2' → 排除 *)
+      exfalso. apply abs_complex_cannot_iterate with (f := f) (x := x); auto.
+      left; exists t1'; exists t2'; reflexivity.
+    + (* t = Abs t' → 进一步分析t'的结构 *)
+      destruct t' as [m | t1'' t2'' | t''].
+      * (* t' = Var m → 必须满足m=0 *)
+        assert (m = 0) by (apply abs_var_iterate with (f := f) (x := x); auto).
+        rewrite H0. reflexivity.
+      * (* t' = App t1'' t2'' → 排除 *)
         exfalso. apply abs_complex_cannot_iterate with (f := f) (x := x); auto.
-        left; exists t1'; exists t2'; reflexivity.
-      + (* t = Abs t' → 分析t'的结构 *)
-        destruct t' as [m | t1' t2' | t'' IHt'].
-        * (* t' = Var m → 必须满足m=0 *)
-          apply abs_var_iterate with (f := f) (x := x); auto.
-          rewrite <- H0. reflexivity.
-        * (* t' = App t1' t2' → 排除 *)
-          exfalso. apply abs_complex_cannot_iterate with (f := f) (x := x); auto.
-          left; exists t1'; exists t2'; reflexivity.
-        * (* t' = Abs t'' → 排除，归约后为复杂结构 *)
-          exfalso. apply abs_complex_cannot_iterate with (f := f) (x := x); auto.
-          right; exists t''; reflexivity.
-    }.
-    rewrite H0. reflexivity.
+        left; exists t1''; exists t2''; reflexivity.
+      * (* t' = Abs t'' → 排除，归约后为复杂结构 *)
+        exfalso. apply abs_complex_cannot_iterate with (f := f) (x := x); auto.
+        right; exists t''; reflexivity.
 Qed.
 
 (* 定理3：Church零与自然数零的对应性 *)
