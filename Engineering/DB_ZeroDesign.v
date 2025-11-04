@@ -1,19 +1,40 @@
 (* # Engineering/DB_ZeroDesign.v *)
-(* 模块定位：FRF框架工程实践层案例核心（三级集成层），基于零概念驱动设计（ZDD）方法论落地分布式数据库空值设计，将数据库空值映射为集合论空集vn_zero，覆盖空值全生命周期操作与并发同步，无循环依赖
-   核心优化：1. 解决类型安全性问题（显式公理转换）；2. 完善错误处理（Option类型替代False_ind）；3. 优化性能（索引+批量同步）；4. 提升证明可读性（拆分长证明+有意义命名）
-   依赖约束：一级基础层（FRF_MetaTheory/SelfContainedLib/CaseA_SetTheory）+ 工程实践层（ZDD_Methodology.v）；适配Coq 8.18.0 + Mathlib 3.74.0 *)
+(* 模块定位：FRF框架工程实践层案例核心（三级集成层），基于零概念驱动设计（ZDD）方法论落地分布式数据库空值设计，将数据库空值映射为集合论空集vn_zero，覆盖空值全生命周期操作与并发同步，无循环依赖 *)
+(* 核心优化：1. 解决类型安全性问题（显式公理转换）；2. 完善错误处理（Option类型替代False_ind）；3. 优化性能（索引+批量同步）；4. 提升证明可读性（拆分长证明+有意义命名）；5. 替换所有Mathlib依赖为Coq标准库 *)
+(* 依赖约束：一级基础层（FRF_MetaTheory/SelfContainedLib/CaseA_SetTheory）+ 工程实践层（ZDD_Methodology.v）；适配Coq 8.18.0（无Mathlib依赖） *)
 Require Import FRF_MetaTheory.
 Require Import FRF_CS_Null_Common.
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
 Require Import CaseA_SetTheory.
 Require Import Engineering.ZDD_Methodology.
-Require Import Mathlib.Lists.List.
-Require Import Mathlib.Logic.FunctionalExtensionality.
-Require Import Mathlib.Strings.String.
-Require Import Mathlib.Reals.Reals.
-Require Import Mathlib.Parallel.ParList.
-Require Import Mathlib.Data.Map.Basic. (* 新增：支撑索引优化 *)
+Require Import Coq.Lists.List.
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Strings.String.
+Require Import Coq.Reals.Reals.
+
+(* ======================== 基础工具补全（基于Coq标准库，替代Mathlib.Map与ParList） ======================== *)
+(* 基于列表的Map模拟（替代Mathlib.Data.Map.Basic，保持接口一致） *)
+Definition Map (K V : Type) : Type := list (K * V).
+Arguments Map {_ _} : clear implicits.
+
+(* Map空值 *)
+Definition Map_empty {K V : Type} : Map K V := [].
+
+(* 列表转Map（替代Mathlib.Data.Map.map_of_list） *)
+Definition map_of_list {K V : Type} (l : list (K * V)) : Map K V := l.
+
+(* Map查找（替代Mathlib.Data.Map.map_lookup） *)
+Definition map_lookup {K V : Type} (m : Map K V) (k : K) : option V :=
+  find (fun p => fst p = k) m.
+
+(* Map合并（替代Mathlib.Data.Map.map_union） *)
+Definition map_union {K V : Type} (m1 m2 : Map K V) : Map K V :=
+  fold_left (fun acc p => if existsb (fun p' => fst p' = fst p) acc then acc else p :: acc) m2 m1.
+
+(* Map相等判定（支撑原证明逻辑） *)
+Definition map_eq {K V : Type} (m1 m2 : Map K V) : Prop :=
+  ∀ k, map_lookup m1 k = map_lookup m2 k.
 
 (* ======================== 全局符号统一（对齐ZDD框架与数据库场景，无歧义） ======================== *)
 Notation "DB⟨0⟩" := (ZDD_Metadata_DistDB.(zdd_zero)) (at level 20) : db_scope.
@@ -52,13 +73,13 @@ Arguments DB_Row : clear implicits.
 Record DB_Table : Type := {
   table_name : string;          (* 表名（唯一） *)
   table_cols : list string;      (* 列名列表（非空） *)
-  table_col_idx : Map string nat; (* 列名→索引映射，优化列查找性能 *)
+  table_col_idx : Map string nat; (* 列名→索引映射，优化列查找性能（基于列表模拟） *)
   table_rows : list DB_Row;     (* 行数据（含空值行） *)
-  table_row_idx : Map string DB_Row; (* 行ID→行映射，优化行查找性能 *)
+  table_row_idx : Map string DB_Row; (* 行ID→行映射，优化行查找性能（基于列表模拟） *)
   table_valid : table_name ≠ "" ∧ 
                 table_cols ≠ [] ∧
-                map_of_list (combine table_cols (seq 0 (length table_cols))) = table_col_idx ∧ (* 索引与列名一致 *)
-                map_of_list (combine (map (fun r => r.(row_id)) table_rows) table_rows) = table_row_idx ∧ (* 行索引与行数据一致 *)
+                map_eq (map_of_list (combine table_cols (seq 0 (length table_cols))) ) table_col_idx ∧ (* 索引与列名一致 *)
+                map_eq (map_of_list (combine (map (fun r => r.(row_id)) table_rows) table_rows) table_row_idx ∧ (* 行索引与行数据一致 *)
                 (∀ r1 r2 ∈ table_rows, r1.(row_id) = r2.(row_id) → r1 = r2); (* 行ID唯一 *)
 }.
 Arguments DB_Table : clear implicits.
@@ -67,7 +88,7 @@ Arguments DB_Table : clear implicits.
 Record DistributedDB : Type := {
   db_nodes : list string;              (* 分布式节点ID列表（非空） *)
   db_tables : list DB_Table;           (* 数据库表集合（支持多表） *)
-  db_table_idx : Map string DB_Table;  (* 表名→表映射，优化表查找性能 *)
+  db_table_idx : Map string DB_Table;  (* 表名→表映射，优化表查找性能（基于列表模拟） *)
   db_sync_queue : list (string * string * list string); (* 同步任务队列：(源节点,表名,空值列) *)
   db_consistent : ∀ (t : DB_Table) (n1 n2 ∈ db_nodes), 
                   table_row_idx t = table_row_idx (replicate_table n1 t); (* 节点间数据一致 *)
@@ -87,7 +108,7 @@ Definition db_table_safe (db : DistributedDB) (tname : string) : option DB_Table
 Definition table_row_safe (t : DB_Table) (rid : string) : option DB_Row :=
   map_lookup t.(table_row_idx) rid.
 
-(* ### 4. 核心操作（性能优化+错误处理完善）
+(* ### 4. 核心操作（性能优化+错误处理完善） *)
 (* 4.1 行空值判定（基于索引，O(1)查询） *)
 Definition row_null_at (row : DB_Row) (col : string) : Prop :=
   In col row.(row_null_cols).
@@ -161,7 +182,7 @@ Definition DB_System : FRF_MetaTheory.FormalSystem := {|
       table_cols := ["id", "value"];
       table_col_idx := map_of_list (combine ["id", "value"] [0, 1]);
       table_rows := [];
-      table_row_idx := Map.empty;
+      table_row_idx := Map_empty;
       table_valid := conj (eq_refl) (conj (eq_refl) (conj (eq_refl) (conj (eq_refl) (fun _ _ _ _ _ => eq_refl))));
     |}];
     db_table_idx := map_of_list (combine ["default_table"] [{|
@@ -169,7 +190,7 @@ Definition DB_System : FRF_MetaTheory.FormalSystem := {|
       table_cols := ["id", "value"];
       table_col_idx := map_of_list (combine ["id", "value"] [0, 1]);
       table_rows := [];
-      table_row_idx := Map.empty;
+      table_row_idx := Map_empty;
       table_valid := conj (eq_refl) (conj (eq_refl) (conj (eq_refl) (conj (eq_refl) (fun _ _ _ _ _ => eq_refl))));
     |}]);
     db_sync_queue := [];
@@ -179,7 +200,7 @@ Definition DB_System : FRF_MetaTheory.FormalSystem := {|
       table_cols := ["id", "value"];
       table_col_idx := map_of_list (combine ["id", "value"] [0, 1]);
       table_rows := [];
-      table_row_idx := Map.empty;
+      table_row_idx := Map_empty;
       table_valid := conj (eq_refl) (conj (eq_refl) (conj (eq_refl) (conj (eq_refl) (fun _ _ _ _ _ => eq_refl))));
     |}];
     db_non_empty := conj (eq_refl) (eq_refl);
@@ -191,7 +212,24 @@ Definition DB_System : FRF_MetaTheory.FormalSystem := {|
 
 (* ======================== 证明前置（无逻辑断层，依赖均为已证定理） ======================== *)
 (* ### 1. 基础工具引理（支撑核心操作正确性） *)
-(* 1.1 空值列索引一致性引理（确保row_null_cols与row_cols匹配） *)
+(* 1.1 Map相等引理（支撑索引一致性证明） *)
+Lemma map_of_list_in {K V : Type} (l : list (K * V)) (k : K) (v : V) :
+  In (k, v) l ↔ map_lookup (map_of_list l) k = Some v.
+Proof.
+  intros. split; intros H.
+  - induction l as [|(k' v') l' IH]; simpl.
+    + contradiction.
+    + destruct H as [H_eq | H_in].
+      * rewrite H_eq. reflexivity.
+      * apply IH in H_in. apply H_in.
+  - induction l as [|(k' v') l' IH]; simpl.
+    + contradiction.
+    + destruct H as [H_eq | H_in].
+      * rewrite H_eq. left; reflexivity.
+      * apply IH in H_in. right; apply H_in.
+Qed.
+
+(* 1.2 空值列索引一致性引理（确保row_null_cols与row_cols匹配） *)
 Lemma row_null_idx_consistent : ∀ (row : DB_Row),
   row.(row_valid) →
   ∀ (c : string * FRF_MetaTheory.carrier CaseA_SetTheory.SetSystem),
@@ -206,16 +244,18 @@ Proof.
   - apply H_in in H_eq; auto.
 Qed.
 
-(* 1.2 安全表查询完整性引理（确保存在的表能被正确查询） *)
+(* 1.3 安全表查询完整性引理（确保存在的表能被正确查询） *)
 Lemma db_table_safe_complete : ∀ (db : DistributedDB) (t : DB_Table),
   In t db.(db_tables) →
   db_table_safe db t.(table_name) = Some t.
 Proof.
   intros db t H_in.
-  destruct db.(db_valid) as [tname_ok cols_ok col_idx_ok row_idx_ok id_unique].
-  apply map_of_list_in in H_in.
-  rewrite col_idx_ok, row_idx_ok.
-  apply map_lookup_some; auto.
+  unfold db_table_safe.
+  destruct db.(db_table_idx) as [|(tname' t') idx']; simpl.
+  - contradiction.
+  - destruct H_in as [H_eq | H_in'].
+    + rewrite H_eq. reflexivity.
+    + apply map_of_list_in in H_in'. apply H_in'.
 Qed.
 
 (* ### 2. 性能优化引理（支撑优化后操作的正确性） *)
@@ -313,7 +353,7 @@ Proof.
     + split.
       * exact col_idx_ok. (* 列索引一致 *)
       * split.
-        -- apply map_union_eq; auto. (* 行索引一致 *)
+        -- apply map_eq; auto. (* 行索引一致 *)
         -- apply table_insert_null_batch_id_unique; auto. (* 行ID唯一 *)
 Qed.
 
@@ -358,15 +398,9 @@ Export DB_Null_Requirement DB_System.
 Export row_null_idx_consistent db_table_safe_complete table_insert_null_batch_id_unique.
 Export db_null_zdd_valid table_insert_null_batch_valid db_sync_null_batch_consistent.
 Export null_query_disjoint_non_null.
+Export Map Map_empty map_of_list map_lookup map_union map_eq.
+
 Close Scope db_scope.
 Close Scope zdd_scope.
 Close Scope frf_scope.
 Close Scope cs_null_scope.
-
-(* 优化说明：
-1. 类型安全：通过axiom_cast显式转换公理，消除类型冲突风险，对接CaseA与FRF元理论；
-2. 错误处理：用Option类型实现安全查询，避免False_ind崩溃，提供完整的错误分支处理；
-3. 性能优化：新增列/行/表索引，空值查询从O(n)优化为O(1)；批量插入/同步减少冗余校验，支撑大规模数据；
-4. 证明可读性：拆分长证明为独立引理，使用有意义命名，避免嵌套split，每步证明均有明确依据；
-5. 兼容性：全量保留原核心功能与定理，无破坏性修改，与ZDD_Methodology.v、CaseA_SetTheory.v无缝对接；
-6. 逻辑完备：覆盖索引一致性、安全查询完整性、批量操作正确性等新增场景，无遗漏。 *)
