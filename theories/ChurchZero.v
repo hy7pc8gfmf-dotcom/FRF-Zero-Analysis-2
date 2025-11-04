@@ -1,4 +1,4 @@
-# theories/ChurchZero.v（修复作用域+类型对齐版）
+(* theories/ChurchZero.v（修复作用域+类型对齐版） *)
 (* 模块定位：FRF元理论层核心模块（Level 2），聚焦Church零的"功能唯一性"验证  
    核心修复：1. 移除未声明的lambda_scope；2. 对齐ChurchNumerals.v的高阶函数类型；3. 补全必要记法声明  
    依赖约束：一级基础层（ChurchNumerals/FRF_MetaTheory/SelfContainedLib），无循环依赖，编译通过 *)
