@@ -15,16 +15,7 @@ Inductive term : Type :=
 | App (t1 t2 : term)
 | Abs (t : term).
 
-(* β-归约关系 *)
-Inductive BetaReduces : term -> term -> Prop :=
-| beta_refl : forall t, BetaReduces t t
-| beta_trans : forall t u v, BetaReduces t u -> BetaReduces u v -> BetaReduces t v
-| beta_app_abs : forall t u, BetaReduces (App (Abs t) u) (subst t u 0)
-| beta_app_l : forall t t' u, BetaReduces t t' -> BetaReduces (App t u) (App t' u)
-| beta_app_r : forall t u u', BetaReduces u u' -> BetaReduces (App t u) (App t u')
-| beta_abs : forall t t', BetaReduces t t' -> BetaReduces (Abs t) (Abs t').
-
-(* 基础函数定义 *)
+(* 基础函数定义（提前于BetaReduces定义，解决subst未定义问题） *)
 Fixpoint lift (t : term) (k : nat) : term :=
   match t with
   | Var n => if le_gt_dec k n then Var (S n) else Var n
@@ -43,6 +34,15 @@ Fixpoint subst (t : term) (u : term) (k : nat) : term :=
   | App t1 t2 => App (subst t1 u k) (subst t2 u k)
   | Abs t' => Abs (subst t' (lift u 0) (S k))
   end.
+
+(* β-归约关系（subst已提前定义，可正常引用） *)
+Inductive BetaReduces : term -> term -> Prop :=
+| beta_refl : forall t, BetaReduces t t
+| beta_trans : forall t u v, BetaReduces t u -> BetaReduces u v -> BetaReduces t v
+| beta_app_abs : forall t u, BetaReduces (App (Abs t) u) (subst t u 0)
+| beta_app_l : forall t t' u, BetaReduces t t' -> BetaReduces (App t u) (App t' u)
+| beta_app_r : forall t u u', BetaReduces u u' -> BetaReduces (App t u) (App t u')
+| beta_abs : forall t t', BetaReduces t t' -> BetaReduces (Abs t) (Abs t').
 
 (* Church零定义 *)
 Definition church_zero : term := Abs (Abs (Var 0)).
@@ -151,10 +151,10 @@ Proof.
 Qed.
 
 (* 引理4：Abs内部为Var时的归约性质 *)
-Lemma abs_var_iterate : forall (m n f x : term),
+Lemma abs_var_iterate : forall (m f x : term),
   BetaReduces (church_iter (Abs (Abs (Var m)) f x) x) x -> m = 0.
 Proof.
-  intros m n f x H. unfold church_iter in H.
+  intros m f x H. unfold church_iter in H.
   (* 展开两次β-归约 *)
   eapply beta_trans in H.
   2: { (* 构造标准归约路径 *)
