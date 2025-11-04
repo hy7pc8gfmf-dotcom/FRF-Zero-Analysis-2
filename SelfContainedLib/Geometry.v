@@ -19,11 +19,19 @@ Definition get_y (p : Point) : nat :=
   | point _ y => y
   end.
 
-(* 绝对值差函数 - 融合版本 *)
+(* 自然数小于等于比较 *)
+Fixpoint leb (n m : nat) : bool :=
+  match n, m with
+  | O, _ => true
+  | S _, O => false
+  | S n', S m' => leb n' m'
+  end.
+
+(* 绝对值差函数 *)
 Definition abs_diff (a b : nat) : nat :=
   if leb a b then b - a else a - b.
 
-(* 最大值函数 - 融合版本 *)
+(* 最大值函数 *)
 Definition max (a b : nat) : nat :=
   if leb a b then b else a.
 
@@ -37,7 +45,7 @@ Definition distance (p q : Point) : nat :=
   let y2 := get_y q in
   max (abs_diff x1 x2) (abs_diff y1 y2).
 
-(* 共线性判断 - 使用标准算术操作 *)
+(* 共线性判断 *)
 Definition collinear (p q r : Point) : Prop :=
   let x1 := get_x p in
   let y1 := get_y p in
