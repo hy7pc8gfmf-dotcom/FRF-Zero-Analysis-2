@@ -14,8 +14,6 @@ Require Import Coq.Reals.Reals.                    (* Coq标准库：实数（�
 Require Import Coq.Lists.ListDec.                 (* Coq标准库：列表判定（支撑NoDup_impl_distinct） *)
 
 (* 一级基础模块导入（修复路径问题） *)
-(* 删除：Require Import FRF_CS_Null_Common. *)
-Require Import CS_Null.FRF_CS_Null_Common.          (* 修正路径：假设FRF_CS_Null_Common在CS_Null子目录中 *)
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
 
