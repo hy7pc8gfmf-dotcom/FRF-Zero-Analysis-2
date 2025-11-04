@@ -1,8 +1,8 @@
 (* # CS_Null/MathNull.v *)
-(* 模块定位：数学计算场景空值（NaN/Inf/0值语义冲突）FRF验证核心（二级场景层），聚焦“数学空值”作为工程化“0”的特殊语义（无效计算标记、边界值处理），严格遵循“一级基础层→二级场景层→三级集成层”架构，仅依赖一级基础模块，无跨场景依赖/冗余导入，全量保留数学空值核心功能（运算/判定/转换/修复） *)
+(* 模块定位：数学计算场景空值（NaN/Inf/0值语义冲突）FRF验证核心（二级场景层），聚焦“数学空值”作为工程化“0”的特殊语义（无效计算标记、边界值处理），严格遵循“一级基础层→二级场景层→三级集成层”架构，仅依赖一级基础模块与Coq标准库，无Mathlib依赖/跨场景依赖/冗余导入，全量保留数学空值核心功能（运算/判定/转换/修复） *)
 Require Import FRF_CS_Null_Common.      (* 一级基础层：统一空值基础定义（PropertyCategory/CS_FormalSystem等） *)
 Require Import FRF_MetaTheory.                 (* 一级基础层：FRF元理论接口（FunctionalRole/ConceptIdentity等） *)
-Require Import Mathlib.Logic.FunctionalExtensionality. (* 显式导入Funext公理，标注依赖：支撑构造子唯一性证明 *)
+Require Import Coq.Logic.FunctionalExtensionality. (* 替换Mathlib依赖为Coq标准库，支撑构造子唯一性证明 *)
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Reals.Reals.         (* 局部导入实数模块（仅数学计算使用） *)
@@ -283,7 +283,7 @@ Lemma math_null_all_constructors_covered : ∀ (v : MathValue),
   | MathValid _ | MathNaN | MathInf | MathZeroConflict _ => True
   end.
 Proof.
-  induction v; auto. (* 归纳法遍历所有构造子，机械验证无遗漏 *)
+  induction v; auto.
 Qed.
 
 (* 引理8：双精度精度误差边界（支撑FillMean误差量化，依赖实数公理） *)
@@ -293,7 +293,7 @@ Proof.
   compute; split; [split; lia | lia].
 Qed.
 
-(* 引理9：加法误差传递规则（支撑FillMean误差定理，依赖Rle_trans公理） *)
+(* 引理9：加法误差传递规则（支撑FillMean误差定理，依赖Rabs_add_le公理） *)
 Lemma add_error_transitive : ∀ (a b c d : R),
   Rabs (a - c) ≤ ε ∧ Rabs (b - d) ≤ ε → Rabs ((a + b) - (c + d)) ≤ 2 * ε.
 Proof.
@@ -338,12 +338,9 @@ Theorem math_null_propagation_consistent : ∀ (op : string) (v : MathValue),
 Proof.
   intros op v H_null.
   induction v as [a | | | s]; try contradiction H_null.
-  - (* v=NaN：应用NaN传播引理 *)
-    split; [apply math_nan_propagate_all_ops; auto | split; trivial | trivial].
-  - (* v=Inf：按运算类型验证 *)
-    split; [trivial | split; unfold math_binary_op; compute; reflexivity | trivial].
-  - (* v=MathZeroConflict s：传播NaN，含新增ZeroPowerZero场景 *)
-    split; [trivial | trivial | exists s; unfold math_binary_op; reflexivity].
+  - split; [apply math_nan_propagate_all_ops; auto | split; trivial | trivial].
+  - split; [trivial | split; unfold math_binary_op; compute; reflexivity | trivial].
+  - split; [trivial | trivial | exists s; unfold math_binary_op; reflexivity].
 Qed.
 
 (* 定理3：数学空值的身份唯一性（区分ZeroConflict所有场景，解决身份混淆问题） *)
@@ -373,16 +370,11 @@ Proof.
                 end in
   specialize (H_core v target).
   
-  (* 用induction战术覆盖MathValue所有构造子，无遗漏 *)
   induction v as [a | | | s']; try contradiction H_core.
-  - (* v=MathValid a：与目标类型冲突，矛盾 *)
-    contradiction H_core.
-  - (* v=MathNaN：仅当nt=NaNType时成立 *)
-    destruct nt; try contradiction H_core; reflexivity.
-  - (* v=MathInf：仅当nt=InfType时成立 *)
-    destruct nt; try contradiction H_core; reflexivity.
-  - (* v=MathZeroConflict s'：仅当nt=ZeroConflictType且场景完全匹配时成立 *)
-    destruct nt; try contradiction H_core.
+  - contradiction H_core.
+  - destruct nt; try contradiction H_core; reflexivity.
+  - destruct nt; try contradiction H_core; reflexivity.
+  - destruct nt; try contradiction H_core.
     destruct scene as [s_scene |]; [
       match s_scene, s' with
       | ZxInf, ZxInf => rewrite <- H_core; reflexivity
@@ -390,8 +382,7 @@ Proof.
       | ZeroPowerZero, ZeroPowerZero => rewrite <- H_core; reflexivity
       | _, _ => contradiction H_core
       end
-    | (* 场景为None时，目标为ZxInf *)
-      match s' with
+    | match s' with
       | ZxInf => rewrite <- H_core; reflexivity
       | _ => contradiction H_core
       end
@@ -404,10 +395,8 @@ Theorem math_null_fix_safe : ∀ (v : MathValue) (s : string),
 Proof.
   intros v s H_null.
   destruct (str_to_strategy s) as [strat | H_invalid].
-  - (* 合法策略：修复后为有效数值 *)
-    destruct strat, v; unfold math_null_fix, math_is_null; compute; auto.
-  - (* 无效策略：保持原值→矛盾，故H_null不成立 *)
-    unfold math_null_fix. rewrite math_null_fix_valid_strategy with (s := s); auto.
+  - destruct strat, v; unfold math_null_fix, math_is_null; compute; auto.
+  - unfold math_null_fix. rewrite math_null_fix_valid_strategy with (s := s); auto.
     contradiction H_null.
 Qed.
 
@@ -456,28 +445,21 @@ Proof.
   intros v w op H_op H_fill H_real_mean.
   destruct H_real_mean as [real_mean H_mean_bound].
   unfold math_null_fix in H_fill.
-  (* 仅当v=NaN时FillMean策略填充0，分情况验证 *)
   destruct v as [a | | | s]; try contradiction H_fill.
-  - (* v=MathValid a：FillMean不修改，与H_fill矛盾 *)
-    contradiction H_fill.
-  - (* v=MathNaN：FillMean填充0，验证加法误差 *)
-    unfold math_binary_op.
+  - contradiction H_fill.
+  - unfold math_binary_op.
     destruct w as [b | | | s']; [
-      (* w=MathValid b：计算实际结果与理想结果的误差 *)
       let res := 0%R + b in
       let ideal_res := real_mean + b in
       assert (error := Rabs (res - ideal_res) = Rabs ((0%R + b) - (real_mean + b)) = Rabs (0%R - real_mean)).
       rewrite error.
       apply Rle_trans with (y := max_acceptable_error); [apply H_mean_bound | reflexivity]
-    | (* w=MathNaN/Inf/ZeroConflict：运算结果为NaN/NaN/NaN，误差条件平凡成立 *)
-      reflexivity
+    | reflexivity
     | reflexivity
     | reflexivity
     ].
-  - (* v=MathInf：FillMean不修改，与H_fill矛盾 *)
-    contradiction H_fill.
-  - (* v=MathZeroConflict s：FillMean不修改，与H_fill矛盾 *)
-    contradiction H_fill.
+  - contradiction H_fill.
+  - contradiction H_fill.
 Qed.
 
 (* ======================== 模块导出（无符号冲突，统一记法，支撑下游调用） ======================== *)
