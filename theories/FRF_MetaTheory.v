@@ -1,4 +1,4 @@
-(* theories/FRF_MetaTheory.v - 步骤1：基本关系定义 *)
+(* theories/FRF_MetaTheory.v - 步骤1：修复导出问题 *)
 Require Import Coq.Strings.String.  (* 关键修复：导入string类型 *)
 Require Import Coq.Lists.List.
 
@@ -41,8 +41,5 @@ Record ConceptIdentity (S : FormalSystem) (obj : carrier S) : Type := {
   ci_unique : forall (y : carrier S), Prop;
 }.
 
-(* 模块导出 *)
-Export FormalSystem.
-Export FunctionalRole.
-Export DefinitiveRelation.
-Export ConceptIdentity.
+(* 正确的导出方式：不导出记录类型本身，而是通过模块或直接使用 *)
+(* 移除错误的Export语句，记录类型在Coq中会自动在作用域内可用 *)
