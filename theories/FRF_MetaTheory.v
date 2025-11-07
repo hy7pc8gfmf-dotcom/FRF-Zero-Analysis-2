@@ -1,50 +1,35 @@
 (* # theories/FRF_MetaTheory.v *)
-(* 模块定位：二级核心模块，定义 FRF 元理论框架基础结构（Axiom/Theory/Interpretation），
-   作为全系统形式化验证的统一元语言层。
-   依赖约束：仅依赖 SelfContainedLib 中的一级基础模块（Algebra/Category/Geometry），
-   无循环依赖、无冗余定义、符号统一、逻辑透明。
-   适配环境：Coq 8.18.0 + Mathlib 3.74.0 *)
-
 Require Import Coq.Logic.Classical_Prop.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
 Require Import SelfContainedLib.Geometry.
 
-(* ======================== 核心定义（前置无依赖，统一符号，对接基础库） ======================== *)
+(* ======================== 核心定义 ======================== *)
 
-(* 1. 公理（FRFAxiom）：FRF 元理论的基本单元，抽象为命题类型 *)
-(* 注意：不能命名为 "Axiom"，因为它是 Coq 关键字 *)
-Definition FRFAxiom : Type := Prop.
+(* 公理即命题，无需重命名 *)
+Definition Theory : Type := list Prop.
 
-(* 2. 理论（Theory）：公理集合，以列表形式组织（支持有限/可枚举公理体系） *)
-Definition Theory : Type := list FRFAxiom.
-
-(* 3. 公理标签（AxiomTag）：统一标签类型，聚合各基础模块公理标签，支撑跨模块判别 *)
 Inductive AxiomTag : Type :=
   | AlgebraTag : AlgebraAxiomTag -> AxiomTag
   | CategoryTag : CategoryAxiomTag -> AxiomTag
   | GeometryTag : GeometryAxiomTag -> AxiomTag.
 
-(* 4. 带标签公理（TaggedAxiom）：封装公理内容与来源标签，用于追踪与验证 *)
 Record TaggedAxiom : Type := {
   tag : AxiomTag;
-  content : FRFAxiom
+  content : Prop
 }.
 
-(* 5. 解释（Interpretation）：从一个理论到另一个理论的映射 *)
 Definition Interpretation (T₁ T₂ : Theory) : Type :=
-  forall (φ : FRFAxiom), In φ T₁ -> exists ψ : FRFAxiom, In ψ T₂ /\ (φ -> ψ).
+  forall (φ : Prop), In φ T₁ -> exists ψ : Prop, In ψ T₂ /\ (φ -> ψ).
 
-(* 6. 理论一致性（Consistency）：不存在矛盾公理对 *)
 Definition Consistent (T : Theory) : Prop :=
-  ~ exists (φ : FRFAxiom), In φ T /\ In (~φ) T.
+  ~ exists (φ : Prop), In φ T /\ In (~φ) T.
 
-(* 7. 理论扩展（Extension）：T₂ 是 T₁ 的扩展当且仅当 T₁ ⊆ T₂ *)
 Definition Extension (T₁ T₂ : Theory) : Prop :=
   forall φ, In φ T₁ -> In φ T₂.
 
-(* ======================== 辅助引理（证明前置，依赖已证基础库） ======================== *)
+(* ======================== 辅助引理 ======================== *)
 
 Lemma algebra_tag_inj : forall t1 t2 : AlgebraAxiomTag,
   AlgebraTag t1 = AlgebraTag t2 -> t1 = t2.
@@ -90,7 +75,7 @@ Proof.
   split; [apply H_ext; assumption | assumption].
 Qed.
 
-(* ======================== 核心定理（证明完备，机械可执行） ======================== *)
+(* ======================== 核心定理 ======================== *)
 
 Definition FRF_BaseAxioms : list TaggedAxiom :=
   (* 代数公理 *)
@@ -131,7 +116,6 @@ Proof.
   apply tagged_axiom_disjoint; assumption.
 Qed.
 
-(* 一致性假设：由基础模块保证 *)
 Axiom AlgebraConsistent : Consistent (map (fun ax : AlgebraAxiom => ax.(axiom_content))
   [(Build_AlgebraAxiom AddAssocTag add_assoc);
    (Build_AlgebraAxiom AddIdLeftTag add_0_l);
@@ -147,10 +131,7 @@ Axiom GeometryConsistent : Consistent (map (fun ax : GeometryAxiom => ax.(axiom_
    (Build_GeometryAxiom HyperbolicMetricTag (fun _ _ => I))]).
 
 Theorem FRF_base_consistent : Consistent (map (fun ta : TaggedAxiom => ta.(content)) FRF_BaseAxioms).
-Proof.
-  (* 各领域公理不相交，且各自内部一致，故整体一致 *)
-  admit. (* 实际部署时应由自动化工具或更细粒度证明完成 *)
-Admitted.
+Proof. admit. Admitted.
 
 Definition compose_interpretation :
   forall T₁ T₂ T₃,
@@ -170,17 +151,9 @@ Proof.
   intros T φ Hin; exists φ; split; [assumption | intro; assumption].
 Defined.
 
-(* ======================== 模块导出（无符号冲突，支撑三级模块调用） ======================== *)
+(* ======================== 模块导出 ======================== *)
 
-Export FRFAxiom Theory AxiomTag TaggedAxiom Interpretation Consistent Extension.
+Export Theory AxiomTag TaggedAxiom Interpretation Consistent Extension.
 Export FRF_BaseAxioms.
 Export compose_interpretation identity_interpretation.
 Export FRF_base_axioms_disjoint.
-
-(* 验证说明：
-   - 无循环依赖：仅 Require Import Level 1 模块
-   - 符号统一：使用基础库导出的 add_assoc, comp_assoc 等
-   - 逻辑完备：覆盖元理论核心概念
-   - 形式化完备：所有证明可在 Coq 8.18.0 中机械执行（除 FRF_base_consistent 因依赖外部假设暂 Admit）
-   - 功能全保留：为 ChurchNumerals.v / ChurchZero.v 提供统一公理接口
-*)
