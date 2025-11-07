@@ -1,4 +1,4 @@
-(* theories/FRF_MetaTheory.v - 步骤2：修复证明策略 *)
+(* theories/FRF_MetaTheory.v - 步骤3：运算结构支持 *)
 Require Import Coq.Strings.String.  (* 关键修复：导入string类型 *)
 Require Import Coq.Lists.List.
 
@@ -89,3 +89,78 @@ Proof.
   destruct H1 as [cid1 H1], H2 as [cid2 H2].
   (* 简化证明 - 使用Admitted避免复杂证明 *)
 Admitted.
+
+(* ======================== *)
+(* 步骤3：添加运算结构支持 *)
+(* ======================== *)
+
+(* 带运算的形式系统扩展 *)
+Record FormalSystemWithOp : Type := {
+  system_name_op : string;
+  carrier_op : Type;
+  op : carrier_op -> carrier_op -> carrier_op;
+  axioms_op : list AxiomType;
+  prop_category_op : PropertyCategory;
+  op_assoc : forall a b c, op (op a b) c = op a (op b c);
+  id_elem : carrier_op;
+  id_left : forall a, op id_elem a = a;
+  id_right : forall a, op a id_elem = a;
+}.
+
+(* 运算系统的功能角色 *)
+Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
+  role_id_op : string;
+  core_features_op : list string;
+  edge_features_op : list (string * nat);  (* 添加边缘特征 *)
+  core_function_op : carrier_op S -> Prop;
+  func_necessary_op : carrier_op S -> Prop;
+}.
+
+(* 运算系统的基本引理 *)
+Lemma op_assoc_property {S : FormalSystemWithOp} :
+  forall (a b c : carrier_op S),
+  op S (op S a b) c = op S a (op S b c).
+Proof.
+  intros a b c.
+  apply op_assoc.
+Qed.
+
+Lemma id_left_property {S : FormalSystemWithOp} :
+  forall (a : carrier_op S), op S (id_elem S) a = a.
+Proof.
+  intros a.
+  apply id_left.
+Qed.
+
+Lemma id_right_property {S : FormalSystemWithOp} :
+  forall (a : carrier_op S), op S a (id_elem S) = a.
+Proof.
+  intros a.
+  apply id_right.
+Qed.
+
+(* 单位元唯一性定理 *)
+Theorem identity_unique {S : FormalSystemWithOp} :
+  forall (id1 id2 : carrier_op S),
+  (forall a, op S id1 a = a) ->
+  (forall a, op S id2 a = a) ->
+  id1 = id2.
+Proof.
+  intros id1 id2 H_id1 H_id2.
+  specialize (H_id1 id2).
+  specialize (H_id2 id1).
+  rewrite <- H_id2 in H_id1.
+  assumption.
+Qed.
+
+(* 实用记法和辅助定义 *)
+Notation "x ·[ S ] y" := (op S x y) (at level 40, left associativity).
+Notation "1_[ S ]" := (id_elem S) (at level 30).
+
+(* 同态映射定义 *)
+Record SystemHomomorphism (S1 S2 : FormalSystemWithOp) : Type := {
+  hom_map : carrier_op S1 -> carrier_op S2;
+  hom_preserves_op : forall a b, 
+    hom_map (op S1 a b) = op S2 (hom_map a) (hom_map b);
+  hom_preserves_id : hom_map (id_elem S1) = id_elem S2;
+}.
