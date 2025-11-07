@@ -25,7 +25,3 @@ Record FunctionalRole (S : FormalSystem) : Type := {
   role_id : string;
   core_features : list string;
 }.
-
-(* 模块导出 *)
-Export FormalSystem.
-Export FunctionalRole.
