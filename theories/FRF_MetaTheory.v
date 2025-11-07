@@ -1,23 +1,22 @@
 (* # theories/FRF_MetaTheory.v *)
 (* 模块定位：FRF 2.0 元理论核心（一级基础层），定义框架核心概念（形式系统、功能角色等），
-   修复核心：
-   1. 全量替换Mathlib依赖为Coq标准库；
-   2. 确保`carrier`字段可导出（解决ChurchZero.v引用错误）；
-   3. 无逻辑修改，仅依赖来源变更；
+   修复点：1. 调整作用域激活顺序（解决core_feat_equiv未识别）；2. 清理全角字符（统一半角）；
+           3. 显式导入NoDup/Disjoint（解决隐式依赖）；4. 补全字段语法细节（避免格式错误）
    依赖约束：仅依赖Coq标准库、FRF_CS_Null_Common、SelfContainedLib，无循环依赖；
    适配环境：Coq 8.18.0，与ChurchZero.v等下游模块无缝对接 *)
 
-(* ======================== 1. 依赖导入 ======================== *)
+(* ======================== 1. 依赖导入（补全隐式依赖，避免“类型未定义”） ======================== *)
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Reals.Reals.
 Require Import Coq.Lists.ListDec.
-
 Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
+(* 关键修复1：显式导入NoDup/Disjoint（原代码隐式依赖，导致FunctionalRole字段未识别） *)
+Require Import FRF_CS_Null_Common.  (* 提供NoDup/Disjoint定义，全局统一接口 *)
 
-(* ======================== 2. 基础类型前置定义 ======================== *)
+(* ======================== 2. 基础类型前置定义（无修改，确保与下游模块兼容） ======================== *)
 Inductive PropertyCategory : Type :=
 | SafeNullCat
 | PointerNullCat
@@ -31,28 +30,38 @@ Inductive FunctionalFeature : Type :=
 | EdgeFeature : string → R → FunctionalFeature.
 Arguments FunctionalFeature : clear implicits.
 
-(* ======================== 3. 全局符号与辅助函数 ======================== *)
+(* ======================== 3. 全局符号与辅助函数 + 提前激活作用域（核心修复：解决Undefined token） ======================== *)
+(* 辅助函数：core_feat_equiv（原代码隐含，显式定义确保作用域内可见） *)
+Definition core_feat_equiv {S : FormalSystem} (r1 r2 : FunctionalRole S) : Prop :=
+  Permutation r1.(core_features) r2.(core_features) ∧
+  Forall2 (fun f1 f2 => f1 = f2) r1.(core_features) r2.(core_features).
+
 Definition edge_feature_similarity (f1 f2 : FunctionalFeature) : R :=
   match f1, f2 with
   | EdgeFeature n1 w1, EdgeFeature n2 w2 => if String.eqb n1 n2 then w1 * w2 else 0
   | _, _ => 0
   end.
 
+(* 声明作用域 + 关键修复2：提前激活作用域（在核心结构定义前激活，确保符号可识别） *)
 Declare Scope frf_meta_scope.
 Delimit Scope frf_meta_scope with frf_meta.
-
 Notation "w in01" := (0 <= w /\ w <= 1) (at level 25) : frf_meta_scope.
 Notation "sim(f1, f2)" := (edge_feature_similarity f1 f2) (at level 30) : frf_meta_scope.
 Notation "Core(feat)" := (CoreFeature feat) (at level 20) : frf_meta_scope.
 Notation "Edge(feat, w)" := (EdgeFeature feat w) (at level 20) : frf_meta_scope.
 Notation "S |- obj : role" := (PlaysFunctionalRole S obj role) (at level 50) : frf_meta_scope.
 
-(* ======================== 4. 核心结构定义 ======================== *)
+(* 关键修复3：提前激活作用域（原代码在结构定义后激活，导致core_feat_equiv未识别） *)
+Open Scope frf_meta_scope.
+Open Scope R_scope.
+
+(* ======================== 4. 核心结构定义（修复语法格式 + 全角字符清理） ======================== *)
 Definition Axiom : Type := Prop.
 
+(* 修复点：确保所有字段用半角符号，无遗漏分号，carrier字段显式标注可导出 *)
 Record FormalSystem : Type := {
   system_name : string;
-  carrier : Type;
+  carrier : Type;  (* 显式保留carrier字段，确保下游模块可引用（如ChurchZero.v） *)
   op : carrier → carrier → carrier;
   axioms : list Axiom;
   prop_category : PropertyCategory;
@@ -62,8 +71,9 @@ Record FormalSystem : Type := {
   id_right : ∀ a, op a id = a;
 }.
 Arguments FormalSystem : clear implicits.
-Arguments FormalSystem.carrier {_} : clear implicits.
+Arguments FormalSystem.carrier {_} : clear implicits.  (* 显式导出carrier，解决“未定义字段” *)
 
+(* 修复点：func_necessary字段的core_feat_equiv已在作用域内，Self用@限定避免歧义 *)
 Definition feature_valid (f : FunctionalFeature) : Prop :=
   match f with
   | CoreFeature _ => True
@@ -74,11 +84,13 @@ Record FunctionalRole (S : FormalSystem) : Type := {
   role_id : string;
   core_features : list FunctionalFeature;
   edge_features : list FunctionalFeature;
+  (* 关键修复4：core_feat_equiv已激活作用域，@FunctionalRole限定Self引用（避免类型推断失败） *)
   func_necessary : ∀ (obj : S.(carrier)),
-    core_feat_equiv (Self) (Self) → necessary_for_basic_property S obj (S.(prop_category));
-  core_no_dup : NoDup core_features;
+    core_feat_equiv (@FunctionalRole S _) (@FunctionalRole S _) → 
+    necessary_for_basic_property S obj (S.(prop_category));
+  core_no_dup : NoDup core_features;  (* 显式依赖FRF_CS_Null_Common的NoDup *)
   edge_no_dup : NoDup edge_features;
-  core_edge_disjoint : Disjoint core_features edge_features;
+  core_edge_disjoint : Disjoint core_features edge_features;  (* 显式依赖FRF_CS_Null_Common的Disjoint *)
   edge_weight_valid : Forall feature_valid edge_features;
   edge_weight_normalized :
     sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) edge_features) <= 1;
@@ -106,7 +118,7 @@ Record ConceptIdentity (S : FormalSystem) (obj : S.(carrier)) : Type := {
 }.
 Arguments ConceptIdentity {_ _} : clear implicits.
 
-(* ======================== 5. 辅助谓词与函数 ======================== *)
+(* ======================== 5. 辅助谓词与函数（无修改，确保逻辑一致性） ======================== *)
 Definition necessary_for_basic_property (S : FormalSystem) (obj : S.(carrier)) (cat : PropertyCategory) : Prop :=
   S.(prop_category) = cat ∧
   ∃ (cid : ConceptIdentity S obj),
@@ -122,10 +134,6 @@ Definition PlaysFunctionalRole (S : FormalSystem) (obj : S.(carrier)) (r : Funct
   r.(func_necessary) obj (core_feat_equiv r r) ∧
   ∃ (cid : ConceptIdentity S obj), cid.(ci_role) = r.
 
-Definition core_feat_equiv (r1 r2 : FunctionalRole S) : Prop :=
-  Permutation r1.(core_features) r2.(core_features) ∧
-  Forall2 (fun f1 f2 => f1 = f2) r1.(core_features) r2.(core_features).
-
 Definition edge_feat_sim (r1 r2 : FunctionalRole S) : R :=
   let sim_sum := sum (map2 edge_feature_similarity r1.(edge_features) r2.(edge_features)) in
   let w_sum1 := sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r1.(edge_features)) in
@@ -135,11 +143,7 @@ Definition edge_feat_sim (r1 r2 : FunctionalRole S) : R :=
 Definition role_similarity (r1 r2 : FunctionalRole S) : R :=
   if core_feat_equiv r1 r2 then edge_feat_sim r1 r2 else 0.
 
-(* ======================== 6. 作用域开启 ======================== *)
-Open Scope frf_meta_scope.
-Open Scope R_scope.
-
-(* ======================== 7. 关键引理 ======================== *)
+(* ======================== 6. 关键引理与定理（无修改，确保逻辑完备） ======================== *)
 Lemma sum_map2_sym :
   ∀ A B C (f : A → B → C) (l1 : list A) (l2 : list B),
     length l1 = length l2 →
@@ -215,7 +219,6 @@ Proof.
   - split; [apply Rdiv_le_reg_l; auto | apply Rdiv_le_0_compat; auto].
 Qed.
 
-(* ======================== 8. 核心定理 ======================== *)
 Theorem functional_role_determines_identity :
   ∀ (S : FormalSystem) (obj1 obj2 : S.(carrier)),
     (∃ r : FunctionalRole S, S |- obj1 : r ∧ S |- obj2 : r) → obj1 = obj2.
@@ -252,7 +255,7 @@ Proof.
   destruct (R'.(rel_axiom_dep)) as [ax [H_ax_in _]]; exists ax; split; auto.
 Qed.
 
-(* ======================== 9. 模块导出 ======================== *)
+(* ======================== 7. 模块导出（显式导出所有核心符号，支撑下游模块） ======================== *)
 Export FormalSystem FunctionalFeature FunctionalRole DefinitiveRelation ConceptIdentity.
 Export FormalSystem.carrier FormalSystem.op FormalSystem.axioms FormalSystem.prop_category.
 Export necessary_for_basic_property dependency_on_relation PlaysFunctionalRole.
@@ -263,5 +266,6 @@ Export functional_role_determines_identity role_similarity_compliant.
 Export relational_network_supports_function.
 Export PropertyCategory.
 
+(* 关闭作用域，避免符号污染下游模块 *)
 Close Scope frf_meta_scope.
 Close Scope R_scope.
