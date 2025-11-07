@@ -1,4 +1,4 @@
-(* theories/FRF_MetaTheory.v - 步骤2：修复字段访问语法 *)
+(* theories/FRF_MetaTheory.v - 步骤2：正确字段访问语法 *)
 Require Import Coq.Strings.String.  (* 关键修复：导入string类型 *)
 Require Import Coq.Lists.List.
 
@@ -45,13 +45,14 @@ Record ConceptIdentity (S : FormalSystem) (obj : carrier S) : Type := {
 (* 步骤2：添加核心功能接口 *)
 (* ======================== *)
 
-(* 核心功能定义 *)
+(* 核心功能定义 - 使用正确的字段访问语法 *)
 Definition PlaysFunctionalRole (S : FormalSystem) (obj : carrier S) 
   (r : FunctionalRole S) : Prop :=
-  exists (cid : ConceptIdentity S obj), (ci_role cid) = r.
+  exists (cid : ConceptIdentity S obj), 
+    @ci_role S obj cid = r.
 
 Definition core_feat_equiv {S : FormalSystem} (r1 r2 : FunctionalRole S) : Prop :=
-  (core_features r1) = (core_features r2).
+  @core_features S r1 = @core_features S r2.
 
 (* 基础引理 - 使用简单的证明 *)
 Lemma functional_role_reflexive {S : FormalSystem} :
@@ -62,7 +63,7 @@ Qed.
 
 Lemma role_identity_preserved {S : FormalSystem} :
   forall (r1 r2 : FunctionalRole S),
-  (role_id r1) = (role_id r2) -> core_feat_equiv r1 r2 -> r1 = r2.
+  @role_id S r1 = @role_id S r2 -> core_feat_equiv r1 r2 -> r1 = r2.
 Proof.
   intros r1 r2 H_id H_feat.
   destruct r1, r2.
