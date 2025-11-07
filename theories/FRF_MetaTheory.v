@@ -1,4 +1,4 @@
-(* # theories/FRF_MetaTheory.v *)
+(* theories/FRF_MetaTheory.v *)
 (* 模块定位：FRF 2.0 元理论核心（Level 2），统一形式系统、功能角色、定义性关系等基础概念， 严格依赖Level 1基础库（Algebra/Category/Geometry），无循环依赖，支撑下游模块统一接口， 实现FRF三大核心主张的形式化奠基：功能角色决定身份、关系先于对象、身份具有系统相对性 *)
 
 Require Import SelfContainedLib.Algebra.
@@ -41,13 +41,13 @@ Record FormalSystem : Type := {
   axioms : list Axiom; (* 公理集：对接基础库公理 *)
   prop_category : Type; (* 属性范畴：区分代数/范畴/几何等类型 *)
   op_assoc : forall a b c, op[Self] (op[Self] a b) c = op[Self] a (op[Self] b c); (* 运算结合律 *)
-  id : carrier; (* 单位元：对应各系统“零/空”概念 *)
+  id : carrier; (* 单位元：对应各系统"零/空"概念 *)
   id_left : forall a, op[Self] id a = a; (* 左单位律 *)
   id_right : forall a, op[Self] a id = a; (* 右单位律 *)
 }.
 Arguments FormalSystem : clear implicits.
 
-(* 3. 功能角色（支撑“功能决定身份”，含核心/边缘功能） *)
+(* 3. 功能角色（支撑"功能决定身份"，含核心/边缘功能） *)
 Record FunctionalRole (S : FormalSystem) : Type := {
   role_id : string;
   core_features : list string;
@@ -62,7 +62,7 @@ Record FunctionalRole (S : FormalSystem) : Type := {
 }.
 Arguments FunctionalRole {_} : clear implicits.
 
-(* 4. 定义性关系（支撑“关系先于对象”，绑定对象与规则） *)
+(* 4. 定义性关系（支撑"关系先于对象"，绑定对象与规则） *)
 Record DefinitiveRelation (S : FormalSystem) : Type := {
   rel_id : string;
   related_objs : list S.(carrier);
@@ -71,7 +71,7 @@ Record DefinitiveRelation (S : FormalSystem) : Type := {
 }.
 Arguments DefinitiveRelation {_} : clear implicits.
 
-(* 5. 概念身份（绑定功能角色与定义性关系，完整刻画“零/空”概念） *)
+(* 5. 概念身份（绑定功能角色与定义性关系，完整刻画"零/空"概念） *)
 Record ConceptIdentity (S : FormalSystem) (obj : S.(carrier)) : Type := {
   ci_role : FunctionalRole S;
   ci_rels : list (DefinitiveRelation S);
@@ -82,7 +82,7 @@ Record ConceptIdentity (S : FormalSystem) (obj : S.(carrier)) : Type := {
 }.
 Arguments ConceptIdentity {_ _} : clear implicits.
 
-(* 6. 跨系统映射（支撑“身份系统相对性”，对接不同形式系统） *)
+(* 6. 跨系统映射（支撑"身份系统相对性"，对接不同形式系统） *)
 Record CrossSystemMapping (S1 S2 : FormalSystem) : Type := {
   map_obj : S1.(carrier) -> S2.(carrier);
   map_preserves_op : forall a b, map_obj (op[S1] a b) = op[S2] (map_obj a) (map_obj b);
