@@ -18,8 +18,6 @@ Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
 
 (* ======================== 2. 基础类型前置定义 ======================== *)
-
-(* PropertyCategory 必须在 FormalSystem 前定义 *)
 Inductive PropertyCategory : Type :=
 | SafeNullCat
 | PointerNullCat
@@ -28,34 +26,28 @@ Inductive PropertyCategory : Type :=
 | LogicCat.
 Arguments PropertyCategory : clear implicits.
 
-(* FunctionalFeature 必须在 edge_feature_similarity 前定义 *)
 Inductive FunctionalFeature : Type :=
 | CoreFeature : string → FunctionalFeature
 | EdgeFeature : string → R → FunctionalFeature.
 Arguments FunctionalFeature : clear implicits.
 
 (* ======================== 3. 全局符号与辅助函数 ======================== *)
-
-(* 提前定义 edge_feature_similarity，供 notation 使用 *)
 Definition edge_feature_similarity (f1 f2 : FunctionalFeature) : R :=
   match f1, f2 with
-  | EdgeFeature n1 w1, EdgeFeature n2 w2 =>
-      if String.eqb n1 n2 then w1 * w2 else 0
+  | EdgeFeature n1 w1, EdgeFeature n2 w2 => if String.eqb n1 n2 then w1 * w2 else 0
   | _, _ => 0
   end.
 
-(* 声明作用域与合法 notation（含非字母符号） *)
 Declare Scope frf_meta_scope.
 Delimit Scope frf_meta_scope with frf_meta.
 
-Notation "w <in01>" := (0 <= w /\ w <= 1) (at level 25) : frf_meta_scope.
+Notation "w in01" := (0 <= w /\ w <= 1) (at level 25) : frf_meta_scope.
 Notation "sim(f1, f2)" := (edge_feature_similarity f1 f2) (at level 30) : frf_meta_scope.
 Notation "Core(feat)" := (CoreFeature feat) (at level 20) : frf_meta_scope.
 Notation "Edge(feat, w)" := (EdgeFeature feat w) (at level 20) : frf_meta_scope.
 Notation "S |- obj : role" := (PlaysFunctionalRole S obj role) (at level 50) : frf_meta_scope.
 
 (* ======================== 4. 核心结构定义 ======================== *)
-
 Definition Axiom : Type := Prop.
 
 Record FormalSystem : Type := {
@@ -75,7 +67,7 @@ Arguments FormalSystem.carrier {_} : clear implicits.
 Definition feature_valid (f : FunctionalFeature) : Prop :=
   match f with
   | CoreFeature _ => True
-  | EdgeFeature _ w => w <in01>
+  | EdgeFeature _ w => w in01
   end.
 
 Record FunctionalRole (S : FormalSystem) : Type := {
@@ -115,7 +107,6 @@ Record ConceptIdentity (S : FormalSystem) (obj : S.(carrier)) : Type := {
 Arguments ConceptIdentity {_ _} : clear implicits.
 
 (* ======================== 5. 辅助谓词与函数 ======================== *)
-
 Definition necessary_for_basic_property (S : FormalSystem) (obj : S.(carrier)) (cat : PropertyCategory) : Prop :=
   S.(prop_category) = cat ∧
   ∃ (cid : ConceptIdentity S obj),
@@ -149,7 +140,6 @@ Open Scope frf_meta_scope.
 Open Scope R_scope.
 
 (* ======================== 7. 关键引理 ======================== *)
-
 Lemma sum_map2_sym :
   ∀ A B C (f : A → B → C) (l1 : list A) (l2 : list B),
     length l1 = length l2 →
@@ -212,9 +202,9 @@ Qed.
 
 Lemma edge_feat_sim_bounded :
   ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
-    edge_feat_sim r1 r2 <in01>.
+    edge_feat_sim r1 r2 in01.
 Proof.
-  intros S r1 r2; unfold edge_feat_sim, "<in01>".
+  intros S r1 r2; unfold edge_feat_sim.
   let sim_sum := eval red in (sum (map2 edge_feature_similarity r1.(edge_features) r2.(edge_features))) in
   let w_sum1 := eval red in (sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r1.(edge_features))) in
   let w_sum2 := eval red in (sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r2.(edge_features))) in
@@ -226,7 +216,6 @@ Proof.
 Qed.
 
 (* ======================== 8. 核心定理 ======================== *)
-
 Theorem functional_role_determines_identity :
   ∀ (S : FormalSystem) (obj1 obj2 : S.(carrier)),
     (∃ r : FunctionalRole S, S |- obj1 : r ∧ S |- obj2 : r) → obj1 = obj2.
@@ -241,7 +230,7 @@ Qed.
 
 Theorem role_similarity_compliant :
   ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
-    role_similarity r1 r2 <in01> ∧
+    role_similarity r1 r2 in01 ∧
     (core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = edge_feat_sim r1 r2) ∧
     (¬ core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = 0).
 Proof.
@@ -264,7 +253,6 @@ Proof.
 Qed.
 
 (* ======================== 9. 模块导出 ======================== *)
-
 Export FormalSystem FunctionalFeature FunctionalRole DefinitiveRelation ConceptIdentity.
 Export FormalSystem.carrier FormalSystem.op FormalSystem.axioms FormalSystem.prop_category.
 Export necessary_for_basic_property dependency_on_relation PlaysFunctionalRole.
