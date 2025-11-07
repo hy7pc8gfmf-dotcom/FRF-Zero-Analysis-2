@@ -21,11 +21,11 @@ Require Import SelfContainedLib.Category.
 Declare Scope frf_meta_scope.
 Delimit Scope frf_meta_scope with frf_meta.
 
-(* 修复：使用ASCII兼容符号替代Unicode符号 *)
-Notation "w in01" := (0 <= w /\ w <= 1) (at level 25) : frf_meta_scope.
-Notation "sim(f1, f2)" := (edge_feature_similarity f1 f2) (at level 30) : frf_meta_scope.
-Notation "Core(feat)" := (CoreFeature feat) (at level 20) : frf_meta_scope.
-Notation "Edge(feat, w)" := (EdgeFeature feat w) (at level 20) : frf_meta_scope.
+(* 修复：使用有效的符号定义 *)
+Notation "[0,1] w" := (0 <= w /\ w <= 1) (at level 25) : frf_meta_scope.
+Notation "sim( f1 , f2 )" := (edge_feature_similarity f1 f2) (at level 30) : frf_meta_scope.
+Notation "Core( feat )" := (CoreFeature feat) (at level 20) : frf_meta_scope.
+Notation "Edge( feat , w )" := (EdgeFeature feat w) (at level 20) : frf_meta_scope.
 Notation "S |- obj : role" := (PlaysFunctionalRole S obj role) (at level 50) : frf_meta_scope.
 
 (* ======================== 3. 定义前置（形式化完备，`carrier`字段显式可见，解决引用错误） ======================== *)
@@ -54,11 +54,11 @@ Inductive FunctionalFeature : Type :=
   | EdgeFeature : string → R → FunctionalFeature. (* 边缘功能：带权重w∈[0,1] *)
 Arguments FunctionalFeature : clear implicits.
 
-(* 3.1.4 功能特征合法性（修复：使用ASCII兼容符号） *)
+(* 3.1.4 功能特征合法性（修复：使用新的符号定义 *)
 Definition feature_valid (f : FunctionalFeature) : Prop :=
   match f with
   | CoreFeature _ => True
-  | EdgeFeature _ w => w in01
+  | EdgeFeature _ w => [0,1] w
   end.
 
 (* 3.1.5 功能角色（修复：使用ASCII兼容符号） *)
@@ -150,7 +150,7 @@ Arguments PropertyCategory : clear implicits.
 Open Scope frf_meta_scope.
 Open Scope R_scope.
 
-(* ======================== 6. 证明前置（修复：使用ASCII兼容符号） ======================== *)
+(* ======================== 6. 证明前置（修复：使用新的符号定义） ======================== *)
 (* ### 6.1 功能特征与权重引理（无逻辑变更，仅依赖Coq标准库） *)
 (* 6.1.1 核心功能无重复→互不相同（依赖Coq.Lists.ListDec的NoDup_impl_NoDupA） *)
 Lemma core_no_dup_impl_distinct : ∀ (S : FormalSystem) (r : FunctionalRole S),
@@ -201,7 +201,7 @@ Where sum_map2_sym : ∀ A B C (f : A→B→C) (l1 : list A) (l2 : list B),
 Qed.
 
 Lemma edge_feat_sim_bounded : ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
-  edge_feat_sim r1 r2 in01.
+  [0,1] (edge_feat_sim r1 r2).
 Proof.
   intros S r1 r2.
   unfold edge_feat_sim;
@@ -224,7 +224,7 @@ Where sum_map2_le_prod_sum : ∀ (l1 : list FunctionalFeature) (l2 : list Functi
   rewrite IH; compute; lia.
 Qed.
 
-(* ======================== 7. 核心定理（修复：使用ASCII兼容符号） ======================== *)
+(* ======================== 7. 核心定理（修复：使用新的符号定义） ======================== *)
 (* ### 7.1 功能角色决定身份（FRF核心，无变更） *)
 Theorem functional_role_determines_identity : ∀ (S : FormalSystem) (obj1 obj2 : S.(carrier)),
   (∃ r : FunctionalRole S, S |- obj1 : r ∧ S |- obj2 : r) → obj1 = obj2.
@@ -239,7 +239,7 @@ Qed.
 
 (* ### 7.2 功能角色相似度合规（无变更） *)
 Theorem role_similarity_compliant : ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
-  role_similarity r1 r2 in01 ∧
+  [0,1] (role_similarity r1 r2) ∧
   (core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = edge_feat_sim r1 r2) ∧
   (¬core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = 0).
 Proof.
