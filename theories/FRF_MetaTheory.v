@@ -17,14 +17,16 @@ Require Import SelfContainedLib.Algebra.
 Require Import SelfContainedLib.Category.
 
 (* ======================== 2. 全局符号统一（修复作用域定义） ======================== *)
-(* 修复：将作用域定义放在模块开头，避免语法错误 *)
+(* 修复：显式声明作用域并使用ASCII兼容符号 *)
+Declare Scope frf_meta_scope.
 Delimit Scope frf_meta_scope with frf_meta.
 
-Notation "w ∈ [0,1]" := (0 ≤ w ∧ w ≤ 1) (at level 25) : frf_meta_scope.
+(* 修复：使用ASCII兼容符号替代Unicode符号 *)
+Notation "w in01" := (0 <= w /\ w <= 1) (at level 25) : frf_meta_scope.
 Notation "sim(f1, f2)" := (edge_feature_similarity f1 f2) (at level 30) : frf_meta_scope.
 Notation "Core(feat)" := (CoreFeature feat) (at level 20) : frf_meta_scope.
 Notation "Edge(feat, w)" := (EdgeFeature feat w) (at level 20) : frf_meta_scope.
-Notation "S ⊢ obj : role" := (PlaysFunctionalRole S obj role) (at level 50) : frf_meta_scope.
+Notation "S |- obj : role" := (PlaysFunctionalRole S obj role) (at level 50) : frf_meta_scope.
 
 (* ======================== 3. 定义前置（形式化完备，`carrier`字段显式可见，解决引用错误） ======================== *)
 (* ### 3.1 基础核心定义（完全保留原结构，确保`carrier`可被下游访问） *)
@@ -52,14 +54,14 @@ Inductive FunctionalFeature : Type :=
   | EdgeFeature : string → R → FunctionalFeature. (* 边缘功能：带权重w∈[0,1] *)
 Arguments FunctionalFeature : clear implicits.
 
-(* 3.1.4 功能特征合法性（无变更，确保权重合规） *)
+(* 3.1.4 功能特征合法性（修复：使用ASCII兼容符号） *)
 Definition feature_valid (f : FunctionalFeature) : Prop :=
   match f with
   | CoreFeature _ => True
-  | EdgeFeature _ w => w ∈ [0,1]
+  | EdgeFeature _ w => w in01
   end.
 
-(* 3.1.5 功能角色（无变更，融合分层量化与功能必要性） *)
+(* 3.1.5 功能角色（修复：使用ASCII兼容符号） *)
 Record FunctionalRole (S : FormalSystem) : Type := {
   role_id : string;                          (* 角色唯一ID *)
   core_features : list FunctionalFeature;    (* 核心功能集 *)
@@ -71,7 +73,7 @@ Record FunctionalRole (S : FormalSystem) : Type := {
   edge_no_dup : NoDup edge_features;
   core_edge_disjoint : Disjoint core_features edge_features;
   edge_weight_valid : Forall feature_valid edge_features;
-  edge_weight_normalized : sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) edge_features) ≤ 1;
+  edge_weight_normalized : sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) edge_features) <= 1;
 }.
 Arguments FunctionalRole {_} : clear implicits.
 
@@ -99,12 +101,12 @@ Record ConceptIdentity (S : FormalSystem) (obj : S.(carrier)) : Type := {
 }.
 Arguments ConceptIdentity {_ _} : clear implicits.
 
-(* ### 3.2 辅助定义（无变更，保留原逻辑） *)
+(* ### 3.2 辅助定义（修复：使用ASCII兼容符号） *)
 Definition necessary_for_basic_property (S : FormalSystem) (obj : S.(carrier)) (cat : PropertyCategory) : Prop :=
   S.(prop_category) = cat ∧
   ∃ (cid : ConceptIdentity S obj),
     core_feat_equiv (cid.(ci_role)) (cid.(ci_role)) ∧
-    sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) (cid.(ci_role).(edge_features))) ≥ 0.
+    sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) (cid.(ci_role).(edge_features))) >= 0.
 
 Definition dependency_on_relation (S : FormalSystem) (obj : S.(carrier)) (R : S.(carrier) → S.(carrier) → Prop) (ax : Axiom) : Prop :=
   ax ∈ S.(axioms) ∧
@@ -148,7 +150,7 @@ Arguments PropertyCategory : clear implicits.
 Open Scope frf_meta_scope.
 Open Scope R_scope.
 
-(* ======================== 6. 证明前置（无逻辑断层，依赖Coq标准库引理，无Mathlib残留） ======================== *)
+(* ======================== 6. 证明前置（修复：使用ASCII兼容符号） ======================== *)
 (* ### 6.1 功能特征与权重引理（无逻辑变更，仅依赖Coq标准库） *)
 (* 6.1.1 核心功能无重复→互不相同（依赖Coq.Lists.ListDec的NoDup_impl_NoDupA） *)
 Lemma core_no_dup_impl_distinct : ∀ (S : FormalSystem) (r : FunctionalRole S),
@@ -161,12 +163,12 @@ Qed.
 
 (* 6.1.2 边缘功能权重合规→单个权重≤1（依赖Coq.Reals的 lia 战术） *)
 Lemma edge_weight_single_le1 : ∀ (S : FormalSystem) (r : FunctionalRole S) (f ∈ r.(edge_features)),
-  r.(edge_weight_normalized) → match f with EdgeFeature _ w => w ≤ 1 end.
+  r.(edge_weight_normalized) → match f with EdgeFeature _ w => w <= 1 end.
 Proof.
   intros S r f H_in H_norm.
   destruct f as [|n w]; try trivial.
-  assert (w ≥ 0) by apply (Forall_inv r.(edge_weight_valid) H_in); auto.  (* Coq.Lists.List的Forall_inv *)
-  assert (w ≤ sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r.(edge_features))) 
+  assert (w >= 0) by apply (Forall_inv r.(edge_weight_valid) H_in); auto.  (* Coq.Lists.List的Forall_inv *)
+  assert (w <= sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r.(edge_features))) 
     by apply sum_le_total; auto.  (* Coq.Lists.List的sum_le_total *)
   rewrite H_norm in H0; lia.  (* Coq.Reals的lia战术，处理实数不等式 *)
 Qed.
@@ -199,7 +201,7 @@ Where sum_map2_sym : ∀ A B C (f : A→B→C) (l1 : list A) (l2 : list B),
 Qed.
 
 Lemma edge_feat_sim_bounded : ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
-  edge_feat_sim r1 r2 ∈ [0,1].
+  edge_feat_sim r1 r2 in01.
 Proof.
   intros S r1 r2.
   unfold edge_feat_sim;
@@ -207,25 +209,25 @@ Proof.
   let w_sum1 := sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r1.(edge_features)) in
   let w_sum2 := sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) r2.(edge_features)) in
   
-  assert (sim_sum ≥ 0) by apply sum_nonneg; intros f; destruct f; compute; lia;  (* Coq.Lists.List的sum_nonneg *)
-  assert (sim_sum ≤ w_sum1 * w_sum2) by apply sum_map2_le_prod_sum; auto;  (* 补全sum_map2_le_prod_sum，机械可证 *)
+  assert (sim_sum >= 0) by apply sum_nonneg; intros f; destruct f; compute; lia;  (* Coq.Lists.List的sum_nonneg *)
+  assert (sim_sum <= w_sum1 * w_sum2) by apply sum_map2_le_prod_sum; auto;  (* 补全sum_map2_le_prod_sum，机械可证 *)
   
   destruct (w_sum1 * w_sum2 = 0) as [H_zero | H_nonzero];
   - reflexivity;
-  - assert (sim_sum / (w_sum1 * w_sum2) ≤ 1) by lia;
+  - assert (sim_sum / (w_sum1 * w_sum2) <= 1) by lia;
     split; [exact H | exact H1].
 Where sum_map2_le_prod_sum : ∀ (l1 : list FunctionalFeature) (l2 : list FunctionalFeature),
-  sum (map2 edge_feature_similarity l1 l2) ≤ 
+  sum (map2 edge_feature_similarity l1 l2) <= 
   sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) l1) *
   sum (map (fun f => match f with EdgeFeature _ w => w | _ => 0 end) l2) :=
   intros l1 l2; induction l1 as [|f1 l1' IH]; destruct l2 as [|f2 l2']; auto;
   rewrite IH; compute; lia.
 Qed.
 
-(* ======================== 7. 核心定理（形式化完备，无逻辑变更，仅依赖来源更新） ======================== *)
+(* ======================== 7. 核心定理（修复：使用ASCII兼容符号） ======================== *)
 (* ### 7.1 功能角色决定身份（FRF核心，无变更） *)
 Theorem functional_role_determines_identity : ∀ (S : FormalSystem) (obj1 obj2 : S.(carrier)),
-  (∃ r : FunctionalRole S, S ⊢ obj1 : r ∧ S ⊢ obj2 : r) → obj1 = obj2.
+  (∃ r : FunctionalRole S, S |- obj1 : r ∧ S |- obj2 : r) → obj1 = obj2.
 Proof.
   intros S obj1 obj2 [r [H1 H2]].
   unfold PlaysFunctionalRole in H1, H2;
@@ -237,7 +239,7 @@ Qed.
 
 (* ### 7.2 功能角色相似度合规（无变更） *)
 Theorem role_similarity_compliant : ∀ (S : FormalSystem) (r1 r2 : FunctionalRole S),
-  role_similarity r1 r2 ∈ [0,1] ∧
+  role_similarity r1 r2 in01 ∧
   (core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = edge_feat_sim r1 r2) ∧
   (¬core_feat_equiv r1 r2 ↔ role_similarity r1 r2 = 0).
 Proof.
@@ -267,7 +269,7 @@ Qed.
 
 (* ### 7.4 关系网络支撑功能（无变更） *)
 Theorem relational_network_supports_function : ∀ (S : FormalSystem) (obj : S.(carrier)) (r : FunctionalRole S),
-  S ⊢ obj : r → (∀ R ∈ (ConceptIdentity S obj).(ci_rels), ∃ ax ∈ S.(axioms), R ⪯ S ∧ ax = proj1_sig (R.(rel_axiom_dep))).
+  S |- obj : r → (∀ R ∈ (ConceptIdentity S obj).(ci_rels), ∃ ax ∈ S.(axioms), R ⪯ S ∧ ax = proj1_sig (R.(rel_axiom_dep))).
 Proof.
   intros S obj r H_role.
   unfold PlaysFunctionalRole in H_role;
