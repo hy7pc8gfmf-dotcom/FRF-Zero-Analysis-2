@@ -1,4 +1,4 @@
-(* theories/FRF_MetaTheory.v - 步骤1：修复导出问题 *)
+(* theories/FRF_MetaTheory.v - 步骤2：核心功能接口 *)
 Require Import Coq.Strings.String.  (* 关键修复：导入string类型 *)
 Require Import Coq.Lists.List.
 
@@ -41,5 +41,31 @@ Record ConceptIdentity (S : FormalSystem) (obj : carrier S) : Type := {
   ci_unique : forall (y : carrier S), Prop;
 }.
 
-(* 正确的导出方式：不导出记录类型本身，而是通过模块或直接使用 *)
-(* 移除错误的Export语句，记录类型在Coq中会自动在作用域内可用 *)
+(* ======================== *)
+(* 步骤2：添加核心功能接口 *)
+(* ======================== *)
+
+(* 核心功能定义 *)
+Definition PlaysFunctionalRole (S : FormalSystem) (obj : carrier S) 
+  (r : FunctionalRole S) : Prop :=
+  exists (cid : ConceptIdentity S obj), ci_role cid = r.
+
+Definition core_feat_equiv {S : FormalSystem} (r1 r2 : FunctionalRole S) : Prop :=
+  core_features r1 = core_features r2.
+
+(* 基础引理 - 使用简单的证明 *)
+Lemma functional_role_reflexive {S : FormalSystem} :
+  forall (r : FunctionalRole S), core_feat_equiv r r.
+Proof.
+  intros r. unfold core_feat_equiv. reflexivity.
+Qed.
+
+Lemma role_identity_preserved {S : FormalSystem} :
+  forall (r1 r2 : FunctionalRole S),
+  role_id r1 = role_id r2 -> core_feat_equiv r1 r2 -> r1 = r2.
+Proof.
+  intros r1 r2 H_id H_feat.
+  destruct r1, r2.
+  simpl in *.
+  congruence.
+Qed.
