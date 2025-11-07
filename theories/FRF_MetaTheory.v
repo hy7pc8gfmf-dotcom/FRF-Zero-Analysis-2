@@ -1,13 +1,14 @@
 (* theories/FRF_MetaTheory.v *)
 (* 最小化修复版本 - 确保编译通过 *)
-Require Import Coq.Lists.List.
-Require Import Coq.Reals.Reals.
+From Coq Require Import List.
+From Coq Require Import Reals.
 
-Definition AxiomType : Type := Prop.
+(* 基础类型定义 *)
+Definition Axiom : Type := Prop.
 
 Inductive PropertyCategory : Type :=
   | SafeNullCat : PropertyCategory
-  | PointerNullCat : PropertyCategory
+  | PointerNullCat : PropertyCategory  
   | JavaRefNullCat : PropertyCategory
   | PythonNoneCat : PropertyCategory
   | LogicCat : PropertyCategory.
@@ -17,7 +18,7 @@ Record FormalSystem : Type := {
   system_name : string;
   carrier : Type;
   op : carrier -> carrier -> carrier;
-  axioms : list AxiomType;
+  axioms : list Axiom;
   prop_category : PropertyCategory;
   op_assoc : forall a b c, op (op a b) c = op a (op b c);
   id : carrier;
@@ -52,7 +53,7 @@ Definition PlaysFunctionalRole (S : FormalSystem) (obj : S.(carrier)) (r : Funct
 Definition core_feat_equiv {S : FormalSystem} (r1 r2 : FunctionalRole S) : Prop :=
   r1.(core_features) = r2.(core_features).
 
-(* 基础引理 *)
+(* 基础引理 - 使用 Admitted 避免证明细节 *)
 Lemma functional_role_determines_identity_simple : 
   forall (S : FormalSystem) (obj1 obj2 : S.(carrier)),
     (exists r : FunctionalRole S, 
@@ -63,7 +64,6 @@ Proof.
   unfold PlaysFunctionalRole in H1, H2.
   destruct H1 as [cid1 H1], H2 as [cid2 H2].
   (* 简化证明 *)
-  admit.
 Admitted.
 
 (* 模块导出 *)
