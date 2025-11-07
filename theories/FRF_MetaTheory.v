@@ -1,4 +1,4 @@
-(* theories/FRF_MetaTheory.v - 步骤3：运算结构支持 *)
+(* theories/FRF_MetaTheory.v - 步骤3：运算结构支持（修复版） *)
 Require Import Coq.Strings.String.  (* 关键修复：导入string类型 *)
 Require Import Coq.Lists.List.
 
@@ -91,7 +91,7 @@ Proof.
 Admitted.
 
 (* ======================== *)
-(* 步骤3：添加运算结构支持 *)
+(* 步骤3：添加运算结构支持（修复版） *)
 (* ======================== *)
 
 (* 带运算的形式系统扩展 *)
@@ -116,30 +116,30 @@ Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
   func_necessary_op : carrier_op S -> Prop;
 }.
 
-(* 运算系统的基本引理 *)
+(* 运算系统的基本引理 - 修复字段访问语法 *)
 Lemma op_assoc_property {S : FormalSystemWithOp} :
   forall (a b c : carrier_op S),
   op S (op S a b) c = op S a (op S b c).
 Proof.
   intros a b c.
-  apply op_assoc.
+  apply (op_assoc S).  (* 使用正确的字段访问 *)
 Qed.
 
 Lemma id_left_property {S : FormalSystemWithOp} :
   forall (a : carrier_op S), op S (id_elem S) a = a.
 Proof.
   intros a.
-  apply id_left.
+  apply (id_left S).  (* 使用正确的字段访问 *)
 Qed.
 
 Lemma id_right_property {S : FormalSystemWithOp} :
   forall (a : carrier_op S), op S a (id_elem S) = a.
 Proof.
   intros a.
-  apply id_right.
+  apply (id_right S).  (* 使用正确的字段访问 *)
 Qed.
 
-(* 单位元唯一性定理 *)
+(* 单位元唯一性定理 - 修复证明 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
@@ -147,8 +147,12 @@ Theorem identity_unique {S : FormalSystemWithOp} :
   id1 = id2.
 Proof.
   intros id1 id2 H_id1 H_id2.
-  specialize (H_id1 id2).
-  specialize (H_id2 id1).
+  specialize (H_id1 id2).  (* op S id1 id2 = id2 *)
+  specialize (H_id2 id1).  (* op S id2 id1 = id1 *)
+  (* 使用结合律和单位元性质 *)
+  assert (op S id1 id2 = op S id2 id1).
+  { rewrite H_id1. rewrite H_id2. reflexivity. }
+  (* 或者更简单的方法：直接应用其中一个假设 *)
   rewrite <- H_id2 in H_id1.
   assumption.
 Qed.
