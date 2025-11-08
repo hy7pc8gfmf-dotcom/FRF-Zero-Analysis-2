@@ -2,6 +2,8 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Arith.PeanoNat.
+Require Import SelfContainedLib.Algebra.
+Require Import SelfContainedLib.Category.
 
 (* ======================== *)
 (* 基础类型定义 *)
@@ -97,7 +99,7 @@ Proof.
 Admitted.
 
 (* ======================== *)
-(* 运算结构支持 - 独立定义避免基础库依赖 *)
+(* 运算结构支持 - 与基础库对接 *)
 (* ======================== *)
 
 Record FormalSystemWithOp : Type := {
@@ -106,11 +108,11 @@ Record FormalSystemWithOp : Type := {
   op : carrier_op -> carrier_op -> carrier_op;
   axioms_op : list AxiomType;
   prop_category_op : PropertyCategory;
-  op_assoc : forall a b c, op (op a b) c = op a (op b c);
-  id_elem : carrier_op;
-  id_left : forall a, op id_elem a = a;
-  id_right : forall a, op a id_elem = a;
+  algebraic_structure : Monoid (carrier_op S) (op S);
 }.
+
+Definition monoid_of_system {S : FormalSystemWithOp} : 
+  Monoid (carrier_op S) (op S) := algebraic_structure S.
 
 Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
   role_id_op : string;
@@ -121,7 +123,7 @@ Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
 }.
 
 (* ======================== *)
-(* 运算系统基本性质 *)
+(* 运算系统基本性质 - 基于基础库 *)
 (* ======================== *)
 
 Lemma op_assoc_property {S : FormalSystemWithOp} :
@@ -129,70 +131,32 @@ Lemma op_assoc_property {S : FormalSystemWithOp} :
   op S (op S a b) c = op S a (op S b c).
 Proof.
   intros a b c.
-  apply (op_assoc S).
+  apply monoid_assoc.
 Qed.
 
 Lemma id_left_property {S : FormalSystemWithOp} :
-  forall (a : carrier_op S), op S (id_elem S) a = a.
+  forall (a : carrier_op S), op S (monoid_unit (monoid_of_system S)) a = a.
 Proof.
   intros a.
-  apply (id_left S).
+  apply monoid_left_id.
 Qed.
 
 Lemma id_right_property {S : FormalSystemWithOp} :
-  forall (a : carrier_op S), op S a (id_elem S) = a.
+  forall (a : carrier_op S), op S a (monoid_unit (monoid_of_system S)) = a.
 Proof.
   intros a.
-  apply (id_right S).
+  apply monoid_right_id.
 Qed.
 
-(* 单位元唯一性定理 - 完全修复版本 *)
+(* 单位元唯一性定理 - 使用基础库的证明 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
   (forall a, op S id2 a = a) ->
   id1 = id2.
 Proof.
-  intros id1 id2 H_id1_left H_id2_left.
-  (* 使用id1的左单位元性质作用于id2 *)
-  specialize (H_id1_left id2).  (* op S id1 id2 = id2 *)
-  (* 使用id2的左单位元性质作用于id1 *)  
-  specialize (H_id2_left id1).  (* op S id2 id1 = id1 *)
-  
-  (* 简单直接的证明：id1 = op S id2 id1 = op S id1 id2 = id2 *)
-  transitivity (op S id2 id1).
-  - symmetry. exact H_id2_left.
-  - transitivity (op S id1 id2).
-    + (* 证明 op S id2 id1 = op S id1 id2 *)
-      rewrite H_id1_left at 2.  (* op S id1 id2 = id2 *)
-      rewrite H_id2_left at 1.  (* op S id2 id1 = id1 *)
-      (* 现在需要证明 id1 = id2 *)
-      (* 使用id1的左单位元性质：op S id1 id2 = id2 *)
-      (* 使用id2的左单位元性质：op S id2 id1 = id1 *)
-      (* 建立等式链：id1 = op S id2 id1 = op S id1 id2 = id2 *)
-      rewrite <- H_id1_left.
-      rewrite H_id2_left.
-      reflexivity.
-    + exact H_id1_left.
-Qed.
-
-(* 更简洁的证明版本 *)
-Theorem identity_unique_simple {S : FormalSystemWithOp} :
-  forall (id1 id2 : carrier_op S),
-  (forall a, op S id1 a = a) ->
-  (forall a, op S id2 a = a) ->
-  id1 = id2.
-Proof.
   intros id1 id2 H1 H2.
-  (* 直接建立等式：id1 = op S id2 id1 = op S id1 id2 = id2 *)
-  transitivity (op S id2 id1).
-  - symmetry. apply H2.
-  - transitivity (op S id1 id2).
-    + (* 证明 op S id2 id1 = op S id1 id2 *)
-      rewrite (H1 id2).
-      rewrite (H2 id1).
-      reflexivity.
-    + apply H1.
+  apply (monoid_unit_unique (carrier_op S) (op S) (monoid_of_system S) id1 id2 H1 H2).
 Qed.
 
 (* ======================== *)
@@ -200,7 +164,7 @@ Qed.
 (* ======================== *)
 
 Notation "x ·[ S ] y" := (op S x y) (at level 40, left associativity).
-Notation "1_[ S ]" := (id_elem S) (at level 30).
+Notation "1_[ S ]" := (monoid_unit (monoid_of_system S)) (at level 30).
 
 (* ======================== *)
 (* 同态映射定义 *)
@@ -210,7 +174,8 @@ Record SystemHomomorphism (S1 S2 : FormalSystemWithOp) : Type := {
   hom_map : carrier_op S1 -> carrier_op S2;
   hom_preserves_op : forall a b, 
     hom_map (op S1 a b) = op S2 (hom_map a) (hom_map b);
-  hom_preserves_id : hom_map (id_elem S1) = id_elem S2;
+  hom_preserves_id : hom_map (monoid_unit (monoid_of_system S1)) = 
+                     monoid_unit (monoid_of_system S2);
 }.
 
 (* ======================== *)
@@ -224,8 +189,8 @@ Definition SystemIsomorphism (S1 S2 : FormalSystemWithOp) : Type :=
     (forall a b, g (op S2 a b) = op S1 (g a) (g b)) /\
     (forall a, g (f a) = a) /\
     (forall b, f (g b) = b) /\
-    (f (id_elem S1) = id_elem S2) /\
-    (g (id_elem S2) = id_elem S1)
+    (f (monoid_unit (monoid_of_system S1)) = monoid_unit (monoid_of_system S2)) /\
+    (g (monoid_unit (monoid_of_system S2)) = monoid_unit (monoid_of_system S1))
   }.
 
 (* ======================== *)
@@ -279,19 +244,14 @@ Definition Build_FormalSystem (name : string) (T : Type)
 
 Definition Build_FormalSystemWithOp (name : string) (T : Type)
   (operation : T -> T -> T) (axs : list AxiomType) 
-  (cat : PropertyCategory) (assoc_proof : forall a b c, operation (operation a b) c = operation a (operation b c))
-  (unit_elem : T) (left_id_proof : forall a, operation unit_elem a = a)
-  (right_id_proof : forall a, operation a unit_elem = a) : FormalSystemWithOp :=
+  (cat : PropertyCategory) (monoid_proof : Monoid T operation) : FormalSystemWithOp :=
   {|
     system_name_op := name;
     carrier_op := T;
     op := operation;
     axioms_op := axs;
     prop_category_op := cat;
-    op_assoc := assoc_proof;
-    id_elem := unit_elem;
-    id_left := left_id_proof;
-    id_right := right_id_proof;
+    algebraic_structure := monoid_proof;
   |}.
 
 (* ======================== *)
@@ -301,18 +261,18 @@ Definition Build_FormalSystemWithOp (name : string) (T : Type)
 Definition BooleanSystem : FormalSystem :=
   Build_FormalSystem "Boolean" bool nil LogicCat.
 
-(* 自然数加法系统 *)
-Definition NatAddSystem : FormalSystemWithOp :=
-  Build_FormalSystemWithOp 
-    "NaturalNumbers" 
-    nat 
-    Nat.add 
-    nil 
-    LogicCat 
-    Nat.add_assoc 
-    0 
-    Nat.add_0_l 
-    Nat.add_0_r.
+(* 自然数加法幺半群 *)
+Definition NatAddMonoid : Monoid nat Nat.add.
+Proof.
+  apply Build_Monoid.
+  - apply Nat.add_assoc.
+  - exists 0. split.
+    + apply Nat.add_0_l.
+    + apply Nat.add_0_r.
+Defined.
+
+Definition NaturalNumberSystem : FormalSystemWithOp :=
+  Build_FormalSystemWithOp "NaturalNumbers" nat Nat.add nil LogicCat NatAddMonoid.
 
 (* ======================== *)
 (* 重要定理 *)
@@ -365,15 +325,44 @@ Definition SystemComplete (S : FormalSystemWithOp) : Prop :=
   (exists x : carrier_op S, P x) \/ (forall x : carrier_op S, ~ P x).
 
 (* ======================== *)
-(* 最终兼容性接口 - 为后续模块准备 *)
+(* 范畴论兼容接口 *)
 (* ======================== *)
 
-(* 为ChurchNumerals和ChurchZero模块提供兼容接口 *)
+Definition category_of_systems : Category.
+Proof.
+  refine {|
+    obj := FormalSystemWithOp;
+    hom := SystemHomomorphism;
+    comp := fun S1 S2 S3 f g =>
+      {|
+        hom_map := fun x => hom_map g (hom_map f x);
+        hom_preserves_op := fun a b =>
+          eq_trans (f_equal (hom_map g) (hom_preserves_op f a b))
+                  (hom_preserves_op g (hom_map f a) (hom_map f b));
+        hom_preserves_id :=
+          eq_trans (f_equal (hom_map g) (hom_preserves_id f))
+                  (hom_preserves_id g);
+      |};
+    id := fun S =>
+      {|
+        hom_map := fun x => x;
+        hom_preserves_op := fun a b => eq_refl;
+        hom_preserves_id := eq_refl;
+      |};
+  |}.
+  - intros A B C D f g h. apply functional_extensionality. intros x. reflexivity.
+  - intros A B f. apply functional_extensionality. intros x. reflexivity.
+  - intros A B f. apply functional_extensionality. intros x. reflexivity.
+Defined.
+
+(* ======================== *)
+(* 后续模块兼容接口 *)
+(* ======================== *)
+
 Definition FRF_Carrier (S : FormalSystem) : Type := carrier S.
 Definition FRF_Op (S : FormalSystemWithOp) : carrier_op S -> carrier_op S -> carrier_op S := op S.
-Definition FRF_Unit (S : FormalSystemWithOp) : carrier_op S := id_elem S.
+Definition FRF_Unit (S : FormalSystemWithOp) : carrier_op S := monoid_unit (monoid_of_system S).
 
-(* 兼容性引理 *)
 Lemma frf_op_assoc {S : FormalSystemWithOp} : 
   forall a b c, FRF_Op S (FRF_Op S a b) c = FRF_Op S a (FRF_Op S b c).
 Proof. apply op_assoc_property. Qed.
@@ -385,3 +374,7 @@ Proof. apply id_left_property. Qed.
 Lemma frf_unit_right {S : FormalSystemWithOp} : 
   forall a, FRF_Op S a (FRF_Unit S) = a.
 Proof. apply id_right_property. Qed.
+
+(* ======================== *)
+(* 导出声明 *)
+(* ======================== *)
