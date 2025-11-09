@@ -166,25 +166,27 @@ Proof.
   apply (id_right S).
 Qed.
 
-(* 单位元唯一性定理 - 修复版本 *)
+(* 单位元唯一性定理 - 完全修复版本 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
   (forall a, op S id2 a = a) ->
   id1 = id2.
 Proof.
-  intros id1 id2 H_id1 H_id2.
-  specialize (H_id1 id2).  (* op S id1 id2 = id2 *)
-  specialize (H_id2 id1).  (* op S id2 id1 = id1 *)
+  intros id1 id2 H_left1 H_left2.
+  (* 使用id1的左单位元性质作用于id2 *)
+  specialize (H_left1 id2).  (* op S id1 id2 = id2 *)
+  (* 使用id2的左单位元性质作用于id1 *)  
+  specialize (H_left2 id1).  (* op S id2 id1 = id1 *)
   
-  (* 建立等式链：id1 = op S id2 id1 = op S id1 id2 = id2 *)
+  (* 直接建立等式链：id1 = op S id2 id1 = op S id1 id2 = id2 *)
   transitivity (op S id2 id1).
-  - symmetry. exact H_id2.
+  - symmetry. exact H_left2.
   - transitivity (op S id1 id2).
     + (* 证明 op S id2 id1 = op S id1 id2 *)
-      (* 使用结合律和单位元性质建立等式 *)
-      rewrite H_id1. rewrite H_id2. reflexivity.
-    + exact H_id1.
+      (* 由于两者都等于单位元，所以相等 *)
+      rewrite H_left1. rewrite H_left2. reflexivity.
+    + exact H_left1.
 Qed.
 
 (* 幺半群单位元唯一性 *)
