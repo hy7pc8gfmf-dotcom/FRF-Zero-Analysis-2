@@ -2,9 +2,8 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Arith.PeanoNat.
-Require Import SelfContainedLib.Algebra.
-Require Import SelfContainedLib.Category.
-Require Import SelfContainedLib.Geometry.
+Require Import SelfContainedLib.Algebra.  (* 导入基础代数库 *)
+Require Import SelfContainedLib.Category. (* 导入基础范畴库 *)
 
 (* ======================== *)
 (* 基础类型定义 *)
@@ -100,7 +99,7 @@ Proof.
 Admitted.
 
 (* ======================== *)
-(* 运算结构支持 - 与基础库对齐 *)
+(* 运算结构支持 - 使用基础库的Monoid *)
 (* ======================== *)
 
 Record FormalSystemWithOp : Type := {
@@ -115,13 +114,16 @@ Record FormalSystemWithOp : Type := {
   id_right : forall a, op a id_elem = a;
 }.
 
+(* 将FormalSystemWithOp转换为基础库的Monoid *)
 Definition monoid_of_system {S : FormalSystemWithOp} : 
-  SelfContainedLib.Algebra.Monoid (carrier_op S) (op S) :=
+  Monoid :=
   {|
-    SelfContainedLib.Algebra.monoid_assoc := op_assoc S;
-    SelfContainedLib.Algebra.monoid_unit := id_elem S;
-    SelfContainedLib.Algebra.monoid_left_id := id_left S;
-    SelfContainedLib.Algebra.monoid_right_id := id_right S;
+    carrier := carrier_op S;
+    op := op S;
+    id := id_elem S;
+    op_assoc := op_assoc S;
+    id_left := id_left S;
+    id_right := id_right S;
   |}.
 
 Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
@@ -158,7 +160,7 @@ Proof.
   apply (id_right S).
 Qed.
 
-(* 单位元唯一性定理 - 使用基础库的正确版本 *)
+(* 单位元唯一性定理 - 使用基础库的证明 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
@@ -166,25 +168,16 @@ Theorem identity_unique {S : FormalSystemWithOp} :
   id1 = id2.
 Proof.
   intros id1 id2 H1 H2.
-  (* 使用基础库中已证明的定理 *)
-  apply (SelfContainedLib.Algebra.monoid_id_unique_aux (monoid_of_system) id1 id2).
+  (* 转换为基础库的Monoid并使用其证明 *)
+  set (M := monoid_of_system S).
+  apply (monoid_id_unique_aux M id1 id2).
   split.
   - intros a. split.
     + apply H1.
-    + (* 需要证明 op S a id1 = a *)
-      rewrite <- (H1 a) at 2.
-      rewrite (op_assoc S a id1 a).
-      rewrite H1.
-      rewrite (id_right_property a).
-      reflexivity.
+    + rewrite (id_right S). reflexivity.
   - intros a. split.
     + apply H2.
-    + (* 需要证明 op S a id2 = a *)
-      rewrite <- (H2 a) at 2.
-      rewrite (op_assoc S a id2 a).
-      rewrite H2.
-      rewrite (id_right_property a).
-      reflexivity.
+    + rewrite (id_right S). reflexivity.
 Qed.
 
 (* ======================== *)
@@ -354,35 +347,38 @@ Definition SystemComplete (S : FormalSystemWithOp) : Prop :=
   (exists x : carrier_op S, P x) \/ (forall x : carrier_op S, ~ P x).
 
 (* ======================== *)
-(* 范畴论兼容接口 *)
+(* 范畴论兼容接口 - 使用基础库的PreCategory *)
 (* ======================== *)
 
-Definition category_of_systems : SelfContainedLib.Category.PreCategory.
+Definition category_of_systems : PreCategory.
 Proof.
   refine {|
-    SelfContainedLib.Category.Obj := FormalSystemWithOp;
-    SelfContainedLib.Category.Hom := SystemHomomorphism;
-    SelfContainedLib.Category.id := fun S =>
-      {|
-        hom_map := fun x => x;
-        hom_preserves_op := fun a b => eq_refl;
-        hom_preserves_id := eq_refl;
-      |};
-    SelfContainedLib.Category.comp := fun S1 S2 S3 f g =>
-      {|
-        hom_map := fun x => hom_map g (hom_map f x);
-        hom_preserves_op := fun a b =>
-          eq_trans (f_equal (hom_map g) (hom_preserves_op f a b))
-                  (hom_preserves_op g (hom_map f a) (hom_map f b));
-        hom_preserves_id :=
-          eq_trans (f_equal (hom_map g) (hom_preserves_id f))
-                  (hom_preserves_id g);
-      |};
+    Obj := FormalSystemWithOp;
+    Hom := SystemHomomorphism;
+    id := fun S => {|
+      hom_map := fun x => x;
+      hom_preserves_op := fun a b => eq_refl;
+      hom_preserves_id := eq_refl;
+    |};
+    comp := fun S1 S2 S3 f g => {|
+      hom_map := fun x => hom_map g (hom_map f x);
+      hom_preserves_op := fun a b =>
+        eq_trans (f_equal (hom_map g) (hom_preserves_op f a b))
+                (hom_preserves_op g (hom_map f a) (hom_map f b));
+      hom_preserves_id :=
+        eq_trans (f_equal (hom_map g) (hom_preserves_id f))
+                (hom_preserves_id g);
+    |};
   |}.
-  - intros A B C D f g h. 
-    apply functional_extensionality. intros x. reflexivity.
-  - intros A B f. apply functional_extensionality. intros x. reflexivity.
-  - intros A B f. apply functional_extensionality. intros x. reflexivity.
+  - intros w x y z f g h. 
+    apply functional_extensionality. 
+    intros a. reflexivity.
+  - intros x y f.
+    apply functional_extensionality.
+    intros a. reflexivity.
+  - intros x y f.
+    apply functional_extensionality.
+    intros a. reflexivity.
 Defined.
 
 (* ======================== *)
@@ -406,83 +402,28 @@ Lemma frf_unit_right {S : FormalSystemWithOp} :
 Proof. apply id_right_property. Qed.
 
 (* ======================== *)
-(* 基础库兼容性包装 *)
+(* 导出定义和定理 *)
 (* ======================== *)
 
-Module FRF_Algebra.
-  (* 导出基础代数结构 *)
-  Definition Monoid := SelfContainedLib.Algebra.Monoid.
-  Definition Group := SelfContainedLib.Algebra.Group.
-  
-  Definition monoid_of_system {S : FormalSystemWithOp} : 
-    Monoid (carrier_op S) (op S) :=
-    {|
-      monoid_assoc := op_assoc S;
-      monoid_unit := id_elem S;
-      monoid_left_id := id_left S;
-      monoid_right_id := id_right S;
-    |}.
-
-  (* 使用基础库中已证明的定理 *)
-  Definition monoid_unit_unique := SelfContainedLib.Algebra.monoid_unit_unique.
-End FRF_Algebra.
-
-Module FRF_Category.
-  (* 导出范畴论结构 *)
-  Definition PreCategory := SelfContainedLib.Category.PreCategory.
-  Definition Functor := SelfContainedLib.Category.Functor.
-  Definition NaturalTransformation := SelfContainedLib.Category.NaturalTransformation.
-  
-  Definition category_of_systems : PreCategory :=
-    {|
-      SelfContainedLib.Category.Obj := FormalSystemWithOp;
-      SelfContainedLib.Category.Hom := SystemHomomorphism;
-      SelfContainedLib.Category.id := fun S =>
-        {|
-          hom_map := fun x => x;
-          hom_preserves_op := fun a b => eq_refl;
-          hom_preserves_id := eq_refl;
-        |};
-      SelfContainedLib.Category.comp := fun S1 S2 S3 f g =>
-        {|
-          hom_map := fun x => hom_map g (hom_map f x);
-          hom_preserves_op := fun a b =>
-            eq_trans (f_equal (hom_map g) (hom_preserves_op f a b))
-                    (hom_preserves_op g (hom_map f a) (hom_map f b));
-          hom_preserves_id :=
-            eq_trans (f_equal (hom_map g) (hom_preserves_id f))
-                    (hom_preserves_id g);
-        |};
-      SelfContainedLib.Category.comp_assoc := fun A B C D f g h => eq_refl;
-      SelfContainedLib.Category.id_left := fun A B f => eq_refl;
-      SelfContainedLib.Category.id_right := fun A B f => eq_refl;
-    |}.
-End FRF_Category.
+Export FormalSystem FormalSystemWithOp FunctionalRole FunctionalRoleWithOp.
+Export DefinitiveRelation ConceptIdentity SystemHomomorphism SystemIsomorphism.
+Export Build_FormalSystem Build_FormalSystemWithOp.
+Export BooleanSystem NatAddSystem.
+Export PlaysFunctionalRole core_feat_equiv FunctionalRoleEquiv.
+Export monoid_of_system category_of_systems.
+Export FRF_Carrier FRF_Op FRF_Unit.
 
 (* ======================== *)
-(* 几何结构兼容接口 *)
+(* 导出引理和定理 *)
 (* ======================== *)
 
-Module FRF_Geometry.
-  Definition SphereManifold := SelfContainedLib.Geometry.SphereManifold.
-  Definition HyperbolicManifold := SelfContainedLib.Geometry.HyperbolicManifold.
-  Definition SphereMetric := SelfContainedLib.Geometry.SphereMetric.
-  Definition HyperbolicMetric := SelfContainedLib.Geometry.HyperbolicMetric.
-  
-  (* 导出几何操作接口 *)
-  Definition CovariantDerivative := SelfContainedLib.Geometry.CovariantDerivative.
-  Definition D_AlembertOperator := SelfContainedLib.Geometry.D_AlembertOperator.
-End FRF_Geometry.
+Export functional_role_reflexive role_identity_preserved.
+Export functional_role_determines_identity_simple.
+Export op_assoc_property id_left_property id_right_property identity_unique.
+Export homomorphism_preserves_structure isomorphism_preserves_equations.
+Export functional_role_equiv_refl functional_role_equiv_sym functional_role_equiv_trans.
+Export frf_op_assoc frf_unit_left frf_unit_right.
 
 (* ======================== *)
-(* 模块导出声明 *)
+(* 模块结束 *)
 (* ======================== *)
-
-Export FRF_Algebra.
-Export FRF_Category. 
-Export FRF_Geometry.
-
-(* 激活核心符号作用域 *)
-Open Scope algebra_scope.
-Open Scope category_scope.
-Open Scope geometry_scope.
