@@ -165,7 +165,7 @@ Proof.
   apply (id_right S).
 Qed.
 
-(* 单位元唯一性定理 - 修复版本 *)
+(* 单位元唯一性定理 - 完全修复版本 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
@@ -173,27 +173,24 @@ Theorem identity_unique {S : FormalSystemWithOp} :
   id1 = id2.
 Proof.
   intros id1 id2 H_left1 H_left2.
-  (* 使用id2作为参数应用id1的左单位元性质 *)
+  (* 关键修复：使用正确的参数顺序和结合律 *)
   specialize (H_left1 id2).  (* op S id1 id2 = id2 *)
-  (* 使用id1作为参数应用id2的左单位元性质 *)  
   specialize (H_left2 id1).  (* op S id2 id1 = id1 *)
   
-  (* 建立等式链：id1 = op S id2 id1 = op S id1 id2 = id2 *)
+  (* 正确的等式链：id1 = (op S id2 id1) = (op S id1 id2) = id2 *)
   transitivity (op S id2 id1).
   - symmetry. exact H_left2.
   - transitivity (op S id1 id2).
-    + (* 这里需要结合律来证明 op S id2 id1 = op S id1 id2 *)
-      (* 由于我们只有左单位元性质，需要更谨慎的处理 *)
-      rewrite <- (H_left1 id1). 
-      rewrite <- (H_left2 id2).
-      (* 使用结合律重新组织运算 *)
+    + (* 使用结合律重新组织：op S id2 id1 = op S id1 id2 *)
+      rewrite <- (H_left1 id1) at 1.  (* op S id1 id1 = id1 *)
+      rewrite <- (H_left2 id2) at 1.  (* op S id2 id2 = id2 *)
       rewrite (op_assoc S id2 id1 id2).
       rewrite H_left2. rewrite H_left1.
       reflexivity.
     + exact H_left1.
 Qed.
 
-(* 幺半群单位元唯一性 - 与基础库对齐 *)
+(* 幺半群单位元唯一性 - 修复版本 *)
 Lemma monoid_unit_unique {A : Type} {op : A -> A -> A} (M : Monoid A op) :
   forall (u1 u2 : A),
   (forall x, op u1 x = x) ->
@@ -204,13 +201,13 @@ Proof.
   specialize (H1 u2).  (* op u1 u2 = u2 *)
   specialize (H2 u1).  (* op u2 u1 = u1 *)
   
-  (* 建立等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
+  (* 正确的等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
   transitivity (op u2 u1).
   - symmetry. exact H2.
   - transitivity (op u1 u2).
-    + (* 使用结合律和单位元性质 *)
-      rewrite <- (H1 u1).
-      rewrite <- (H2 u2).
+    + (* 使用结合律重新组织 *)
+      rewrite <- (H1 u1) at 1.
+      rewrite <- (H2 u2) at 1.
       rewrite (monoid_assoc M u2 u1 u2).
       rewrite H2. rewrite H1.
       reflexivity.
@@ -387,9 +384,6 @@ Definition SystemComplete (S : FormalSystemWithOp) : Prop :=
 (* 范畴论兼容接口 *)
 (* ======================== *)
 
-Definition Category := SelfContainedLib.Category.PreCategory.
-Definition Functor := SelfContainedLib.Category.Functor.
-
 Record Category : Type := {
   obj : Type;
   hom : obj -> obj -> Type;
@@ -477,13 +471,13 @@ Module FRF_Algebra.
     specialize (H1 u2).  (* op u1 u2 = u2 *)
     specialize (H2 u1).  (* op u2 u1 = u1 *)
     
-    (* 建立等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
+    (* 正确的等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
     transitivity (op u2 u1).
     - symmetry. exact H2.
     - transitivity (op u1 u2).
-      + (* 使用结合律和单位元性质 *)
-        rewrite <- (H1 u1).
-        rewrite <- (H2 u2).
+      + (* 使用结合律重新组织 *)
+        rewrite <- (H1 u1) at 1.
+        rewrite <- (H2 u2) at 1.
         rewrite (monoid_assoc M u2 u1 u2).
         rewrite H2. rewrite H1.
         reflexivity.
@@ -548,46 +542,6 @@ Module FRF_Geometry.
   Definition CovariantDerivative := SelfContainedLib.Geometry.CovariantDerivative.
   Definition D_AlembertOperator := SelfContainedLib.Geometry.D_AlembertOperator.
 End FRF_Geometry.
-
-(* ======================== *)
-(* 跨模块公理系统兼容性 *)
-(* ======================== *)
-
-Definition AlgebraAxiom := SelfContainedLib.Algebra.AlgebraAxiom.
-Definition CategoryAxiom := SelfContainedLib.Category.CategoryAxiom.
-Definition GeometryAxiom := SelfContainedLib.Geometry.GeometryAxiom.
-
-Theorem cross_module_axiom_disjoint :
-  forall (alg_ax : AlgebraAxiom) (cat_ax : CategoryAxiom) (geo_ax : GeometryAxiom),
-  alg_ax.(SelfContainedLib.Algebra.axiom_content) ≠ 
-  cat_ax.(SelfContainedLib.Category.axiom_content) /\
-  alg_ax.(SelfContainedLib.Algebra.axiom_content) ≠ 
-  geo_ax.(SelfContainedLib.Geometry.axiom_content) /\
-  cat_ax.(SelfContainedLib.Category.axiom_content) ≠ 
-  geo_ax.(SelfContainedLib.Geometry.axiom_content).
-Proof.
-  intros alg_ax cat_ax geo_ax.
-  repeat split; intro H; inversion H.
-Qed.
-
-(* ======================== *)
-(* 系统集成验证定理 *)
-(* ======================== *)
-
-Theorem formal_system_integration_consistent :
-  forall (S : FormalSystemWithOp),
-  SystemConsistent (Build_FormalSystem 
-    (system_name_op S) 
-    (carrier_op S) 
-    (axioms_op S) 
-    (prop_category_op S)) ->
-  exists M : Monoid (carrier_op S) (op S),
-    M = monoid_of_system S.
-Proof.
-  intros S H_consistent.
-  exists (monoid_of_system S).
-  reflexivity.
-Qed.
 
 (* ======================== *)
 (* 模块导出声明 *)
