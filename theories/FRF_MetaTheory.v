@@ -100,14 +100,7 @@ Proof.
 Admitted.
 
 (* ======================== *)
-(* 代数结构定义 - 与基础库对齐 *)
-(* ======================== *)
-
-Definition Monoid := SelfContainedLib.Algebra.Monoid.
-Definition Group := SelfContainedLib.Algebra.Group.
-
-(* ======================== *)
-(* 运算结构支持 *)
+(* 运算结构支持 - 与基础库对齐 *)
 (* ======================== *)
 
 Record FormalSystemWithOp : Type := {
@@ -123,12 +116,12 @@ Record FormalSystemWithOp : Type := {
 }.
 
 Definition monoid_of_system {S : FormalSystemWithOp} : 
-  Monoid (carrier_op S) (op S) :=
+  SelfContainedLib.Algebra.Monoid (carrier_op S) (op S) :=
   {|
-    monoid_assoc := op_assoc S;
-    monoid_unit := id_elem S;
-    monoid_left_id := id_left S;
-    monoid_right_id := id_right S;
+    SelfContainedLib.Algebra.monoid_assoc := op_assoc S;
+    SelfContainedLib.Algebra.monoid_unit := id_elem S;
+    SelfContainedLib.Algebra.monoid_left_id := id_left S;
+    SelfContainedLib.Algebra.monoid_right_id := id_right S;
   |}.
 
 Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
@@ -165,53 +158,33 @@ Proof.
   apply (id_right S).
 Qed.
 
-(* 单位元唯一性定理 - 完全修复版本 *)
+(* 单位元唯一性定理 - 使用基础库的正确版本 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
   (forall a, op S id2 a = a) ->
   id1 = id2.
 Proof.
-  intros id1 id2 H_left1 H_left2.
-  (* 关键修复：使用正确的参数顺序和结合律 *)
-  specialize (H_left1 id2).  (* op S id1 id2 = id2 *)
-  specialize (H_left2 id1).  (* op S id2 id1 = id1 *)
-  
-  (* 正确的等式链：id1 = (op S id2 id1) = (op S id1 id2) = id2 *)
-  transitivity (op S id2 id1).
-  - symmetry. exact H_left2.
-  - transitivity (op S id1 id2).
-    + (* 使用结合律重新组织：op S id2 id1 = op S id1 id2 *)
-      rewrite <- (H_left1 id1) at 1.  (* op S id1 id1 = id1 *)
-      rewrite <- (H_left2 id2) at 1.  (* op S id2 id2 = id2 *)
-      rewrite (op_assoc S id2 id1 id2).
-      rewrite H_left2. rewrite H_left1.
+  intros id1 id2 H1 H2.
+  (* 使用基础库中已证明的定理 *)
+  apply (SelfContainedLib.Algebra.monoid_id_unique_aux (monoid_of_system) id1 id2).
+  split.
+  - intros a. split.
+    + apply H1.
+    + (* 需要证明 op S a id1 = a *)
+      rewrite <- (H1 a) at 2.
+      rewrite (op_assoc S a id1 a).
+      rewrite H1.
+      rewrite (id_right_property a).
       reflexivity.
-    + exact H_left1.
-Qed.
-
-(* 幺半群单位元唯一性 - 修复版本 *)
-Lemma monoid_unit_unique {A : Type} {op : A -> A -> A} (M : Monoid A op) :
-  forall (u1 u2 : A),
-  (forall x, op u1 x = x) ->
-  (forall x, op u2 x = x) ->
-  u1 = u2.
-Proof.
-  intros u1 u2 H1 H2.
-  specialize (H1 u2).  (* op u1 u2 = u2 *)
-  specialize (H2 u1).  (* op u2 u1 = u1 *)
-  
-  (* 正确的等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
-  transitivity (op u2 u1).
-  - symmetry. exact H2.
-  - transitivity (op u1 u2).
-    + (* 使用结合律重新组织 *)
-      rewrite <- (H1 u1) at 1.
-      rewrite <- (H2 u2) at 1.
-      rewrite (monoid_assoc M u2 u1 u2).
-      rewrite H2. rewrite H1.
+  - intros a. split.
+    + apply H2.
+    + (* 需要证明 op S a id2 = a *)
+      rewrite <- (H2 a) at 2.
+      rewrite (op_assoc S a id2 a).
+      rewrite H2.
+      rewrite (id_right_property a).
       reflexivity.
-    + exact H1.
 Qed.
 
 (* ======================== *)
@@ -384,23 +357,18 @@ Definition SystemComplete (S : FormalSystemWithOp) : Prop :=
 (* 范畴论兼容接口 *)
 (* ======================== *)
 
-Record Category : Type := {
-  obj : Type;
-  hom : obj -> obj -> Type;
-  comp : forall {A B C}, hom B C -> hom A B -> hom A C;
-  id : forall A, hom A A;
-  comp_assoc : forall A B C D (f : hom A B) (g : hom B C) (h : hom C D),
-    comp h (comp g f) = comp (comp h g) f;
-  id_left : forall A B (f : hom A B), comp (id B) f = f;
-  id_right : forall A B (f : hom A B), comp f (id A) = f;
-}.
-
-Definition category_of_systems : Category.
+Definition category_of_systems : SelfContainedLib.Category.PreCategory.
 Proof.
   refine {|
-    obj := FormalSystemWithOp;
-    hom := SystemHomomorphism;
-    comp := fun S1 S2 S3 f g =>
+    SelfContainedLib.Category.Obj := FormalSystemWithOp;
+    SelfContainedLib.Category.Hom := SystemHomomorphism;
+    SelfContainedLib.Category.id := fun S =>
+      {|
+        hom_map := fun x => x;
+        hom_preserves_op := fun a b => eq_refl;
+        hom_preserves_id := eq_refl;
+      |};
+    SelfContainedLib.Category.comp := fun S1 S2 S3 f g =>
       {|
         hom_map := fun x => hom_map g (hom_map f x);
         hom_preserves_op := fun a b =>
@@ -409,12 +377,6 @@ Proof.
         hom_preserves_id :=
           eq_trans (f_equal (hom_map g) (hom_preserves_id f))
                   (hom_preserves_id g);
-      |};
-    id := fun S =>
-      {|
-        hom_map := fun x => x;
-        hom_preserves_op := fun a b => eq_refl;
-        hom_preserves_id := eq_refl;
       |};
   |}.
   - intros A B C D f g h. 
@@ -461,28 +423,8 @@ Module FRF_Algebra.
       monoid_right_id := id_right S;
     |}.
 
-  Lemma monoid_unit_unique {A : Type} {op : A -> A -> A} (M : Monoid A op) :
-    forall (u1 u2 : A),
-    (forall x, op u1 x = x) ->
-    (forall x, op u2 x = x) ->
-    u1 = u2.
-  Proof.
-    intros u1 u2 H1 H2.
-    specialize (H1 u2).  (* op u1 u2 = u2 *)
-    specialize (H2 u1).  (* op u2 u1 = u1 *)
-    
-    (* 正确的等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
-    transitivity (op u2 u1).
-    - symmetry. exact H2.
-    - transitivity (op u1 u2).
-      + (* 使用结合律重新组织 *)
-        rewrite <- (H1 u1) at 1.
-        rewrite <- (H2 u2) at 1.
-        rewrite (monoid_assoc M u2 u1 u2).
-        rewrite H2. rewrite H1.
-        reflexivity.
-      + exact H1.
-  Qed.
+  (* 使用基础库中已证明的定理 *)
+  Definition monoid_unit_unique := SelfContainedLib.Algebra.monoid_unit_unique.
 End FRF_Algebra.
 
 Module FRF_Category.
@@ -491,22 +433,17 @@ Module FRF_Category.
   Definition Functor := SelfContainedLib.Category.Functor.
   Definition NaturalTransformation := SelfContainedLib.Category.NaturalTransformation.
   
-  Record Category : Type := {
-    obj : Type;
-    hom : obj -> obj -> Type;
-    comp : forall {A B C}, hom B C -> hom A B -> hom A C;
-    id : forall A, hom A A;
-    comp_assoc : forall A B C D (f : hom A B) (g : hom B C) (h : hom C D),
-      comp h (comp g f) = comp (comp h g) f;
-    id_left : forall A B (f : hom A B), comp (id B) f = f;
-    id_right : forall A B (f : hom A B), comp f (id A) = f;
-  }.
-
-  Definition category_of_systems : Category :=
+  Definition category_of_systems : PreCategory :=
     {|
-      obj := FormalSystemWithOp;
-      hom := SystemHomomorphism;
-      comp := fun S1 S2 S3 f g =>
+      SelfContainedLib.Category.Obj := FormalSystemWithOp;
+      SelfContainedLib.Category.Hom := SystemHomomorphism;
+      SelfContainedLib.Category.id := fun S =>
+        {|
+          hom_map := fun x => x;
+          hom_preserves_op := fun a b => eq_refl;
+          hom_preserves_id := eq_refl;
+        |};
+      SelfContainedLib.Category.comp := fun S1 S2 S3 f g =>
         {|
           hom_map := fun x => hom_map g (hom_map f x);
           hom_preserves_op := fun a b =>
@@ -516,15 +453,9 @@ Module FRF_Category.
             eq_trans (f_equal (hom_map g) (hom_preserves_id f))
                     (hom_preserves_id g);
         |};
-      id := fun S =>
-        {|
-          hom_map := fun x => x;
-          hom_preserves_op := fun a b => eq_refl;
-          hom_preserves_id := eq_refl;
-        |};
-      comp_assoc := fun A B C D f g h => eq_refl;
-      id_left := fun A B f => eq_refl;
-      id_right := fun A B f => eq_refl;
+      SelfContainedLib.Category.comp_assoc := fun A B C D f g h => eq_refl;
+      SelfContainedLib.Category.id_left := fun A B f => eq_refl;
+      SelfContainedLib.Category.id_right := fun A B f => eq_refl;
     |}.
 End FRF_Category.
 
