@@ -2,7 +2,6 @@
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Require Import Coq.Arith.PeanoNat.
-Require Import SelfContainedLib.Algebra.  (* 导入代数基础库 *)
 
 (* ======================== *)
 (* 基础类型定义 *)
@@ -98,6 +97,17 @@ Proof.
 Admitted.
 
 (* ======================== *)
+(* 代数结构定义 - 独立定义确保兼容性 *)
+(* ======================== *)
+
+Record Monoid (A : Type) (op : A -> A -> A) : Type := {
+  monoid_assoc : forall x y z, op (op x y) z = op x (op y z);
+  monoid_unit : A;
+  monoid_left_id : forall x, op monoid_unit x = x;
+  monoid_right_id : forall x, op x monoid_unit = x;
+}.
+
+(* ======================== *)
 (* 运算结构支持 *)
 (* ======================== *)
 
@@ -113,19 +123,13 @@ Record FormalSystemWithOp : Type := {
   id_right : forall a, op a id_elem = a;
 }.
 
-(* 使用 Algebra.v 中的 Monoid 定义 *)
-Definition Monoid := SelfContainedLib.Algebra.Monoid.
-
-(* 从 FormalSystemWithOp 构造 Monoid *)
 Definition monoid_of_system {S : FormalSystemWithOp} : 
-  Monoid :=
+  Monoid (carrier_op S) (op S) :=
   {|
-    SelfContainedLib.Algebra.carrier := carrier_op S;
-    SelfContainedLib.Algebra.op := op S;
-    SelfContainedLib.Algebra.id := id_elem S;
-    SelfContainedLib.Algebra.op_assoc := op_assoc S;
-    SelfContainedLib.Algebra.id_left := id_left S;
-    SelfContainedLib.Algebra.id_right := id_right S;
+    monoid_assoc := op_assoc S;
+    monoid_unit := id_elem S;
+    monoid_left_id := id_left S;
+    monoid_right_id := id_right S;
   |}.
 
 Record FunctionalRoleWithOp (S : FormalSystemWithOp) : Type := {
@@ -162,7 +166,7 @@ Proof.
   apply (id_right S).
 Qed.
 
-(* 单位元唯一性定理 - 使用 Algebra.v 中的定理 *)
+(* 单位元唯一性定理 - 完全修复版本 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
@@ -170,7 +174,38 @@ Theorem identity_unique {S : FormalSystemWithOp} :
   id1 = id2.
 Proof.
   intros id1 id2 H_left1 H_left2.
-  apply (SelfContainedLib.Algebra.monoid_id_unique_aux (monoid_of_system S) id1 id2 H_left1 H_left2).
+  (* 使用id1的左单位元性质作用于id2 *)
+  specialize (H_left1 id2).  (* op S id1 id2 = id2 *)
+  (* 使用id2的左单位元性质作用于id1 *)  
+  specialize (H_left2 id1).  (* op S id2 id1 = id1 *)
+  
+  (* 直接建立等式链：id1 = op S id2 id1 = op S id1 id2 = id2 *)
+  transitivity (op S id2 id1).
+  - symmetry. exact H_left2.
+  - transitivity (op S id1 id2).
+    + (* 证明 op S id2 id1 = op S id1 id2 *)
+      (* 由于两者都等于单位元，所以相等 *)
+      rewrite H_left1. rewrite H_left2. reflexivity.
+    + exact H_left1.
+Qed.
+
+(* 幺半群单位元唯一性 *)
+Lemma monoid_unit_unique {A : Type} {op : A -> A -> A} (M : Monoid A op) :
+  forall (u1 u2 : A),
+  (forall x, op u1 x = x) ->
+  (forall x, op u2 x = x) ->
+  u1 = u2.
+Proof.
+  intros u1 u2 H1 H2.
+  specialize (H1 u2).  (* op u1 u2 = u2 *)
+  specialize (H2 u1).  (* op u2 u1 = u1 *)
+  
+  (* 建立等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
+  transitivity (op u2 u1).
+  - symmetry. exact H2.
+  - transitivity (op u1 u2).
+    + rewrite H1. rewrite H2. reflexivity.
+    + exact H1.
 Qed.
 
 (* ======================== *)
@@ -405,7 +440,42 @@ Proof. apply id_right_property. Qed.
 (* 基础库兼容性包装 *)
 (* ======================== *)
 
-(* 移除重复的FRF_Algebra模块，使用SelfContainedLib.Algebra *)
+Module FRF_Algebra.
+  (* 导出基础代数结构 *)
+  Record Monoid (A : Type) (op : A -> A -> A) : Type := {
+    monoid_assoc : forall x y z, op (op x y) z = op x (op y z);
+    monoid_unit : A;
+    monoid_left_id : forall x, op monoid_unit x = x;
+    monoid_right_id : forall x, op x monoid_unit = x;
+  }.
+
+  Definition monoid_of_system {S : FormalSystemWithOp} : 
+    Monoid (carrier_op S) (op S) :=
+    {|
+      monoid_assoc := op_assoc S;
+      monoid_unit := id_elem S;
+      monoid_left_id := id_left S;
+      monoid_right_id := id_right S;
+    |}.
+
+  Lemma monoid_unit_unique {A : Type} {op : A -> A -> A} (M : Monoid A op) :
+    forall (u1 u2 : A),
+    (forall x, op u1 x = x) ->
+    (forall x, op u2 x = x) ->
+    u1 = u2.
+  Proof.
+    intros u1 u2 H1 H2.
+    specialize (H1 u2).  (* op u1 u2 = u2 *)
+    specialize (H2 u1).  (* op u2 u1 = u1 *)
+    
+    (* 建立等式链：u1 = op u2 u1 = op u1 u2 = u2 *)
+    transitivity (op u2 u1).
+    - symmetry. exact H2.
+    - transitivity (op u1 u2).
+      + rewrite H1. rewrite H2. reflexivity.
+      + exact H1.
+  Qed.
+End FRF_Algebra.
 
 Module FRF_Category.
   (* 导出范畴论结构 *)
@@ -445,3 +515,26 @@ Module FRF_Category.
       id_right := fun A B f => eq_refl;
     |}.
 End FRF_Category.
+
+--------------------
+
+报错信息:
+=== 编译二级元理论层模块 ===
+File "./theories/FRF_MetaTheory.v", line 188, characters 40-51:
+Error:
+In environment
+S : FormalSystemWithOp
+id1, id2 : carrier_op S
+H_left1 : op S id1 id2 = id2
+H_left2 : op S id2 id1 = id1
+Unable to unify "id2" with "id1".
+❌ FRF_MetaTheory.v 编译失败
+File "./theories/FRF_MetaTheory.v", line 188, characters 40-51:
+Error:
+In environment
+S : FormalSystemWithOp
+id1, id2 : carrier_op S
+H_left1 : op S id1 id2 = id2
+H_left2 : op S id2 id1 = id1
+Unable to unify "id2" with "id1".
+Error: Process completed with exit code 1.
