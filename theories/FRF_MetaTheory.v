@@ -113,9 +113,10 @@ Record FormalSystemWithOp : Type := {
   id_right : forall a, op a id_elem = a;
 }.
 
-(* 使用Algebra.v中的Monoid定义 *)
+(* 使用 Algebra.v 中的 Monoid 定义 *)
 Definition Monoid := SelfContainedLib.Algebra.Monoid.
 
+(* 从 FormalSystemWithOp 构造 Monoid *)
 Definition monoid_of_system {S : FormalSystemWithOp} : 
   Monoid :=
   {|
@@ -161,7 +162,7 @@ Proof.
   apply (id_right S).
 Qed.
 
-(* 单位元唯一性定理 - 使用Algebra.v中的定理 *)
+(* 单位元唯一性定理 - 使用 Algebra.v 中的定理 *)
 Theorem identity_unique {S : FormalSystemWithOp} :
   forall (id1 id2 : carrier_op S),
   (forall a, op S id1 a = a) ->
@@ -169,14 +170,7 @@ Theorem identity_unique {S : FormalSystemWithOp} :
   id1 = id2.
 Proof.
   intros id1 id2 H_left1 H_left2.
-  apply (SelfContainedLib.Algebra.monoid_id_unique_aux (monoid_of_system S) id1 id2).
-  split.
-  - intros a. split.
-    + apply H_left1.
-    + rewrite id_right_property. reflexivity.
-  - intros a. split.
-    + apply H_left2.
-    + rewrite id_right_property. reflexivity.
+  apply (SelfContainedLib.Algebra.monoid_id_unique_aux (monoid_of_system S) id1 id2 H_left1 H_left2).
 Qed.
 
 (* ======================== *)
