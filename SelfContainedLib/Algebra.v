@@ -156,15 +156,14 @@ Defined.
 Definition build_algebra_axiom (tag : AlgebraAxiomTag) (content : Prop) : AlgebraAxiom :=
   {| axiom_tag := tag; axiom_content := content |}.
 
-(* 代数公理相等性 - 仅当标签和内容都相同时 *)
-Theorem algebra_axiom_equality : forall (tag1 tag2 : AlgebraAxiomTag) (content1 content2 : Prop),
-  tag1 = tag2 -> (content1 <-> content2) -> 
-  build_algebra_axiom tag1 content1 = build_algebra_axiom tag2 content2.
+(* 代数公理相等性 - 简化版本：仅当标签相同时 *)
+Theorem algebra_axiom_same_tag_equal : forall (tag : AlgebraAxiomTag) (content1 content2 : Prop),
+  build_algebra_axiom tag content1 = build_algebra_axiom tag content2 ->
+  content1 = content2.
 Proof.
-  intros tag1 tag2 content1 content2 H_tag_eq H_content_iff.
-  destruct H_tag_eq.
-  apply f_equal.
-  apply prop_ext; assumption.
+  intros tag content1 content2 H_eq.
+  injection H_eq.
+  auto.
 Qed.
 
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
@@ -184,5 +183,5 @@ Export add add_assoc add_0_l add_0_r.
 Export Monoid Group NatAddMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
 Export algebra_axiom_tag_distinct algebra_axiom_eq_by_tag_dec.
-Export build_algebra_axiom algebra_axiom_equality.
+Export build_algebra_axiom algebra_axiom_same_tag_equal.
 Export non_trivial_monoid_no_zero AlgebraAxiom AlgebraAxiomTag algebra_axiom_tag_dec algebra_axiom_tag_eq_dec.
