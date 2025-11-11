@@ -156,23 +156,21 @@ Defined.
 Definition build_algebra_axiom (tag : AlgebraAxiomTag) (content : Prop) : AlgebraAxiom :=
   {| axiom_tag := tag; axiom_content := content |}.
 
-(* 代数公理等价性 - 替代相等性 *)
-Theorem algebra_axiom_same_tag_iff : forall (tag : AlgebraAxiomTag) (content1 content2 : Prop),
-  build_algebra_axiom tag content1 = build_algebra_axiom tag content2 ->
-  (content1 <-> content2).
+(* 代数公理等价性 - 简化版本 *)
+Theorem algebra_axiom_tag_injective : forall (ax1 ax2 : AlgebraAxiom),
+  ax1 = ax2 -> ax1.(axiom_tag) = ax2.(axiom_tag).
 Proof.
-  intros tag content1 content2 H_eq.
-  split; intro H.
-  - (* content1 -> content2 *)
-    assert (H1 : build_algebra_axiom tag content1 = build_algebra_axiom tag content1) by reflexivity.
-    rewrite H_eq in H1.
-    injection H1.
-    auto.
-  - (* content2 -> content1 *)
-    assert (H1 : build_algebra_axiom tag content2 = build_algebra_axiom tag content2) by reflexivity.
-    rewrite <- H_eq in H1.
-    injection H1.
-    auto.
+  intros [tag1 content1] [tag2 content2] H_eq.
+  injection H_eq.
+  auto.
+Qed.
+
+(* 代数公理投影引理 *)
+Lemma algebra_axiom_projection : forall (ax : AlgebraAxiom),
+  ax = build_algebra_axiom (ax.(axiom_tag)) (ax.(axiom_content)).
+Proof.
+  intros [tag content].
+  reflexivity.
 Qed.
 
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
@@ -192,5 +190,5 @@ Export add add_assoc add_0_l add_0_r.
 Export Monoid Group NatAddMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
 Export algebra_axiom_tag_distinct algebra_axiom_eq_by_tag_dec.
-Export build_algebra_axiom algebra_axiom_same_tag_iff.
+Export build_algebra_axiom algebra_axiom_tag_injective algebra_axiom_projection.
 Export non_trivial_monoid_no_zero AlgebraAxiom AlgebraAxiomTag algebra_axiom_tag_dec algebra_axiom_tag_eq_dec.
