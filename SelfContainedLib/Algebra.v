@@ -135,7 +135,7 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 代数公理标签不同则公理不同 - 修正版本 *)
+(* 代数公理标签不同则公理不同 *)
 Theorem algebra_axiom_tag_distinct : forall (ax1 ax2 : AlgebraAxiom),
   ax1.(axiom_tag) <> ax2.(axiom_tag) -> ax1 <> ax2.
 Proof.
@@ -144,15 +144,23 @@ Proof.
   contradiction H_tag_neq.
 Qed.
 
-(* 代数公理相等性判定 *)
-Definition algebra_axiom_eq_dec : forall (ax1 ax2 : AlgebraAxiom), {ax1 = ax2} + {ax1 <> ax2}.
+(* 代数公理标签相等性判定 - 仅比较标签 *)
+Definition algebra_axiom_eq_by_tag_dec : forall (ax1 ax2 : AlgebraAxiom), 
+  {ax1.(axiom_tag) = ax2.(axiom_tag)} + {ax1.(axiom_tag) <> ax2.(axiom_tag)}.
 Proof.
   intros [tag1 content1] [tag2 content2].
-  destruct (algebra_axiom_tag_eq_dec tag1 tag2) as [H_tag_eq|H_tag_neq].
-  - destruct H_tag_eq.
-    left; reflexivity.
-  - right; intro H; injection H; contradiction.
+  exact (algebra_axiom_tag_eq_dec tag1 tag2).
 Defined.
+
+(* 简化版本：仅当标签和内容都相同时公理才相同 *)
+Theorem algebra_axiom_identical : forall (ax1 ax2 : AlgebraAxiom),
+  ax1.(axiom_tag) = ax2.(axiom_tag) -> ax1.(axiom_content) = ax2.(axiom_content) -> ax1 = ax2.
+Proof.
+  intros [tag1 content1] [tag2 content2] H_tag_eq H_content_eq.
+  destruct H_tag_eq.
+  destruct H_content_eq.
+  reflexivity.
+Qed.
 
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
@@ -170,5 +178,5 @@ Qed.
 Export add add_assoc add_0_l add_0_r.
 Export Monoid Group NatAddMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
-Export algebra_axiom_tag_distinct algebra_axiom_eq_dec.
+Export algebra_axiom_tag_distinct algebra_axiom_eq_by_tag_dec algebra_axiom_identical.
 Export non_trivial_monoid_no_zero AlgebraAxiom AlgebraAxiomTag algebra_axiom_tag_dec algebra_axiom_tag_eq_dec.
