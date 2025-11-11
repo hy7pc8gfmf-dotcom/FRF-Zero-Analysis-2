@@ -8,6 +8,7 @@
 Require Import Coq.Arith.PeanoNat.
 Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Coq.ZArith.ZArith.
+Require Import Coq.Init.Specif. (* 导入 sumor 关系支持 *)
 
 (* ======================== 核心定义（前置无依赖，统一符号，对接algebra_scope） ======================== *)
 
@@ -97,19 +98,25 @@ Proof.
   - exact H2_left.
 Qed.
 
-(* 引理5：代数公理类型判别 *)
+(* 引理5：代数公理类型判别 - 修复版本 *)
 Lemma algebra_axiom_tag_dec : forall (ax : AlgebraAxiom),
-  {ax.(axiom_tag) = AddAssocTag} + {ax.(axiom_tag) = AddIdLeftTag} + 
-  {ax.(axiom_tag) = AddIdRightTag} + {ax.(axiom_tag) = MulAssocTag} + 
-  {ax.(axiom_tag) = MulIdLeftTag} + {ax.(axiom_tag) = MulIdRightTag} + 
+  {ax.(axiom_tag) = AddAssocTag} + 
+  {ax.(axiom_tag) = AddIdLeftTag} + 
+  {ax.(axiom_tag) = AddIdRightTag} + 
+  {ax.(axiom_tag) = MulAssocTag} + 
+  {ax.(axiom_tag) = MulIdLeftTag} + 
+  {ax.(axiom_tag) = MulIdRightTag} + 
   {ax.(axiom_tag) = MulLeftInvTag}.
 Proof.
   intros ax.
-  destruct ax.(axiom_tag); 
-    [left; reflexivity | right; left; reflexivity | right; right; left; reflexivity | 
-     right; right; right; left; reflexivity | right; right; right; right; left; reflexivity | 
-     right; right; right; right; right; left; reflexivity | 
-     right; right; right; right; right; right; left; reflexivity].
+  destruct ax.(axiom_tag) eqn:tag_eq;
+  try (left; reflexivity);
+  try (right; left; reflexivity);
+  try (right; right; left; reflexivity);
+  try (right; right; right; left; reflexivity);
+  try (right; right; right; right; left; reflexivity);
+  try (right; right; right; right; right; left; reflexivity);
+  try (right; right; right; right; right; right; left; reflexivity).
 Qed.
 
 (* ======================== 核心定理（证明完备，无跳跃） ======================== *)
