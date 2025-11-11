@@ -135,13 +135,13 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 代数公理标签不同则公理不同 *)
+(* 代数公理标签不同则公理不同 - 简化证明 *)
 Theorem algebra_axiom_tag_distinct : forall (ax1 ax2 : AlgebraAxiom),
   ax1.(axiom_tag) <> ax2.(axiom_tag) -> ax1 <> ax2.
 Proof.
-  intros [tag1 content1] [tag2 content2] H_tag_neq H_eq.
-  injection H_eq as H_tag_eq.
-  contradiction H_tag_neq.
+  intros ax1 ax2 H_tag_neq H_eq.
+  apply H_tag_neq.
+  congruence.
 Qed.
 
 (* 代数公理标签相等性判定 - 仅比较标签 *)
@@ -156,13 +156,12 @@ Defined.
 Definition build_algebra_axiom (tag : AlgebraAxiomTag) (content : Prop) : AlgebraAxiom :=
   {| axiom_tag := tag; axiom_content := content |}.
 
-(* 代数公理等价性 - 简化版本 *)
+(* 代数公理标签相等性 - 使用congruence *)
 Theorem algebra_axiom_tag_injective : forall (ax1 ax2 : AlgebraAxiom),
   ax1 = ax2 -> ax1.(axiom_tag) = ax2.(axiom_tag).
 Proof.
-  intros [tag1 content1] [tag2 content2] H_eq.
-  injection H_eq.
-  auto.
+  intros ax1 ax2 H_eq.
+  congruence.
 Qed.
 
 (* 代数公理投影引理 *)
