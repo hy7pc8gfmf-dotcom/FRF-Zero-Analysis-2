@@ -162,8 +162,8 @@ Theorem algebra_axiom_same_tag_equal : forall (tag : AlgebraAxiomTag) (content1 
   content1 = content2.
 Proof.
   intros tag content1 content2 H_eq.
-  apply f_equal with (f := axiom_content) in H_eq.
-  exact H_eq.
+  inversion H_eq.
+  reflexivity.
 Qed.
 
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
