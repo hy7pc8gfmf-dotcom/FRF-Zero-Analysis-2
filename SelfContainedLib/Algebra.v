@@ -2,12 +2,11 @@
 (* 模块定位：一级基础模块，提供自包含代数核心定义（自然数加法、幺半群、群）与公理体系
 适配标准：Coq 8.18.0，完全自包含（无Mathlib依赖），无循环依赖 *)
 
-(* 显式导入依赖模块（仅Coq标准库，无Mathlib依赖） *)
+(* 仅导入最基础的Coq标准库模块 *)
 Require Import Coq.Arith.PeanoNat.
-Require Import Coq.Logic.FunctionalExtensionality.
-Require Import Coq.ZArith.ZArith.
+Require Import Coq.Init.Datatypes.
 
-(* ======================== 核心定义（前置无依赖，统一符号） ======================== *)
+(* ======================== 核心定义（完全自包含） ======================== *)
 
 (* 1. 自然数加法 *)
 Fixpoint add (n m : nat) : nat := 
@@ -56,7 +55,6 @@ Notation "1_[ M ]" := (M.(id)) (at level 30) : algebra_scope.
 Notation "inv[ G ] a" := (G.(inv) a) (at level 40) : algebra_scope.
 Open Scope algebra_scope.
 Open Scope nat_scope.
-Open Scope Z_scope.
 
 (* ======================== 辅助引理 ======================== *)
 
@@ -90,7 +88,7 @@ Proof.
   - exact H2_left.
 Qed.
 
-(* 代数公理类型判别 - 简化版本 *)
+(* 代数公理类型相等性判定 *)
 Definition algebra_axiom_tag_eq_dec : forall (t1 t2 : AlgebraAxiomTag), {t1 = t2} + {t1 <> t2}.
 Proof.
   decide equality.
@@ -137,20 +135,8 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-Definition IntAddMonoid : Monoid := {|
-  carrier := Z;
-  op := Z.add;
-  id := 0%Z;
-  op_assoc := Z.add_assoc;
-  id_left := Z.add_0_l;
-  id_right := Z.add_0_r
-|}.
-
-Definition IntAddGroup : Group := {|
-  group_monoid := IntAddMonoid;
-  inv := Z.opp;
-  mul_left_inv := Z.add_opp_diag_l
-|}.
+(* 移除整数群实例，避免外部依赖问题 *)
+(* 用户可以在需要时基于此模块自行定义整数群 *)
 
 Theorem algebra_axiom_disjoint : forall (ax1 ax2 : AlgebraAxiom),
   ax1.(axiom_tag) <> ax2.(axiom_tag) -> 
@@ -178,6 +164,6 @@ Qed.
 
 (* ======================== 模块导出 ======================== *)
 Export add add_assoc add_0_l add_0_r.
-Export Monoid Group NatAddMonoid IntAddMonoid IntAddGroup.
+Export Monoid Group NatAddMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique algebra_axiom_disjoint.
 Export non_trivial_monoid_no_zero AlgebraAxiom AlgebraAxiomTag algebra_axiom_tag_dec algebra_axiom_tag_eq_dec.
