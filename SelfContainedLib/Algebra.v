@@ -90,8 +90,8 @@ Lemma monoid_id_unique_aux : forall (M : Monoid) (id2 id1 : carrier M),
 Proof.
   intros M id2 id1 [H2l H2r] [H1l H1r].
   (* 明确指定 a 的类型为 id1 和 id2，解决类型推断问题 *)
-  assert (id2 = op M id2 id1) by (apply H2l with a := id1).
-  assert (op M id2 id1 = id1) by (apply H1r with a := id2).
+  assert (id2 = op M id2 id1) by (apply H2l with (a := id1)).
+  assert (op M id2 id1 = id1) by (apply H1r with (a := id2)).
   rewrite H, H0; reflexivity.
 Qed.
 
