@@ -32,22 +32,6 @@ Record Group : Type := {
   mul_left_inv : forall a : carrier group_monoid, op group_monoid (inv a) a = id group_monoid
 }.
 
-(* 4. 代数公理标签 *)
-Inductive AlgebraAxiomTag : Type := 
-| AddAssocTag
-| AddIdLeftTag 
-| AddIdRightTag 
-| MulAssocTag 
-| MulIdLeftTag 
-| MulIdRightTag 
-| MulLeftInvTag.
-
-(* 5. 代数公理封装 *)
-Record AlgebraAxiom : Type := {
-  axiom_tag : AlgebraAxiomTag;
-  axiom_content : Prop;
-}.
-
 (* 符号记法 *)
 Declare Scope algebra_scope.
 Notation "a ·[ M ] b" := (M.(op) a b) (at level 50) : algebra_scope.
@@ -88,32 +72,6 @@ Proof.
   - exact H2_left.
 Qed.
 
-(* 代数公理类型相等性判定 *)
-Definition algebra_axiom_tag_eq_dec : forall (t1 t2 : AlgebraAxiomTag), {t1 = t2} + {t1 <> t2}.
-Proof.
-  decide equality.
-Defined.
-
-Lemma algebra_axiom_tag_dec : forall (ax : AlgebraAxiom),
-  (ax.(axiom_tag) = AddAssocTag) \/
-  (ax.(axiom_tag) = AddIdLeftTag) \/
-  (ax.(axiom_tag) = AddIdRightTag) \/
-  (ax.(axiom_tag) = MulAssocTag) \/
-  (ax.(axiom_tag) = MulIdLeftTag) \/
-  (ax.(axiom_tag) = MulIdRightTag) \/
-  (ax.(axiom_tag) = MulLeftInvTag).
-Proof.
-  intros ax.
-  destruct ax.(axiom_tag);
-  [ left; reflexivity
-  | right; left; reflexivity
-  | right; right; left; reflexivity
-  | right; right; right; left; reflexivity
-  | right; right; right; right; left; reflexivity
-  | right; right; right; right; right; left; reflexivity
-  | right; right; right; right; right; right; reflexivity ].
-Qed.
-
 (* ======================== 核心定理 ======================== *)
 
 Definition NatAddMonoid : Monoid := {|
@@ -135,47 +93,6 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 代数公理标签不同则公理不同 - 简化版本 *)
-Theorem algebra_axiom_tag_distinct : forall (ax1 ax2 : AlgebraAxiom),
-  ax1.(axiom_tag) <> ax2.(axiom_tag) -> ax1 <> ax2.
-Proof.
-  intros ax1 ax2 H H_eq.
-  apply H.
-  destruct ax1 as [tag1 content1], ax2 as [tag2 content2].
-  simpl in *.
-  congruence.
-Qed.
-
-(* 代数公理标签相等性判定 - 仅比较标签 *)
-Definition algebra_axiom_eq_by_tag_dec : forall (ax1 ax2 : AlgebraAxiom), 
-  {ax1.(axiom_tag) = ax2.(axiom_tag)} + {ax1.(axiom_tag) <> ax2.(axiom_tag)}.
-Proof.
-  intros [tag1 content1] [tag2 content2].
-  exact (algebra_axiom_tag_eq_dec tag1 tag2).
-Defined.
-
-(* 代数公理构造器 - 简化公理创建 *)
-Definition build_algebra_axiom (tag : AlgebraAxiomTag) (content : Prop) : AlgebraAxiom :=
-  {| axiom_tag := tag; axiom_content := content |}.
-
-(* 代数公理标签相等性 - 使用destruct和congruence *)
-Theorem algebra_axiom_tag_injective : forall (ax1 ax2 : AlgebraAxiom),
-  ax1 = ax2 -> ax1.(axiom_tag) = ax2.(axiom_tag).
-Proof.
-  intros ax1 ax2 H_eq.
-  destruct ax1 as [tag1 content1], ax2 as [tag2 content2].
-  simpl in *.
-  congruence.
-Qed.
-
-(* 代数公理投影引理 *)
-Lemma algebra_axiom_projection : forall (ax : AlgebraAxiom),
-  ax = build_algebra_axiom (ax.(axiom_tag)) (ax.(axiom_content)).
-Proof.
-  intros [tag content].
-  reflexivity.
-Qed.
-
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
@@ -192,6 +109,4 @@ Qed.
 Export add add_assoc add_0_l add_0_r.
 Export Monoid Group NatAddMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
-Export algebra_axiom_tag_distinct algebra_axiom_eq_by_tag_dec.
-Export build_algebra_axiom algebra_axiom_tag_injective algebra_axiom_projection.
-Export non_trivial_monoid_no_zero AlgebraAxiom AlgebraAxiomTag algebra_axiom_tag_dec algebra_axiom_tag_eq_dec.
+Export non_trivial_monoid_no_zero.
