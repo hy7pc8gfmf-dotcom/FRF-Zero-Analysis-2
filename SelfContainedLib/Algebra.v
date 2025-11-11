@@ -98,7 +98,7 @@ Proof.
   - exact H2_left.
 Qed.
 
-(* 引理5：代数公理类型判别 - 修复版本 *)
+(* 引理5：代数公理类型判别 - 完全修复版本 *)
 Lemma algebra_axiom_tag_dec : forall (ax : AlgebraAxiom),
   {ax.(axiom_tag) = AddAssocTag} + 
   {ax.(axiom_tag) = AddIdLeftTag} + 
@@ -109,14 +109,14 @@ Lemma algebra_axiom_tag_dec : forall (ax : AlgebraAxiom),
   {ax.(axiom_tag) = MulLeftInvTag}.
 Proof.
   intros ax.
-  destruct ax.(axiom_tag) eqn:tag_eq;
-  try (left; reflexivity);
-  try (right; left; reflexivity);
-  try (right; right; left; reflexivity);
-  try (right; right; right; left; reflexivity);
-  try (right; right; right; right; left; reflexivity);
-  try (right; right; right; right; right; left; reflexivity);
-  try (right; right; right; right; right; right; left; reflexivity).
+  destruct (ax.(axiom_tag)) as [| | | | | |] eqn:?;
+  [ left; reflexivity
+  | right; left; reflexivity
+  | right; right; left; reflexivity
+  | right; right; right; left; reflexivity
+  | right; right; right; right; left; reflexivity
+  | right; right; right; right; right; left; reflexivity
+  | right; right; right; right; right; right; left; reflexivity ].
 Qed.
 
 (* ======================== 核心定理（证明完备，无跳跃） ======================== *)
