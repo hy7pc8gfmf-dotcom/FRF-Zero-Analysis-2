@@ -1,4 +1,4 @@
-(* # SelfContainedLib/Algebra.v *)
+(* # SelfContainedLib/Algebra.v *)  
 (* 模块定位：一级基础模块，提供自包含代数核心定义（自然数加法、幺半群、群）与公理体系  
    适配标准：Coq 8.18.0，完全自包含（无Mathlib依赖），无循环依赖  
    核心优化：1. 修复语法错误（Record字段投影引用缺少括号，导致解析失败）；2. 移除Mathlib导入（环境无Mathlib，解决路径错误）；3. 保持符号与功能一致性  
@@ -27,9 +27,9 @@ Record Monoid : Type := {
 (* 3. 群定义（扩展幺半群，自包含，满足：幺半群公理+左逆元律；修复语法错误：投影引用加括号） *)
 Record Group : Type := {
   group_monoid : Monoid;  (* 底层幺半群结构：通过「group_monoid G」访问 *)
-  inv : carrier (group_monoid) -> carrier (group_monoid);  (* 修复：投影引用加括号，Coq 8.18.0语法要求 *)
-  mul_left_inv : forall a : carrier (group_monoid), 
-    op (group_monoid) (inv a) a = id (group_monoid)  (* 修复：op/id投影引用加括号 *)
+  inv : carrier group_monoid -> carrier group_monoid;  (* 修复：移除多余括号 *)
+  mul_left_inv : forall a : carrier group_monoid, 
+    op group_monoid (inv a) a = id group_monoid  (* 修复：移除多余括号 *)
 }.
 (* 4. 代数公理标签（枚举所有核心公理类型，支撑axiom_disjoint判定，无遗漏） *)
 Inductive AlgebraAxiomTag : Type :=
@@ -43,12 +43,12 @@ Inductive AlgebraAxiomTag : Type :=
 (* 5. 代数公理封装（对接FRF_MetaTheory.Axiom，无类型冲突，标签与内容绑定） *)
 Record AlgebraAxiom : Type := {
   axiom_tag : AlgebraAxiomTag;  (* 公理类型标签：快速判别类别 *)
-  axiom_content : Axiom;        (* 公理内容：统一为Axiom类型，兼容FRF元理论 *)
+  axiom_content : Prop;         (* 修复：改为Prop类型，避免未定义Axiom类型 *)
 }.
 (* 统一符号记法（对齐algebra_scope，全模块唯一，无歧义） *)
-Notation "op M a b" := (M.(op) a b) (at level 50) : algebra_scope.  (* 幺半群运算记法 *)
-Notation "id M" := (M.(id)) (at level 40) : algebra_scope.          (* 幺半群单位元记法 *)
-Notation "inv G a" := (G.(inv) a) (at level 40) : algebra_scope.    (* 群逆元记法 *)
+Notation "op M a b" := (op M a b) (at level 50) : algebra_scope.  (* 幺半群运算记法 *)
+Notation "id M" := (id M) (at level 40) : algebra_scope.          (* 幺半群单位元记法 *)
+Notation "inv G a" := (inv G a) (at level 40) : algebra_scope.    (* 群逆元记法 *)
 Open Scope algebra_scope.
 Open Scope nat_scope.
 (* ======================== 辅助引理（证明前置，无逻辑断层，标注公理依赖） ======================== *)
@@ -120,17 +120,18 @@ Proof.
   split; [intros a; apply NatAddMonoid.(id_left) | intros a; apply NatAddMonoid.(id_right)].
 Qed.
 (* 定理3：整数加法群实例（载体=int，运算=Int.add，逆元=Int.neg，仅依赖Coq标准库Int模块） *)
+Require Import Coq.ZArith.Int.
 Definition IntAddGroup : Group := {|
   group_monoid := {|
-    carrier := int;
-    op := Int.add;                     (* 运算：整数加法（Coq标准库） *)
-    id := 0%int;                       (* 单位元：0%int *)
-    op_assoc := Int.add_assoc;         (* 结合律：Coq标准库已证 Int.add_assoc *)
-    id_left := Int.add_zero;           (* 左单位律：Coq标准库已证 Int.add_zero（0 + a = a） *)
-    id_right := Int.zero_add           (* 右单位律：Coq标准库已证 Int.zero_add（a + 0 = a） *)
+    carrier := Z;
+    op := Z.add;                       (* 运算：整数加法（Coq标准库） *)
+    id := Z0;                          (* 单位元：0 *)
+    op_assoc := Z.add_assoc;           (* 结合律：Coq标准库已证 Z.add_assoc *)
+    id_left := Z.add_0_l;              (* 左单位律：Coq标准库已证 Z.add_0_l（0 + a = a） *)
+    id_right := Z.add_0_r              (* 右单位律：Coq标准库已证 Z.add_0_r（a + 0 = a） *)
   |};
-  inv := Int.neg;                      (* 逆元：整数相反数（Coq标准库） *)
-  mul_left_inv := Int.neg_add_self      (* 左逆元律：Coq标准库已证 Int.neg_add_self（-a + a = 0） *)
+  inv := Z.opp;                        (* 逆元：整数相反数（Coq标准库） *)
+  mul_left_inv := Z.add_opp_diag_l     (* 左逆元律：Coq标准库已证 Z.add_opp_diag_l（-a + a = 0） *)
 |}.
 (* 定理4：代数公理无交集判定（标签不同→公理内容不同，覆盖所有标签组合，无遗漏） *)
 Theorem algebra_axiom_disjoint : forall (ax1 ax2 : AlgebraAxiom),
@@ -162,12 +163,4 @@ Export non_trivial_monoid_no_zero AlgebraAxiom AlgebraAxiomTag algebra_axiom_tag
 (* 激活作用域，确保下游模块调用时符号解析一致，无歧义 *)
 Open Scope algebra_scope.
 Open Scope nat_scope.
-Open Scope int_scope.
-(* 修复说明：
-1. 核心语法修复：
-   - Group定义的inv字段：将「carrier group_monoid -> carrier group_monoid」改为「carrier (group_monoid) -> carrier (group_monoid)」，给投影引用加括号，符合Coq 8.18.0语法要求；
-   - Group定义的mul_left_inv字段：将「op group_monoid」改为「op (group_monoid)」、「id group_monoid」改为「id (group_monoid)」，同步修复投影引用语法；
-   根因：Coq 8.18.0要求Record字段中引用其他字段的投影时，需用括号包裹参数（group_monoid），否则解析为语法错误。
-2. 残留问题修复：保留之前移除Mathlib导入的修改，避免路径找不到错误；
-3. 功能全保留：所有定义、定理、符号均未改变，仅修正语法格式，不影响与Category.v等下游模块的兼容性；
-4. 无冲突保证：修改仅涉及语法格式，不新增/删除字段，与现有模块无冲突，无需更新其他模块。 *)
+Open Scope Z_scope.
