@@ -59,14 +59,15 @@ Proof.
   - rewrite IHa; reflexivity.
 Qed.
 
+(* 简化monoid_id_unique_aux证明，避免复杂模式匹配 *)
 Lemma monoid_id_unique_aux : forall (M : Monoid) (id2 id1 : carrier M), 
   (forall a : carrier M, op M id2 a = a /\ op M a id2 = a) ->
   (forall a : carrier M, op M id1 a = a /\ op M a id1 = a) ->
   id2 = id1.
 Proof.
   intros M id2 id1 H2 H1.
-  specialize (H2 id1) as [H2_left _].
-  specialize (H1 id2) as [_ H1_right].
+  pose proof (H2 id1) as [H2_left _].
+  pose proof (H1 id2) as [_ H1_right].
   transitivity (op M id2 id1).
   - symmetry. exact H1_right.
   - exact H2_left.
@@ -93,16 +94,18 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
+(* 简化non_trivial_monoid_no_zero证明 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
 Proof.
   intros M [a b Hab] [Z [HZl HZr]].
-  assert (a = Z).
-  { rewrite <- (id_left M a) at 2. rewrite HZr. reflexivity. }
-  assert (b = Z).
-  { rewrite <- (id_left M b) at 2. rewrite HZr. reflexivity. }
-  rewrite H, H0 in Hab; contradiction.
+  pose proof (id_left M a) as H_left_a.
+  rewrite HZr in H_left_a at 2.
+  pose proof (id_left M b) as H_left_b.
+  rewrite HZr in H_left_b at 2.
+  rewrite H_left_a, H_left_b in Hab.
+  contradiction.
 Qed.
 
 (* ======================== 模块导出 ======================== *)
