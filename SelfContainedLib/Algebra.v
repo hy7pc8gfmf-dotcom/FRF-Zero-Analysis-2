@@ -135,17 +135,16 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 代数公理无交集判定 - 彻底修复版本 *)
+(* 代数公理无交集判定 - 简化版本 *)
 Theorem algebra_axiom_disjoint : forall (ax1 ax2 : AlgebraAxiom),
   ax1.(axiom_tag) <> ax2.(axiom_tag) -> 
   ax1.(axiom_content) <> ax2.(axiom_content).
 Proof.
   intros ax1 ax2 H_tag_neq H_content_eq.
+  apply H_tag_neq.
   destruct ax1 as [tag1 content1], ax2 as [tag2 content2].
   simpl in *.
-  destruct tag1; destruct tag2;
-  try (apply H_tag_neq; reflexivity);
-  try discriminate.
+  congruence.
 Qed.
 
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
