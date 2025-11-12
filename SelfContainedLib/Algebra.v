@@ -96,27 +96,27 @@ Proof.
   destruct H_nontrivial as [a [b Hab]].
   destruct H_zero as [Z [HZl HZr]].
   
-  (* 直接推导矛盾，避免复杂重写 *)
-  assert (a_eq_Z : a = Z).
+  (* 使用幺半群公理和零元性质直接推导 *)
+  assert (a_equals_Z : a = Z).
   {
-    (* a = a · id = a · Z = Z *)
+    (* a = a · 1 = a · Z = Z *)
     transitivity (op M a (id M)).
-    - symmetry; apply id_right.
-    - rewrite HZr.
+    - symmetry. apply (id_right M a).
+    - rewrite (HZr a).  (* 这里使用 HZr a: op M a Z = Z *)
       reflexivity.
   }
   
-  assert (b_eq_Z : b = Z).
+  assert (b_equals_Z : b = Z).
   {
-    (* b = b · id = b · Z = Z *)
+    (* b = b · 1 = b · Z = Z *)
     transitivity (op M b (id M)).
-    - symmetry; apply id_right.
-    - rewrite HZr.
+    - symmetry. apply (id_right M b).
+    - rewrite (HZr b).  (* 这里使用 HZr b: op M b Z = Z *)
       reflexivity.
   }
   
   (* 现在 a = Z 且 b = Z，但假设 a ≠ b，矛盾 *)
-  rewrite a_eq_Z, b_eq_Z in Hab.
+  rewrite a_equals_Z, b_equals_Z in Hab.
   contradiction.
 Qed.
 
@@ -129,10 +129,21 @@ Record CommutativeMonoid : Type := {
     op comm_monoid a b = op comm_monoid b a
 }.
 
+(* 自然数加法交换性引理 *)
+Lemma add_comm : forall a b : nat, add a b = add b a.
+Proof.
+  induction a; intros b.
+  - simpl. apply add_0_r.
+  - simpl. rewrite IHa. 
+    induction b.
+    + reflexivity.
+    + simpl. rewrite IHb. reflexivity.
+Qed.
+
 (* 自然数加法交换幺半群 *)
 Definition NatAddCommMonoid : CommutativeMonoid := {|
   comm_monoid := NatAddMonoid;
-  comm_proof := Nat.add_comm
+  comm_proof := add_comm
 |}.
 
 (* 群的基本性质 *)
@@ -144,7 +155,7 @@ Proof.
 Qed.
 
 (* ======================== 模块导出 ======================== *)
-Export add add_assoc add_0_l add_0_r.
+Export add add_assoc add_0_l add_0_r add_comm.
 Export Monoid Group NatAddMonoid.
 Export CommutativeMonoid NatAddCommMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
