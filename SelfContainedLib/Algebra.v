@@ -85,7 +85,7 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 完全重写 non_trivial_monoid_no_zero 证明 - 简化版本 *)
+(* 完全重写 non_trivial_monoid_no_zero 证明 - 使用正确的等式方向 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
@@ -93,18 +93,18 @@ Proof.
   intros M H_nontrivial H_zero.
   destruct H_nontrivial as [a [b Hab]].
   destruct H_zero as [Z [HZl HZr]].
-  (* 简化证明：使用零元性质直接推导矛盾 *)
+  (* 使用正确的等式方向：从 op a id = a 开始 *)
   assert (a_equals_Z : a = Z).
   { 
     transitivity (op M a (id M)).
-    - apply id_right.
+    - symmetry. apply id_right.  (* 这里使用 symmetry 来调整等式方向 *)
     - rewrite HZr.
       reflexivity.
   }
   assert (b_equals_Z : b = Z).
   { 
     transitivity (op M b (id M)).
-    - apply id_right.
+    - symmetry. apply id_right.  (* 这里使用 symmetry 来调整等式方向 *)
     - rewrite HZr.
       reflexivity.
   }
