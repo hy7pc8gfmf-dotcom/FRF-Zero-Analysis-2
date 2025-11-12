@@ -87,29 +87,22 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 非平凡幺半群不存在零元 - 完全重写版本 *)
+(* 非平凡幺半群不存在零元 - 简化版本 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
 Proof.
-  intros M H_nontrivial H_zero.
-  destruct H_nontrivial as [a [b Hab]].
-  destruct H_zero as [Z [HZl HZr]].
+  intros M [a [b Hab]] [Z [HZl HZr]].
+  (* 简化证明：直接使用零元性质 *)
+  specialize (HZr a) as Ha.
+  specialize (HZr b) as Hb.
   
-  (* 使用零元性质直接推导 *)
-  assert (H1 : op M a Z = Z). { apply HZr. }
-  assert (H2 : op M b Z = Z). { apply HZr. }
+  (* 使用幺半群右单位元公理 *)
+  assert (H1 : a = op M a (id M)) by apply id_right.
+  assert (H2 : b = op M b (id M)) by apply id_right.
   
-  (* 使用幺半群公理 *)
-  assert (H3 : a = op M a (id M)). { symmetry; apply id_right. }
-  assert (H4 : b = op M b (id M)). { symmetry; apply id_right. }
-  
-  (* 现在我们有 a = a · 1 和 b = b · 1 *)
-  (* 但根据零元性质，a · Z = Z 和 b · Z = Z *)
-  (* 如果我们能证明 1 = Z，那么 a = a · Z = Z 且 b = b · Z = Z *)
-  
-  (* 证明 1 = Z *)
-  assert (id_equals_Z : id M = Z).
+  (* 如果 id M = Z，那么 a = Z 且 b = Z，矛盾 *)
+  assert (H3 : id M = Z).
   {
     transitivity (op M (id M) (id M)).
     - apply id_right.
@@ -117,13 +110,12 @@ Proof.
       reflexivity.
   }
   
-  (* 现在证明 a = Z 和 b = Z *)
-  rewrite id_equals_Z in H3, H4.
-  rewrite H1 in H3.
-  rewrite H2 in H4.
+  rewrite H3 in H1, H2.
+  rewrite Ha in H1.
+  rewrite Hb in H2.
   
-  (* 现在 H3: a = Z, H4: b = Z *)
-  rewrite H3, H4 in Hab.
+  (* 现在 H1: a = Z, H2: b = Z *)
+  rewrite H1, H2 in Hab.
   contradiction.
 Qed.
 
