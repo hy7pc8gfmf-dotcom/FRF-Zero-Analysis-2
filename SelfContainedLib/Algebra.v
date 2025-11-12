@@ -101,14 +101,14 @@ Proof.
   assert (H1 : op M a (id M) = a) by apply id_right.
   assert (H2 : op M b (id M) = b) by apply id_right.
   
-  (* 证明 id M = Z *)
+  (* 证明 id M = Z - 使用左单位元性质 *)
   assert (H3 : id M = Z).
   {
-    (* 使用左单位元性质：id M = op M (id M) a *)
-    transitivity (op M (id M) a).
-    - symmetry. apply id_left.  (* id M = op M (id M) a *)
-    - rewrite (HZl a).          (* op M Z a = Z *)
-      reflexivity.
+    (* 计算 op M (id M) Z 的两种方式 *)
+    assert (H4 : op M (id M) Z = Z). { apply HZr. }
+    assert (H5 : op M (id M) Z = id M). { apply id_left. }
+    rewrite H5 in H4.
+    exact H4.
   }
   
   (* 将 id M 替换为 Z *)
