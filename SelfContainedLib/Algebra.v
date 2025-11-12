@@ -87,7 +87,7 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 非平凡幺半群不存在零元 - 完全修复版本 *)
+(* 非平凡幺半群不存在零元 - 完全重写版本 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
@@ -96,27 +96,34 @@ Proof.
   destruct H_nontrivial as [a [b Hab]].
   destruct H_zero as [Z [HZl HZr]].
   
-  (* 使用幺半群公理和零元性质直接推导 *)
-  assert (a_equals_Z : a = Z).
+  (* 使用零元性质直接推导 *)
+  assert (H1 : op M a Z = Z). { apply HZr. }
+  assert (H2 : op M b Z = Z). { apply HZr. }
+  
+  (* 使用幺半群公理 *)
+  assert (H3 : a = op M a (id M)). { symmetry; apply id_right. }
+  assert (H4 : b = op M b (id M)). { symmetry; apply id_right. }
+  
+  (* 现在我们有 a = a · 1 和 b = b · 1 *)
+  (* 但根据零元性质，a · Z = Z 和 b · Z = Z *)
+  (* 如果我们能证明 1 = Z，那么 a = a · Z = Z 且 b = b · Z = Z *)
+  
+  (* 证明 1 = Z *)
+  assert (id_equals_Z : id M = Z).
   {
-    (* a = a · 1 = a · Z = Z *)
-    transitivity (op M a (id M)).
-    - symmetry. apply (id_right M a).
-    - rewrite (HZr a).  (* 这里使用 HZr a: op M a Z = Z *)
+    transitivity (op M (id M) (id M)).
+    - apply id_right.
+    - rewrite (HZr (id M)).
       reflexivity.
   }
   
-  assert (b_equals_Z : b = Z).
-  {
-    (* b = b · 1 = b · Z = Z *)
-    transitivity (op M b (id M)).
-    - symmetry. apply (id_right M b).
-    - rewrite (HZr b).  (* 这里使用 HZr b: op M b Z = Z *)
-      reflexivity.
-  }
+  (* 现在证明 a = Z 和 b = Z *)
+  rewrite id_equals_Z in H3, H4.
+  rewrite H1 in H3.
+  rewrite H2 in H4.
   
-  (* 现在 a = Z 且 b = Z，但假设 a ≠ b，矛盾 *)
-  rewrite a_equals_Z, b_equals_Z in Hab.
+  (* 现在 H3: a = Z, H4: b = Z *)
+  rewrite H3, H4 in Hab.
   contradiction.
 Qed.
 
