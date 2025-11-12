@@ -85,7 +85,7 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 完全重写 non_trivial_monoid_no_zero 证明 - 避免复杂模式匹配 *)
+(* 完全重写 non_trivial_monoid_no_zero 证明 - 简化版本 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
@@ -93,20 +93,23 @@ Proof.
   intros M H_nontrivial H_zero.
   destruct H_nontrivial as [a [b Hab]].
   destruct H_zero as [Z [HZl HZr]].
-  (* 使用幺半群公理和零元性质推导矛盾 *)
-  assert (H1 : a = op M (id M) a) by (rewrite (id_left M a); reflexivity).
-  assert (H2 : b = op M (id M) b) by (rewrite (id_left M b); reflexivity).
-  assert (H3 : op M (id M) a = Z).
-  { rewrite <- (id_right M (op M (id M) a)).
-    rewrite HZr.
-    reflexivity. }
-  assert (H4 : op M (id M) b = Z).
-  { rewrite <- (id_right M (op M (id M) b)).
-    rewrite HZr.
-    reflexivity. }
-  rewrite H1, H2, H3, H4 in *.
-  apply Hab.
-  reflexivity.
+  (* 简化证明：使用零元性质直接推导矛盾 *)
+  assert (a_equals_Z : a = Z).
+  { 
+    transitivity (op M a (id M)).
+    - apply id_right.
+    - rewrite HZr.
+      reflexivity.
+  }
+  assert (b_equals_Z : b = Z).
+  { 
+    transitivity (op M b (id M)).
+    - apply id_right.
+    - rewrite HZr.
+      reflexivity.
+  }
+  rewrite a_equals_Z, b_equals_Z in *.
+  contradiction.
 Qed.
 
 (* ======================== 模块导出 ======================== *)
