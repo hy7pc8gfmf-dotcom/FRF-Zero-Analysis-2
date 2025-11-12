@@ -97,23 +97,23 @@ Proof.
   specialize (HZr a) as Ha.
   specialize (HZr b) as Hb.
   
-  (* 使用幺半群右单位元公理，但注意方向 *)
+  (* 使用幺半群右单位元公理 *)
   assert (H1 : op M a (id M) = a) by apply id_right.
   assert (H2 : op M b (id M) = b) by apply id_right.
   
   (* 证明 id M = Z *)
   assert (H3 : id M = Z).
   {
-    transitivity (op M (id M) (id M)).
-    - symmetry. apply id_right.  (* id M = op M (id M) (id M) *)
-    - rewrite (HZr (id M)).      (* op M (id M) Z = Z *)
+    (* 使用左单位元性质：id M = op M (id M) a *)
+    transitivity (op M (id M) a).
+    - symmetry. apply id_left.  (* id M = op M (id M) a *)
+    - rewrite (HZl a).          (* op M Z a = Z *)
       reflexivity.
   }
   
   (* 将 id M 替换为 Z *)
   rewrite H3 in H1, H2.
   (* 现在 H1: op M a Z = a, H2: op M b Z = b *)
-  (* 但 Ha: op M a Z = Z, Hb: op M b Z = Z *)
   
   rewrite Ha in H1.  (* 得到 a = Z *)
   rewrite Hb in H2.  (* 得到 b = Z *)
