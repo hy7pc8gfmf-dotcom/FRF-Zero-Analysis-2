@@ -51,14 +51,13 @@ Proof.
   - rewrite IHa; reflexivity.
 Qed.
 
-(* 修复 monoid_id_unique_aux 证明 - 简化版本 *)
+(* 修复 monoid_id_unique_aux 证明 *)
 Lemma monoid_id_unique_aux : forall (M : Monoid) (id2 id1 : carrier M), 
   (forall a : carrier M, op M id2 a = a /\ op M a id2 = a) ->
   (forall a : carrier M, op M id1 a = a /\ op M a id1 = a) ->
   id2 = id1.
 Proof.
   intros M id2 id1 H2 H1.
-  (* 直接从假设推导 *)
   destruct (H2 id1) as [H2_left _].
   destruct (H1 id2) as [_ H1_right].
   rewrite <- H1_right at 1.
@@ -86,17 +85,28 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 完全重写 non_trivial_monoid_no_zero 证明 - 简化版本 *)
+(* 完全重写 non_trivial_monoid_no_zero 证明 - 避免复杂模式匹配 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
 Proof.
-  intros M [a b Hab] [Z [HZl HZr]].
-  (* 简化证明，避免复杂模式 *)
+  intros M H_nontrivial H_zero.
+  destruct H_nontrivial as [a [b Hab]].
+  destruct H_zero as [Z [HZl HZr]].
+  (* 使用幺半群公理和零元性质推导矛盾 *)
+  assert (H1 : a = op M (id M) a) by (rewrite (id_left M a); reflexivity).
+  assert (H2 : b = op M (id M) b) by (rewrite (id_left M b); reflexivity).
+  assert (H3 : op M (id M) a = Z).
+  { rewrite <- (id_right M (op M (id M) a)).
+    rewrite HZr.
+    reflexivity. }
+  assert (H4 : op M (id M) b = Z).
+  { rewrite <- (id_right M (op M (id M) b)).
+    rewrite HZr.
+    reflexivity. }
+  rewrite H1, H2, H3, H4 in *.
   apply Hab.
-  rewrite <- (id_left M a).
-  rewrite <- (id_left M b).
-  now rewrite HZr, HZr.
+  reflexivity.
 Qed.
 
 (* ======================== 模块导出 ======================== *)
