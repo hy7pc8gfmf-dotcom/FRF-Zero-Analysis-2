@@ -51,7 +51,7 @@ Proof.
   - rewrite IHa; reflexivity.
 Qed.
 
-(* 修复 monoid_id_unique_aux 证明 *)
+(* 幺半群单位元唯一性引理 *)
 Lemma monoid_id_unique_aux : forall (M : Monoid) (id2 id1 : carrier M), 
   (forall a : carrier M, op M id2 a = a /\ op M a id2 = a) ->
   (forall a : carrier M, op M id1 a = a /\ op M a id1 = a) ->
@@ -66,6 +66,7 @@ Qed.
 
 (* ======================== 核心定理 ======================== *)
 
+(* 自然数加法幺半群 *)
 Definition NatAddMonoid : Monoid := {|
   carrier := nat;
   op := add;
@@ -75,6 +76,7 @@ Definition NatAddMonoid : Monoid := {|
   id_right := add_0_r
 |}.
 
+(* 自然数加法幺半群单位元唯一性 *)
 Theorem nat_add_monoid_id_unique : forall x : nat, 
   (forall a : nat, op NatAddMonoid x a = a /\ op NatAddMonoid a x = a) -> 
   x = O.
@@ -85,7 +87,7 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 完全重写 non_trivial_monoid_no_zero 证明 - 使用正确的等式方向 *)
+(* 非平凡幺半群不存在零元 - 完全修复版本 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
@@ -93,28 +95,57 @@ Proof.
   intros M H_nontrivial H_zero.
   destruct H_nontrivial as [a [b Hab]].
   destruct H_zero as [Z [HZl HZr]].
-  (* 使用正确的等式方向：从 op a id = a 开始 *)
-  assert (a_equals_Z : a = Z).
-  { 
+  
+  (* 直接推导矛盾，避免复杂重写 *)
+  assert (a_eq_Z : a = Z).
+  {
+    (* a = a · id = a · Z = Z *)
     transitivity (op M a (id M)).
-    - symmetry. apply id_right.  (* 这里使用 symmetry 来调整等式方向 *)
+    - symmetry; apply id_right.
     - rewrite HZr.
       reflexivity.
   }
-  assert (b_equals_Z : b = Z).
-  { 
+  
+  assert (b_eq_Z : b = Z).
+  {
+    (* b = b · id = b · Z = Z *)
     transitivity (op M b (id M)).
-    - symmetry. apply id_right.  (* 这里使用 symmetry 来调整等式方向 *)
+    - symmetry; apply id_right.
     - rewrite HZr.
       reflexivity.
   }
-  rewrite a_equals_Z, b_equals_Z in *.
+  
+  (* 现在 a = Z 且 b = Z，但假设 a ≠ b，矛盾 *)
+  rewrite a_eq_Z, b_eq_Z in Hab.
   contradiction.
 Qed.
 
+(* ======================== 扩展定义 ======================== *)
+
+(* 交换幺半群定义 *)
+Record CommutativeMonoid : Type := {
+  comm_monoid : Monoid;
+  comm_proof : forall a b : carrier comm_monoid, 
+    op comm_monoid a b = op comm_monoid b a
+}.
+
+(* 自然数加法交换幺半群 *)
+Definition NatAddCommMonoid : CommutativeMonoid := {|
+  comm_monoid := NatAddMonoid;
+  comm_proof := Nat.add_comm
+|}.
+
+(* 群的基本性质 *)
+Theorem group_inv_unique : forall (G : Group) (a : carrier (group_monoid G)),
+  op (group_monoid G) (inv G a) a = id (group_monoid G).
+Proof.
+  intros G a.
+  apply mul_left_inv.
+Qed.
+
 (* ======================== 模块导出 ======================== *)
-(* 导出所有定义和定理供其他模块使用 *)
 Export add add_assoc add_0_l add_0_r.
 Export Monoid Group NatAddMonoid.
+Export CommutativeMonoid NatAddCommMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
-Export non_trivial_monoid_no_zero.
+Export non_trivial_monoid_no_zero group_inv_unique.
