@@ -34,9 +34,9 @@ Record Group : Type := {
 
 (* 符号记法 *)
 Declare Scope algebra_scope.
-Notation "a ·[ M ] b" := (M.(op) a b) (at level 50) : algebra_scope.
-Notation "1_[ M ]" := (M.(id)) (at level 30) : algebra_scope.
-Notation "inv[ G ] a" := (G.(inv) a) (at level 40) : algebra_scope.
+Delimit Scope algebra_scope with alg.
+Notation "a · b" := (op _ a b) (at level 50) : algebra_scope.
+Notation "1" := (id _) (at level 30) : algebra_scope.
 Open Scope algebra_scope.
 Open Scope nat_scope.
 
@@ -59,20 +59,20 @@ Proof.
   - rewrite IHa; reflexivity.
 Qed.
 
-(* 完全重写monoid_id_unique_aux证明，避免所有复杂模式匹配 *)
+(* 修复 monoid_id_unique_aux 证明 *)
 Lemma monoid_id_unique_aux : forall (M : Monoid) (id2 id1 : carrier M), 
   (forall a : carrier M, op M id2 a = a /\ op M a id2 = a) ->
   (forall a : carrier M, op M id1 a = a /\ op M a id1 = a) ->
   id2 = id1.
 Proof.
   intros M id2 id1 H2 H1.
-  (* 避免使用任何复杂的模式匹配 *)
-  assert (H2_left: op M id2 id1 = id1).
-  { destruct (H2 id1) as [H _]. exact H. }
-  assert (H1_right: op M id2 id1 = id2).
-  { destruct (H1 id2) as [_ H]. exact H. }
-  rewrite H1_right at 1.
-  exact H2_left.
+  (* 使用正确的字段访问语法 *)
+  specialize (H2 id1) as [H2_left _].
+  specialize (H1 id2) as [_ H1_right].
+  (* 现在可以直接使用这些等式 *)
+  transitivity (op M id2 id1).
+  - symmetry; exact H1_right.
+  - exact H2_left.
 Qed.
 
 (* ======================== 核心定理 ======================== *)
@@ -96,20 +96,23 @@ Proof.
   - intros a. split; [apply NatAddMonoid.(id_left) | apply NatAddMonoid.(id_right)].
 Qed.
 
-(* 完全重写non_trivial_monoid_no_zero证明 *)
+(* 修复 non_trivial_monoid_no_zero 证明 *)
 Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
   (exists a b : carrier M, a <> b) ->
   ~(exists Z : carrier M, (forall a : carrier M, op M Z a = Z) /\ (forall a : carrier M, op M a Z = Z)).
 Proof.
   intros M [a b Hab] [Z [HZl HZr]].
-  (* 避免使用assert和复杂重写 *)
   apply Hab.
-  transitivity Z.
-  - rewrite <- (id_left M a). rewrite HZr. reflexivity.
-  - symmetry. rewrite <- (id_left M b). rewrite HZr. reflexivity.
+  (* 使用幺半群公理 *)
+  transitivity (op M (id M) a).
+  - rewrite (id_left M a). reflexivity.
+  - transitivity (op M (id M) b).
+    + rewrite HZr, HZr. reflexivity.
+    + rewrite (id_left M b). reflexivity.
 Qed.
 
 (* ======================== 模块导出 ======================== *)
+(* 导出所有定义和定理供其他模块使用 *)
 Export add add_assoc add_0_l add_0_r.
 Export Monoid Group NatAddMonoid.
 Export monoid_id_unique_aux nat_add_monoid_id_unique.
