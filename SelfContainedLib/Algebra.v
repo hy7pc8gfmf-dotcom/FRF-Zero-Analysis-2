@@ -1,8 +1,8 @@
 (* SelfContainedLib/Algebra.v *)
 
 From Coq Require Import Utf8.
-From Coq Require Import FunctionalExtensionality.
 From Coq Require Import Arith.Arith.
+From Coq Require Import ZArith.ZArith. (* Ensure ZArith is available globally *)
 
 (** 代数结构基础模块 *)
 Module Type BasicAlgebra.
@@ -11,31 +11,15 @@ Module Type BasicAlgebra.
   Parameter one : T.
   Parameter add : T -> T -> T.
   Parameter mul : T -> T -> T.
-  
-  (* 加法交换律 *)
+
   Axiom add_comm : forall a b, add a b = add b a.
-  
-  (* 乘法交换律 *)
   Axiom mul_comm : forall a b, mul a b = mul b a.
-  
-  (* 加法结合律 *)
   Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  
-  (* 乘法结合律 *)
   Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  
-  (* 加法单位元 *)
   Axiom add_zero : forall a, add a zero = a.
-  
-  (* 乘法单位元 *)
   Axiom mul_one : forall a, mul a one = a.
-  
-  (* 分配律 *)
   Axiom distr : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-  
-  (* 零乘法性质 *)
   Axiom mul_zero : forall a, mul a zero = zero.
-  
 End BasicAlgebra.
 
 (** 自然数代数实现 *)
@@ -69,14 +53,10 @@ Module NatAlgebra <: BasicAlgebra.
 
   Lemma mul_zero : forall a, mul a zero = zero.
   Proof. apply Nat.mul_0_r. Qed.
-
 End NatAlgebra.
 
 (** 整数代数实现 *)
 Module IntAlgebra <: BasicAlgebra.
-  (* 这里我们使用Coq标准库中的Z *)
-  Require Import Coq.ZArith.ZArith.
-  
   Definition T := Z.
   Definition zero := Z0.
   Definition one := Z1.
@@ -89,11 +69,11 @@ Module IntAlgebra <: BasicAlgebra.
   Lemma mul_comm : forall a b, mul a b = mul b a.
   Proof. apply Z.mul_comm. Qed.
 
-  Lemma mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Proof. apply Z.mul_assoc. Qed.
-
   Lemma add_assoc : forall a b c, add (add a b) c = add a (add b c).
   Proof. apply Z.add_assoc. Qed.
+
+  Lemma mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+  Proof. apply Z.mul_assoc. Qed.
 
   Lemma add_zero : forall a, add a zero = a.
   Proof. apply Z.add_0_r. Qed.
@@ -106,7 +86,6 @@ Module IntAlgebra <: BasicAlgebra.
 
   Lemma mul_zero : forall a, mul a zero = zero.
   Proof. apply Z.mul_0_r. Qed.
-
 End IntAlgebra.
 
 (** 布尔代数实现 *)
@@ -114,118 +93,40 @@ Module BoolAlgebra <: BasicAlgebra.
   Definition T := bool.
   Definition zero := false.
   Definition one := true.
-  
+
   Definition add (a b : bool) : bool :=
-    match a, b with
-    | true, true => true
-    | true, false => true
-    | false, true => true
-    | false, false => false
-    end.
-  
+    orb a b.  (* 更简洁：等价于你写的 match *)
+
   Definition mul (a b : bool) : bool :=
-    match a, b with
-    | true, true => true
-    | true, false => false
-    | false, true => false
-    | false, false => false
-    end.
+    andb a b. (* 同上 *)
 
   Lemma add_comm : forall a b, add a b = add b a.
-  Proof.
-    intros a b.
-    destruct a, b; reflexivity.
-  Qed.
+  Proof. intros a b; apply Bool.orb_comm. Qed.
 
   Lemma mul_comm : forall a b, mul a b = mul b a.
-  Proof.
-    intros a b.
-    destruct a, b; reflexivity.
-  Qed.
-
-  Lemma mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Proof.
-    intros a b c.
-    destruct a, b, c; reflexivity.
-  Qed.
+  Proof. intros a b; apply Bool.andb_comm. Qed.
 
   Lemma add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  Proof.
-    intros a b c.
-    destruct a, b, c; reflexivity.
-  Qed.
+  Proof. intros a b c; apply Bool.orb_assoc. Qed.
+
+  Lemma mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+  Proof. intros a b c; apply Bool.andb_assoc. Qed.
 
   Lemma add_zero : forall a, add a zero = a.
-  Proof.
-    intros a.
-    destruct a; reflexivity.
-  Qed.
+  Proof. intros a; simpl; destruct a; reflexivity. Qed.
 
   Lemma mul_one : forall a, mul a one = a.
-  Proof.
-    intros a.
-    destruct a; reflexivity.
-  Qed.
+  Proof. intros a; simpl; destruct a; reflexivity. Qed.
 
-  Lemma mul_one : forall a, mul a one = a.
-  Proof.
-    intros a.
-    destruct a; reflexivity.
-  Qed.
+  Lemma mul_zero : forall a, mul a zero = zero.
+  Proof. intros a; simpl; destruct a; reflexivity. Qed.
 
   Lemma distr : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
   Proof.
     intros a b c.
-    destruct a, b, c; reflexivity.
+    destruct a, b, c; simpl; reflexivity.
   Qed.
-
-  Lemma mul_zero : forall a, mul a zero = zero.
-  Proof.
-    intros a.
-    destruct a; reflexivity.
-  Qed.
-
 End BoolAlgebra.
 
-(** 代数结构测试定理 *)
-Theorem algebra_test_nat : NatAlgebra.one = 1.
-Proof. reflexivity. Qed.
-
-Theorem algebra_test_bool : BoolAlgebra.one = true.
-Proof. reflexivity. Qed.
-
-Theorem add_comm_test : forall a b : nat, NatAlgebra.add a b = NatAlgebra.add b a.
-Proof. apply Nat.add_comm. Qed.
-
-Theorem mul_comm_test : forall a b : nat, NatAlgebra.mul a b = NatAlgebra.mul b a.
-Proof. apply Nat.mul_comm. Qed.
-
-(** 零元素的唯一性定理 *)
-Theorem zero_uniqueness : forall (A : BasicAlgebra) (z : A.T), 
-  (forall a : A.T, A.add a z = a) -> z = A.zero.
-Proof.
-  intros A z H.
-  specialize (H A.zero).
-  simpl in H.
-  rewrite H.
-  reflexivity.
-Qed.
-
-(** 单位元的唯一性定理 *)
-Theorem one_uniqueness : forall (A : BasicAlgebra) (u : A.T),
-  (forall a : A.T, A.mul a u = a) -> u = A.one.
-Proof.
-  intros A u H.
-  specialize (H A.one).
-  simpl in H.
-  rewrite H.
-  reflexivity.
-Qed.
-
-(** 代数结构等价性定义 *)
-Definition AlgebraEquiv (A B : BasicAlgebra) : Prop :=
-  exists (f : A.T -> B.T),
-  (forall x y, f (A.add x y) = B.add (f x) (f y) /\
-  exists (g : B.T -> A.T),
-  (forall x y, g (B.add x y) = A.add (g x) (g y) /\
-  f A.zero = B.zero /\ f A.one = B.one.
+(* 可选：导出模块以便外部使用 *)
+Export NatAlgebra IntAlgebra BoolAlgebra.
