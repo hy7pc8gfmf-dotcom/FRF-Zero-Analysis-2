@@ -1,3 +1,4 @@
+```coq
 (* © 2025 FRF-Zero-Analysis Project. Licensed under GPLv3 or commercial license. *)
 (* SelfContainedLib/Algebra.v - 自然数加法幺半群与代数公理基础 *)
 
@@ -134,11 +135,11 @@ Theorem non_trivial_monoid_no_zero : forall (M : Monoid),
       (forall a : carrier M, op M a Z = Z)).
 Proof.
   intros M [a b Hab] [Z [HZl HZr]].
-  assert (a = Z).
-  { rewrite <- (id_left M a) at 2. rewrite HZr. reflexivity. }
-  assert (b = Z).
-  { rewrite <- (id_left M b) at 2. rewrite HZr. reflexivity. }
-  rewrite H, H0 in Hab; contradiction.
+  assert (Ha : a = Z).
+  { rewrite <- (id_left M a). rewrite HZr. reflexivity. }
+  assert (Hb : b = Z).
+  { rewrite <- (id_left M b). rewrite HZr. reflexivity. }
+  rewrite Ha, Hb in Hab. contradiction.
 Qed.
 
 (* ======================== 符号记法与作用域 ======================== *)
