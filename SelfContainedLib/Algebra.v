@@ -1,4 +1,3 @@
-```coq
 (* © 2025 FRF-Zero-Analysis Project. Licensed under GPLv3 or commercial license. *)
 (* SelfContainedLib/Algebra.v - 自然数加法幺半群与代数公理基础 *)
 
