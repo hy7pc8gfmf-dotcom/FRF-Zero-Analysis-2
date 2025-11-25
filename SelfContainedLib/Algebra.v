@@ -21,7 +21,6 @@ From Coq Require Import Vectors.Fin.
 From Coq Require Import Lia.
 From Coq Require Import Arith.PeanoNat.
 From Coq Require Import Logic.ProofIrrelevance.
-From Coq Require Import Logic.Eqdep_dec.
 
 (* 关闭弃用警告 *)
 Set Warnings "-deprecated".
@@ -219,7 +218,7 @@ Proof.
   reflexivity.
 Qed.
 
-(* ======================== 4. 自包含模运算核心性质（修复参数名称问题） ======================== *)
+(* ======================== 4. 自包含模运算核心性质（修复所有已弃用API调用） ======================== *)
 
 (* 引理4：模乘法左兼容 (n * K) mod n = 0 *)
 Lemma mul_mod_zero (n k : nat) (Hpos : 0 < n) : (n * k) mod n = 0.
@@ -229,16 +228,15 @@ Proof.
   apply Nat.mod_mul; auto.
 Qed.
 
+(* 使用标准库中的模运算性质，避免已弃用的API *)
 (* 引理5：模加法分配律 (a + b) mod n = ((a mod n) + (b mod n)) mod n *)
 Lemma add_mod_idemp (a b n : nat) (Hpos : 0 < n) : 
   (a + b) mod n = ((a mod n) + (b mod n)) mod n.
 Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
-  (* 使用标准库中的模加法性质 *)
-  rewrite (Nat.add_mod a b n Hneq).
-  rewrite (Nat.add_mod (a mod n) (b mod n) n Hneq).
-  (* 现在需要证明：a mod n mod n = a mod n *)
-  rewrite Nat.mod_mod; [|exact Hneq].
+  (* 使用标准库中的模加法性质，避免已弃用的Nat.add_mod *)
+  rewrite Nat.add_mod_idemp_l; [|exact Hneq].
+  rewrite Nat.add_mod_idemp_r; [|exact Hneq].
   reflexivity.
 Qed.
 
@@ -247,9 +245,7 @@ Lemma add_mod_idemp_r (a b n : nat) (Hpos : 0 < n) :
   (a + (b mod n)) mod n = (a + b) mod n.
 Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
-  rewrite (Nat.add_mod a b n Hneq).
-  rewrite (Nat.add_mod a (b mod n) n Hneq).
-  rewrite Nat.mod_mod; [|exact Hneq].
+  rewrite Nat.add_mod_idemp_r; [|exact Hneq].
   reflexivity.
 Qed.
 
@@ -258,9 +254,7 @@ Lemma add_mod_idemp_l (a b n : nat) (Hpos : 0 < n) :
   ((a mod n) + b) mod n = (a + b) mod n.
 Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
-  rewrite (Nat.add_mod a b n Hneq).
-  rewrite (Nat.add_mod (a mod n) b n Hneq).
-  rewrite Nat.mod_mod; [|exact Hneq].
+  rewrite Nat.add_mod_idemp_l; [|exact Hneq].
   reflexivity.
 Qed.
 
@@ -269,11 +263,9 @@ Lemma mul_mod_idemp (a b n : nat) (Hpos : 0 < n) :
   (a * b) mod n = ((a mod n) * (b mod n)) mod n.
 Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
-  (* 使用标准库中的模乘法性质 *)
-  rewrite (Nat.mul_mod a b n Hneq).
-  rewrite (Nat.mul_mod (a mod n) (b mod n) n Hneq).
-  (* 现在需要证明：a mod n mod n = a mod n *)
-  rewrite Nat.mod_mod; [|exact Hneq].
+  (* 使用标准库中的模乘法性质，避免已弃用的Nat.mul_mod *)
+  rewrite Nat.mul_mod_idemp_l; [|exact Hneq].
+  rewrite Nat.mul_mod_idemp_r; [|exact Hneq].
   reflexivity.
 Qed.
 
@@ -282,9 +274,7 @@ Lemma mul_mod_idemp_r (a b n : nat) (Hpos : 0 < n) :
   (a * (b mod n)) mod n = (a * b) mod n.
 Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
-  rewrite (Nat.mul_mod a b n Hneq).
-  rewrite (Nat.mul_mod a (b mod n) n Hneq).
-  rewrite Nat.mod_mod; [|exact Hneq].
+  rewrite Nat.mul_mod_idemp_r; [|exact Hneq].
   reflexivity.
 Qed.
 
@@ -293,9 +283,7 @@ Lemma mul_mod_idemp_l (a b n : nat) (Hpos : 0 < n) :
   ((a mod n) * b) mod n = (a * b) mod n.
 Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
-  rewrite (Nat.mul_mod a b n Hneq).
-  rewrite (Nat.mul_mod (a mod n) b n Hneq).
-  rewrite Nat.mod_mod; [|exact Hneq].
+  rewrite Nat.mul_mod_idemp_l; [|exact Hneq].
   reflexivity.
 Qed.
 
@@ -313,18 +301,10 @@ Qed.
 Lemma mod_mul_assoc (x y z n : nat) (Hpos : 0 < n) :
   ((x * y) mod n * z) mod n = (x * (y * z) mod n) mod n.
 Proof.
-  pose proof (pos_to_neq Hpos) as Hneq.
-  
-  (* 左侧简化 *)
+  (* 使用已修复的引理 *)
   rewrite (mul_mod_idemp_l (x * y) z n Hpos).
-  
-  (* 右侧简化 *)
   rewrite (mul_mod_idemp_r x (y * z) n Hpos).
-  
-  (* 现在目标变为：(x * y * z) mod n = (x * (y * z)) mod n *)
-  
-  (* 使用乘法结合律 - 这里需要正确匹配 *)
-  replace (x * y * z) with (x * (y * z)) by lia.
+  rewrite Nat.mul_assoc.
   reflexivity.
 Qed.
 
@@ -354,14 +334,14 @@ Module MakeModAlgebra (Param : MODALGEBRA) : BasicAlgebra.
     let y := fin_to_nat_val b in
     let sum := (x + y) mod Param.n in
     (* 使用 mod_upper_bound_proper 证明 sum < Param.n *)
-    Fin.of_nat_lt (mod_upper_bound_proper Param.Hpos) sum.
+    Fin.of_nat_lt sum (mod_upper_bound_proper Param.Hpos).
   
   (* 模n乘法：逻辑同加法 *)
   Definition mul (a b : T) : T :=
     let x := fin_to_nat_val a in
     let y := fin_to_nat_val b in
     let prod := (x * y) mod Param.n in
-    Fin.of_nat_lt (mod_upper_bound_proper Param.Hpos) prod.
+    Fin.of_nat_lt prod (mod_upper_bound_proper Param.Hpos).
   
   (* 证明加法交换律 *)
   Lemma add_comm : forall a b, add a b = add b a.
