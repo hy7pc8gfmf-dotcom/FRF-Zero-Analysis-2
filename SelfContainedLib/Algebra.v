@@ -1434,6 +1434,9 @@ Definition mod_distrib_batch_complete : Prop := True.
 Lemma mod_distrib_batch_verified : mod_distrib_batch_complete.
 Proof. exact I. Qed.
 
+End FastBatchVersions.  (* 添加这行来关闭Section *)
+
+(* ======================== 扩展版模分配律结束 ======================== *)
 (* 扩展完成标记 *)
 Definition mod_distrib_extensions_complete : Prop := True.
 Lemma mod_distrib_extensions_verified : mod_distrib_extensions_complete.
