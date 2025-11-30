@@ -1091,6 +1091,18 @@ Module FiniteField (P : PrimeParams) <: Field.
     reflexivity.
   Qed.
   
+(* 添加缺失的引理 *)
+Lemma lt_0_neq : forall n, 0 < n -> 0 < n.
+Proof. auto. Qed.
+
+(* 修复 mod_upper_bound_proper 的参数顺序 *)
+Lemma mod_upper_bound_proper {a n : nat} (Hpos : 0 < n) : a mod n < n.
+Proof.
+  pose proof (pos_to_neq Hpos) as Hneq.
+  apply Nat.mod_upper_bound.
+  assumption.
+Qed.
+
   (* 这里只提供接口声明，具体证明需要补充 *)
   Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
   Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
@@ -1107,7 +1119,8 @@ Module FiniteField (P : PrimeParams) <: Field.
   Axiom mul_inv : forall a, a <> zero -> exists b, mul a b = one.
   Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
   Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
-  
+
+ 
 End FiniteField.
 
 (* 测试模块 *)
