@@ -955,6 +955,9 @@ End PrimeParams.
 
 (* ======================== 有限域构造器基础定义 ======================== *)
 
+(* 在FiniteField模块开头确保有这些 *)
+From Coq Require Import ProofIrrelevance.
+
 Module FiniteField (P : PrimeParams) <: Field.
   (* 从参数模块中获取 p 和 Hprime *)
   Definition p := P.p.
@@ -1101,6 +1104,25 @@ Proof.
   pose proof (pos_to_neq Hpos) as Hneq.
   apply Nat.mod_upper_bound.
   assumption.
+Qed.
+  
+(* 这些引理应该在模块外部或内部定义 *)
+Lemma mod_add_assoc (x y z n : nat) (Hpos : 0 < n) : 
+  ((x + y) mod n + z) mod n = (x + (y + z) mod n) mod n.
+Proof.
+  (* 使用add_mod_idemp_l和add_mod_idemp_r *)
+  rewrite (add_mod_idemp_l (x + y) z n Hpos).
+  rewrite (add_mod_idemp_r x (y + z) n Hpos).
+  rewrite Nat.add_assoc.
+  reflexivity.
+Qed.
+
+Lemma pos_to_neq {n : nat} (Hpos : 0 < n) : n <> 0.
+Proof.
+  intros Heq.
+  rewrite Heq in Hpos.
+  apply Nat.lt_irrefl with 0.
+  exact Hpos.
 Qed.
   
   (* 这里只提供接口声明，具体证明需要补充 *)
