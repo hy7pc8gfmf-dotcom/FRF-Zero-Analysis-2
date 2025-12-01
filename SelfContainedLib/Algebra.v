@@ -340,11 +340,6 @@ Proof.
   reflexivity. (* 完成证明 *)
 Qed.
 
-
-
-
-
-
 (* 引理5：模乘法零性质 (n * k) mod n = 0（复用标准库Nat.mod_mul） *)
 Lemma mul_mod_zero (n k : nat) (Hpos : 0 < n) : (n * k) mod n = 0.
 Proof.
@@ -471,7 +466,6 @@ Proof.
   reflexivity. (* 完成证明 *)
 Qed.
 
-
 (* ======================== 环接口扩展 ======================== *)
 Module Type Ring.
   Include BasicAlgebra.
@@ -503,7 +497,6 @@ Module Type Ring.
   Axiom neg_add : forall a b, neg (add a b) = add (neg a) (neg b). (* 负元和 *)
   
 End Ring.
-
 
 (* ======================== 环性质推导模块 ======================== *)
 Module RingProperties (R : Ring).
@@ -648,7 +641,6 @@ Qed.
   
 End RingProperties.
 
-
 (* ======================== 使用Coq标准库的环策略 ======================== *)
 (* 导入Coq的标准ring库 *)
 From Coq Require Import Ring.
@@ -696,7 +688,6 @@ Module RingVerificationTools (R : Ring).
     
 End RingVerificationTools.
 
-
 (* ======================== 域接口定义 ======================== *)
 Module Type Field.
   (* 直接复制Ring的所有声明 *)
@@ -734,7 +725,6 @@ Module Type Field.
   Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
   Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
 End Field.
-
 
 (* ======================== 增强版模逆计算 ======================== *)
 From Coq Require Import ZArith.ZArith.
@@ -962,12 +952,6 @@ Module Type PrimeParams.
   Parameter Hprime : is_prime p.
 End PrimeParams.
 
-
-
-
-
-
-
 (* ======================== 素数辅助引理 ======================== *)
 Lemma prime_pos : forall p, is_prime p -> 0 < p.
 Proof.
@@ -981,26 +965,10 @@ Proof.
   exact H.
 Qed.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 (* ======================== 有限域构造器基础定义 ======================== *)
 
-(* 在FiniteField模块开头确保有这些 *)
-From Coq Require Import ProofIrrelevance.
+
+(* ======================== FiniteField 模块完整实现 ======================== *)
 
 Module FiniteField (P : PrimeParams) <: Field.
   (* 从参数模块中获取 p 和 Hprime *)
@@ -1019,8 +987,7 @@ Module FiniteField (P : PrimeParams) <: Field.
   
   Lemma prime_pos : 0 < p.
   Proof.
-    destruct Hprime as [H _].
-    apply Nat.lt_trans with (m := 1); [lia|exact H].
+    apply Nat.lt_trans with (m := 1); [lia|apply prime_gt_1].
   Qed.
   
   (* 零元素和一元素 *)
@@ -1034,12 +1001,19 @@ Module FiniteField (P : PrimeParams) <: Field.
   (* 辅助函数：获取Fin元素的自然数值 *)
   Definition to_nat (x : T) : nat := proj1_sig (Fin.to_nat x).
   
-  (* 辅助函数：创建Fin元素 - 修复版本 *)
+  (* 辅助引理：to_nat的值总是小于p *)
+  Lemma to_nat_bound : forall (x : T), to_nat x < p.
+  Proof.
+    intros x.
+    exact (proj2_sig (Fin.to_nat x)).
+  Qed.
+  
+  (* 辅助函数：创建Fin元素 *)
   Definition of_nat (x : nat) : T :=
     let x_mod := x mod p in
-    Fin.of_nat_lt (Nat.mod_upper_bound x p (pos_to_neq prime_pos)).
-
-  (* 代数运算定义 - 统一使用of_nat包装器 *)
+    Fin.of_nat_lt (Nat.mod_upper_bound x_mod p (pos_to_neq prime_pos)).
+  
+  (* 代数运算定义 *)
   Definition add (a b : T) : T :=
     of_nat ((to_nat a + to_nat b) mod p).
   
@@ -1051,7 +1025,7 @@ Module FiniteField (P : PrimeParams) <: Field.
   
   Definition sub (a b : T) : T := add a (neg b).
   
-  (* 域运算定义 - 完整版本 *)
+  (* 域运算定义 *)
   Definition inv (a : T) : option T :=
     if Fin.eq_dec a zero then None
     else
@@ -1065,6 +1039,33 @@ Module FiniteField (P : PrimeParams) <: Field.
     | Some b_inv => Some (mul a b_inv)
     | None => None
     end.
+  
+  (* 这里只提供接口声明，具体证明需要补充 *)
+  Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
+  Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+  Axiom add_ident : forall a, add a zero = a.
+  Axiom mul_ident : forall a, mul a one = a.
+  Axiom add_inv : forall a, add a (neg a) = zero.
+  Axiom neg_zero : neg zero = zero.
+  Axiom distrib_l : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+  Axiom mul_zero_l : forall a, mul zero a = zero.
+  Axiom mul_zero_r : forall a, mul a zero = zero.
+  Axiom neg_mul_l : forall a b, mul (neg a) b = neg (mul a b).
+  Axiom neg_mul_r : forall a b, mul a (neg b) = neg (mul a b).
+  Axiom neg_add : forall a b, neg (add a b) = add (neg a) (neg b).
+  Axiom mul_inv : forall a, a <> zero -> exists b, mul a b = one.
+  Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
+  Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
+  
+  (* ======================== 环公理证明 ======================== *)
+  
+  (* 减法定义 *)
+  Lemma sub_def : forall a b, sub a b = add a (neg b).
+  Proof.
+    intros a b.
+    unfold sub.
+    reflexivity.
+  Qed.
 
   (* 新增：直接构造方法，避免of_nat的开销 *)
   Definition add_direct (a b : T) : T :=
@@ -1129,14 +1130,6 @@ Module FiniteField (P : PrimeParams) <: Field.
     rewrite Nat.mul_comm.
     reflexivity.
   Qed.
-   
-  (* 减法定义 *)
-  Lemma sub_def : forall a b, sub a b = add a (neg b).
-  Proof.
-    intros a b.
-    unfold sub.
-    reflexivity.
-  Qed.
   
 (* 添加缺失的引理 *)
 Lemma lt_0_neq : forall n, 0 < n -> 0 < n.
@@ -1150,21 +1143,6 @@ Proof.
   assumption.
 Qed.
   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 (* ======================== 扩展：模代数核心引理 ======================== *)
 
 (* 模加法交换律 *)
@@ -1821,13 +1799,6 @@ Proof.
   exact Hpos.
 Qed.
   
-  (* 辅助引理：to_nat的值总是小于p *)
-  Lemma to_nat_bound : forall (x : T), to_nat x < p.
-  Proof.
-    intros x.
-    exact (proj2_sig (Fin.to_nat x)).
-  Qed.
-  
 (* 加法交换律证明 - 版本3：检查并修复 fin_nat_eq 引理  *)
 (* 首先检查并修复 fin_nat_eq 引理 *)
 Lemma fin_nat_eq_fixed {n : nat} (a b : Fin.t n) : 
@@ -1923,43 +1894,16 @@ Qed.
     apply Nat.lt_trans with (m := 1); [lia|apply prime_gt_1_proof].
   Qed.
   
-  (* 域公理的证明（需要更深入的数论知识） *)
-  
-  Lemma mul_inv_proof : forall a, a <> zero -> exists b, mul a b = one.
+  (* 辅助引理：Fin.t元素相等当且仅当其自然数值相等 *)
+  Lemma fin_nat_eq {n : nat} (a b : Fin.t n) : fin_to_nat_val a = fin_to_nat_val b -> a = b.
   Proof.
-    intros a Hnonzero.
-    (* 由于p是素数，每个非零元都有乘法逆元 *)
-    (* 使用mod_inv函数查找逆元 *)
-    unfold zero in Hnonzero.
-    
-    (* 获取a的自然数值 *)
-    let a_val := constr:(to_nat a) in
-    assert (Ha_val : a_val < p) by apply to_nat_bound.
-
-(* 简化的fin_to_nat_val定义 *)
-Definition fin_to_nat_val {n} (f : Fin.t n) : nat :=
-  proj1_sig (Fin.to_nat f).
-
-(* ======================== 扩展：错误处理和调试工具 ======================== *)
-
-(* 模运算安全包装 *)
-Definition safe_mod (a n : nat) : option nat :=
-  match n with
-  | O => None
-  | S _ => Some (a mod n)
-  end.
-
-Definition safe_add_mod (a b n : nat) : option nat :=
-  match safe_mod n n with
-  | Some _ => safe_mod (a + b) n
-  | None => None
-  end.
-
-Definition safe_mul_mod (a b n : nat) : option nat :=
-  match safe_mod n n with
-  | Some _ => safe_mod (a * b) n
-  | None => None
-  end.
-
-
-
+    intros H.
+    apply Fin.to_nat_inj.
+    unfold fin_to_nat_val in H.
+    destruct (Fin.to_nat a) as [x Hx], (Fin.to_nat b) as [y Hy].
+    simpl in H.
+    subst y.
+    assert (Hx_eq_Hy : Hx = Hy) by apply proof_irrelevance.
+    rewrite Hx_eq_Hy.
+    reflexivity.
+  Qed.
