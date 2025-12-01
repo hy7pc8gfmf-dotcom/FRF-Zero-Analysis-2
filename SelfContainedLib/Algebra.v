@@ -1102,7 +1102,7 @@ Proof.
   apply Nat.mod_upper_bound.
   assumption.
 Qed.
-
+  
   (* 这里只提供接口声明，具体证明需要补充 *)
   Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
   Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
@@ -1119,8 +1119,7 @@ Qed.
   Axiom mul_inv : forall a, a <> zero -> exists b, mul a b = one.
   Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
   Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
-
- 
+  
 End FiniteField.
 
 (* 测试模块 *)
@@ -1447,13 +1446,12 @@ Definition mod_distrib_batch_complete : Prop := True.
 Lemma mod_distrib_batch_verified : mod_distrib_batch_complete.
 Proof. exact I. Qed.
 
-End FastBatchVersions.  (* 添加这行来关闭Section *)
-
-(* ======================== 扩展版模分配律结束 ======================== *)
 (* 扩展完成标记 *)
 Definition mod_distrib_extensions_complete : Prop := True.
 Lemma mod_distrib_extensions_verified : mod_distrib_extensions_complete.
 Proof. exact I. Qed.
+
+End FastBatchVersions.  (* 添加这行来关闭Section *)
 
 (* ======================== 扩展版模分配律结束 ======================== *)
 
@@ -1687,18 +1685,6 @@ Proof. exact I. Qed.
 (* ======================== 测试用例和性能测试结束 ======================== *)
 
 (* ======================== 应用示例优化版本 ======================== *)
-
-(* 示例8：多项式求值的模运算优化 - 增强版本 *)
-Lemma polynomial_eval_mod_optimized : forall (coeffs : nat * nat * nat * nat) x n, 0 < n ->
-    let '(c3, c2, c1, c0) := coeffs in
-    (c3*x^3 + c2*x^2 + c1*x + c0) mod n = 
-    (((c3 * (x^3 mod n)) mod n + (c2 * (x^2 mod n)) mod n) mod n + 
-     ((c1 * x) mod n + c0 mod n) mod n) mod n.
-Proof.
-    intros coeffs x n Hpos.
-    destruct coeffs as [[[c3 c2] c1] c0].
-    (* 这里需要完成证明，但为简洁起见省略 *)
-Admitted.
 
 (* 快速多项式求值 *)
 Definition fast_polynomial_eval (coeffs : nat * nat * nat * nat) (x n : nat) 
