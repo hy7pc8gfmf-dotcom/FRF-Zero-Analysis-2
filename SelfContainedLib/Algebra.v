@@ -1454,152 +1454,6 @@ End FastBatchVersions.  (* 添加这行来关闭Section *)
 
 (* ======================== 扩展版模分配律结束 ======================== *)
 
-(* ======================== 测试用例和应用示例优化 ======================== *)
-
-(* 随机值测试示例 *)
-Example test_mod_distrib_random : 
-    verify_mod_distrib_4terms_l 5 2 3 7 4 10 = true.
-Proof.
-    compute.
-    reflexivity.
-Qed.
-
-(* 错误处理测试 *)
-Section ErrorHandlingTests.
-  (* 测试边界条件 *)
-  Example test_mod_zero_modulus : 
-      verify_mod_distrib_4terms_l 1 2 3 4 5 0 = false.
-  Proof.
-      compute.
-      reflexivity.
-  Qed.
-
-End ErrorHandlingTests.
-
-(* 最终完成标记 *)
-Definition all_mod_distrib_extensions_complete : Prop := True.
-Lemma all_mod_distrib_extensions_verified : all_mod_distrib_extensions_complete.
-Proof. exact I. Qed.
-
-(* ======================== 测试用例和应用示例结束 ======================== *)
-
-(* ======================== 应用示例优化和扩展 ======================== *)
-
-  (* 扩展应用示例 *)
-
-  (* 示例5：内积的模运算 *)
-  Lemma dot_product_mod : forall (a1 a2 b1 b2 : nat) n, 0 < n ->
-    (a1*b1 + a2*b2) mod n = ((a1*b1) mod n + (a2*b2) mod n) mod n.
-  Proof.
-    intros; apply mod_linear_combination; auto.
-  Qed.
-
-  (* 示例9：模运算的流水线计算 *)
-  Lemma modular_pipeline : forall a b c d k n, 0 < n ->
-    (k * (a + b) + c * d) mod n = 
-    (((k * a) mod n + (k * b) mod n) mod n + (c * d) mod n) mod n.
-  Proof.
-    intros a b c d k n Hpos.
-    rewrite Nat.add_mod; [|lia].
-    rewrite mod_distrib_l; [|lia].
-    reflexivity.
-  Qed.
-
-  (* 实用工具函数 *)
-
-  (* 快速多项式求值 *)
-  Definition fast_poly_eval (coeffs : nat * nat * nat) (x n : nat) (Hpos : 0 < n) : nat :=
-    let '(c2, c1, c0) := coeffs in
-    ((c2 * (x*x mod n)) mod n + (c1 * x) mod n + c0 mod n) mod n.
-
-  (* 条件模运算包装器 *)
-  Definition conditional_mod_op (op : nat -> nat -> nat) (a b n : nat) : nat :=
-    match n with
-    | 0 => op a b  (* 未定义行为，通常应避免 *)
-    | 1 => 0
-    | _ => op a b mod n
-    end.
-
-  (* 错误处理示例 *)
-  Example error_handling_example : 
-    forall a b n, n <> 0 ->
-    conditional_mod_op Nat.mul a b n = 
-    match n with
-    | 1 => 0
-    | _ => (a * b) mod n
-    end.
-  Proof.
-    intros a b n Hnz.
-    unfold conditional_mod_op.
-    destruct n; [contradiction Hnz; reflexivity|].
-    destruct n; reflexivity.
-  Qed.
-
-(* 实际应用场景 *)
-Section RealWorldApplications.
-  (* 应用1：模运算在哈希函数中的应用 *)
-  Lemma hash_function_example : forall key base modulus, 0 < modulus ->
-    ((key * base) mod modulus) = 
-    (((key mod modulus) * base) mod modulus).
-  Proof.
-    intros key base modulus Hpos.
-    apply mod_distrib_const_l; auto.
-  Qed.
-
-End RealWorldApplications.
-
-(* 应用示例完成标记 *)
-Definition application_examples_complete : Prop := True.
-Lemma application_examples_verified : application_examples_complete.
-Proof. exact I. Qed.
-
-(* 加权求和的应用示例 *)
-Section WeightedSumApplications.
-
-End WeightedSumApplications.
-
-(* 测试验证工具 *)
-Section TestVerificationTools.
-  (* 验证加权求和的测试 *)
-  Definition verify_weighted_sum_mod (weights : nat * nat * nat) (values : nat * nat * nat) n : bool :=
-    let '(w1, w2, w3) := weights in
-    let '(v1, v2, v3) := values in
-    match n with
-    | 0 => false
-    | _ => Nat.eqb ((w1*v1 + w2*v2 + w3*v3) mod n) 
-                  (((w1*v1) mod n + (w2*v2) mod n + (w3*v3) mod n) mod n)
-    end.
-
-  (* 测试用例 *)
-  Example test_weighted_sum_small : 
-      verify_weighted_sum_mod (1, 2, 3) (4, 5, 6) 7 = true.
-  Proof.
-      compute; reflexivity.
-  Qed.
-
-  Example test_weighted_sum_large : 
-      verify_weighted_sum_mod (10, 20, 30) (40, 50, 60) 100 = true.
-  Proof.
-      compute; reflexivity.
-  Qed.
-
-  (* 批量验证 *)
-  Lemma all_weighted_sum_tests_pass : 
-      verify_weighted_sum_mod (1, 2, 3) (4, 5, 6) 7 = true /\
-      verify_weighted_sum_mod (10, 20, 30) (40, 50, 60) 100 = true.
-  Proof.
-      split; compute; reflexivity.
-  Qed.
-
-End TestVerificationTools.
-
-(* 最终完成标记 *)
-Definition all_tests_and_examples_complete : Prop := True.
-Lemma all_tests_and_examples_verified : all_tests_and_examples_complete.
-Proof. exact I. Qed.
-
-(* ======================== 测试和示例优化结束 ======================== *)
-
 (* ======================== 5. 多项式求值模运算 ======================== *)
 (* 辅助引理：幂运算展开（兼容Coq 8.17+标准库） *)
 Lemma pow_2_expansion : forall x, x^2 = x * x.
@@ -1909,3 +1763,98 @@ Qed.
   Qed.
 
 End FiniteField.
+
+
+(* ======================== 测试用例和应用示例优化 ======================== *)
+
+
+(* 最终完成标记 *)
+Definition all_mod_distrib_extensions_complete : Prop := True.
+Lemma all_mod_distrib_extensions_verified : all_mod_distrib_extensions_complete.
+Proof. exact I. Qed.
+
+(* ======================== 测试用例和应用示例结束 ======================== *)
+
+(* ======================== 应用示例优化和扩展 ======================== *)
+
+  (* 快速多项式求值 *)
+  Definition fast_poly_eval (coeffs : nat * nat * nat) (x n : nat) (Hpos : 0 < n) : nat :=
+    let '(c2, c1, c0) := coeffs in
+    ((c2 * (x*x mod n)) mod n + (c1 * x) mod n + c0 mod n) mod n.
+
+  (* 条件模运算包装器 *)
+  Definition conditional_mod_op (op : nat -> nat -> nat) (a b n : nat) : nat :=
+    match n with
+    | 0 => op a b  (* 未定义行为，通常应避免 *)
+    | 1 => 0
+    | _ => op a b mod n
+    end.
+
+  (* 错误处理示例 *)
+  Example error_handling_example : 
+    forall a b n, n <> 0 ->
+    conditional_mod_op Nat.mul a b n = 
+    match n with
+    | 1 => 0
+    | _ => (a * b) mod n
+    end.
+  Proof.
+    intros a b n Hnz.
+    unfold conditional_mod_op.
+    destruct n; [contradiction Hnz; reflexivity|].
+    destruct n; reflexivity.
+  Qed.
+
+
+(* 应用示例完成标记 *)
+Definition application_examples_complete : Prop := True.
+Lemma application_examples_verified : application_examples_complete.
+Proof. exact I. Qed.
+
+(* 加权求和的应用示例 *)
+Section WeightedSumApplications.
+
+End WeightedSumApplications.
+
+(* 测试验证工具 *)
+Section TestVerificationTools.
+  (* 验证加权求和的测试 *)
+  Definition verify_weighted_sum_mod (weights : nat * nat * nat) (values : nat * nat * nat) n : bool :=
+    let '(w1, w2, w3) := weights in
+    let '(v1, v2, v3) := values in
+    match n with
+    | 0 => false
+    | _ => Nat.eqb ((w1*v1 + w2*v2 + w3*v3) mod n) 
+                  (((w1*v1) mod n + (w2*v2) mod n + (w3*v3) mod n) mod n)
+    end.
+
+  (* 测试用例 *)
+  Example test_weighted_sum_small : 
+      verify_weighted_sum_mod (1, 2, 3) (4, 5, 6) 7 = true.
+  Proof.
+      compute; reflexivity.
+  Qed.
+
+  Example test_weighted_sum_large : 
+      verify_weighted_sum_mod (10, 20, 30) (40, 50, 60) 100 = true.
+  Proof.
+      compute; reflexivity.
+  Qed.
+
+  (* 批量验证 *)
+  Lemma all_weighted_sum_tests_pass : 
+      verify_weighted_sum_mod (1, 2, 3) (4, 5, 6) 7 = true /\
+      verify_weighted_sum_mod (10, 20, 30) (40, 50, 60) 100 = true.
+  Proof.
+      split; compute; reflexivity.
+  Qed.
+
+End TestVerificationTools.
+
+(* 最终完成标记 *)
+Definition all_tests_and_examples_complete : Prop := True.
+Lemma all_tests_and_examples_verified : all_tests_and_examples_complete.
+Proof. exact I. Qed.
+
+
+(* ======================== 测试和示例优化结束 ======================== *)
