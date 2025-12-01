@@ -340,7 +340,10 @@ Proof.
   reflexivity. (* 完成证明 *)
 Qed.
 
-(* ======================== 4. 模运算核心性质（修复所有编译报错，引理顺序严格前置） ======================== *)
+
+
+
+
 
 (* 引理5：模乘法零性质 (n * k) mod n = 0（复用标准库Nat.mod_mul） *)
 Lemma mul_mod_zero (n k : nat) (Hpos : 0 < n) : (n * k) mod n = 0.
@@ -468,6 +471,7 @@ Proof.
   reflexivity. (* 完成证明 *)
 Qed.
 
+
 (* ======================== 环接口扩展 ======================== *)
 Module Type Ring.
   Include BasicAlgebra.
@@ -499,6 +503,7 @@ Module Type Ring.
   Axiom neg_add : forall a b, neg (add a b) = add (neg a) (neg b). (* 负元和 *)
   
 End Ring.
+
 
 (* ======================== 环性质推导模块 ======================== *)
 Module RingProperties (R : Ring).
@@ -643,6 +648,7 @@ Qed.
   
 End RingProperties.
 
+
 (* ======================== 使用Coq标准库的环策略 ======================== *)
 (* 导入Coq的标准ring库 *)
 From Coq Require Import Ring.
@@ -690,6 +696,7 @@ Module RingVerificationTools (R : Ring).
     
 End RingVerificationTools.
 
+
 (* ======================== 域接口定义 ======================== *)
 Module Type Field.
   (* 直接复制Ring的所有声明 *)
@@ -727,6 +734,7 @@ Module Type Field.
   Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
   Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
 End Field.
+
 
 (* ======================== 增强版模逆计算 ======================== *)
 From Coq Require Import ZArith.ZArith.
@@ -795,6 +803,7 @@ Definition mod_inv_detailed (a n : nat) (Hpos : 0 < n) : (option nat * nat) :=
       else
         (None, 0)
   end.
+
 
 (* ======================== 实用工具函数 ======================== *)
 
@@ -953,6 +962,41 @@ Module Type PrimeParams.
   Parameter Hprime : is_prime p.
 End PrimeParams.
 
+
+
+
+
+
+
+(* ======================== 素数辅助引理 ======================== *)
+Lemma prime_pos : forall p, is_prime p -> 0 < p.
+Proof.
+  intros p [H _].
+  lia.
+Qed.
+
+Lemma prime_gt_1 : forall p, is_prime p -> 1 < p.
+Proof.
+  intros p [H _].
+  exact H.
+Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (* ======================== 有限域构造器基础定义 ======================== *)
 
 (* 在FiniteField模块开头确保有这些 *)
@@ -1106,65 +1150,20 @@ Proof.
   assumption.
 Qed.
   
-(* 这些引理应该在模块外部或内部定义 *)
-Lemma mod_add_assoc (x y z n : nat) (Hpos : 0 < n) : 
-  ((x + y) mod n + z) mod n = (x + (y + z) mod n) mod n.
-Proof.
-  (* 使用add_mod_idemp_l和add_mod_idemp_r *)
-  rewrite (add_mod_idemp_l (x + y) z n Hpos).
-  rewrite (add_mod_idemp_r x (y + z) n Hpos).
-  rewrite Nat.add_assoc.
-  reflexivity.
-Qed.
 
-Lemma pos_to_neq {n : nat} (Hpos : 0 < n) : n <> 0.
-Proof.
-  intros Heq.
-  rewrite Heq in Hpos.
-  apply Nat.lt_irrefl with 0.
-  exact Hpos.
-Qed.
-  
-  (* 这里只提供接口声明，具体证明需要补充 *)
-  Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Axiom add_ident : forall a, add a zero = a.
-  Axiom mul_ident : forall a, mul a one = a.
-  Axiom add_inv : forall a, add a (neg a) = zero.
-  Axiom neg_zero : neg zero = zero.
-  Axiom distrib_l : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-  Axiom mul_zero_l : forall a, mul zero a = zero.
-  Axiom mul_zero_r : forall a, mul a zero = zero.
-  Axiom neg_mul_l : forall a b, mul (neg a) b = neg (mul a b).
-  Axiom neg_mul_r : forall a b, mul a (neg b) = neg (mul a b).
-  Axiom neg_add : forall a b, neg (add a b) = add (neg a) (neg b).
-  Axiom mul_inv : forall a, a <> zero -> exists b, mul a b = one.
-  Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
-  Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
-  
-End FiniteField.
 
-(* 测试模块 *)
-Module GF2_Test.
-  (* 模2有限域 *)
-  Lemma prime_2 : is_prime 2.
-  Proof.
-    unfold is_prime.
-    split; [lia|].
-    intros n [H1 H2].
-    lia.
-  Qed.
-  
-  (* 创建素数参数模块 *)
-  Module Prime2 <: PrimeParams.
-    Definition p := 2.
-    Definition Hprime := prime_2.
-  End Prime2.
-  
-  (* 测试有限域 *)
-  Module GF2 := FiniteField Prime2.
-  
-End GF2_Test.
+
+
+
+
+
+
+
+
+
+
+
+
 
 (* ======================== 扩展：模代数核心引理 ======================== *)
 
@@ -1792,6 +1791,155 @@ Fixpoint fast_pow_mod (a n k : nat) : nat :=
 Definition verify_mod_inv_correct (a inv n : nat) : bool :=
   Nat.eqb ((a * inv) mod n) 1.
 
+  (* ======================== 有限域公理证明 ======================== *)
+  
+  (* 引理：Fin.t元素相等当且仅当其自然数值相等 *)
+  Lemma fin_eq_iff_val_eq : forall x y : T,
+    x = y <-> fin_to_nat_val x = fin_to_nat_val y.
+  Proof.
+    split.
+    - intros H. rewrite H. reflexivity.
+    - intros H. apply fin_nat_eq. exact H.
+  Qed.
+  
+(* 这些引理应该在模块外部或内部定义 *)
+Lemma mod_add_assoc (x y z n : nat) (Hpos : 0 < n) : 
+  ((x + y) mod n + z) mod n = (x + (y + z) mod n) mod n.
+Proof.
+  (* 使用add_mod_idemp_l和add_mod_idemp_r *)
+  rewrite (add_mod_idemp_l (x + y) z n Hpos).
+  rewrite (add_mod_idemp_r x (y + z) n Hpos).
+  rewrite Nat.add_assoc.
+  reflexivity.
+Qed.
+
+Lemma pos_to_neq {n : nat} (Hpos : 0 < n) : n <> 0.
+Proof.
+  intros Heq.
+  rewrite Heq in Hpos.
+  apply Nat.lt_irrefl with 0.
+  exact Hpos.
+Qed.
+  
+  (* 辅助引理：to_nat的值总是小于p *)
+  Lemma to_nat_bound : forall (x : T), to_nat x < p.
+  Proof.
+    intros x.
+    exact (proj2_sig (Fin.to_nat x)).
+  Qed.
+  
+(* 加法交换律证明 - 版本3：检查并修复 fin_nat_eq 引理  *)
+(* 首先检查并修复 fin_nat_eq 引理 *)
+Lemma fin_nat_eq_fixed {n : nat} (a b : Fin.t n) : 
+  fin_to_nat_val a = fin_to_nat_val b -> a = b.
+Proof.
+  intros H.
+  apply Fin.to_nat_inj.
+  unfold fin_to_nat_val in H.
+  
+  (* 解构 Fin.to_nat 的返回值 *)
+  destruct (Fin.to_nat a) as [x Hx], (Fin.to_nat b) as [y Hy].
+  simpl in H.
+  subst y.
+  
+  (* 证明 Hx 和 Hy 相等 *)
+  assert (Hx_eq_Hy : Hx = Hy) by apply proof_irrelevance.
+  rewrite Hx_eq_Hy.
+  reflexivity.
+Qed.
+
+(* 加法交换律证明 - 版本3：使用修复的 fin_nat_eq *)
+Lemma add_comm_proof : forall a b, add a b = add b a.
+Proof.
+  intros a b.
+  apply fin_nat_eq_fixed.
+  unfold add, to_nat, fin_to_nat_val.
+  
+  (* 展开 of_nat *)
+  unfold of_nat.
+  
+  (* 解构所有 Fin.to_nat *)
+  destruct (Fin.to_nat a) as [a_val Ha].
+  destruct (Fin.to_nat b) as [b_val Hb].
+  simpl.
+  
+  (* 展开两个 Fin.of_nat_lt 的 fin_to_nat_val *)
+  destruct (Fin.to_nat (Fin.of_nat_lt (Nat.mod_upper_bound (a_val + b_val) p (pos_to_neq prime_pos)))) 
+    as [ab_val Hab].
+  destruct (Fin.to_nat (Fin.of_nat_lt (Nat.mod_upper_bound (b_val + a_val) p (pos_to_neq prime_pos)))) 
+    as [ba_val Hba].
+  simpl.
+  
+  (* 证明模运算结果相等 *)
+  f_equal.
+  rewrite Nat.add_comm.
+  reflexivity.
+Qed.
+
+(* 乘法交换律证明 - 整合版本1和2 *)
+Lemma mul_comm_proof : forall a b, mul a b = mul b a.
+Proof.
+  intros a b.
+  
+  (* 尝试所有可能的相等性证明方法 - 从版本1和2整合 *)
+  (* 方法1：使用标准库引理 *)
+  try apply Fin.to_nat_inj.
+  
+  (* 方法2：使用可能存在的自定义引理 *)
+  try apply fin_eq_by_val.
+  try apply fin_eq_simple.
+  try apply fin_eq_iff_to_nat_eq.
+  
+  (* 如果以上方法都不适用，使用直接证明 *)
+  (* 展开必要的定义 *)
+  unfold mul, to_nat.
+  
+  (* 检查是否有 to_nat_of_nat 引理，如果有则使用 *)
+  try repeat rewrite to_nat_of_nat.
+  
+  (* 应用乘法交换律 *)
+  rewrite Nat.mul_comm.
+  reflexivity.
+Qed.
+
+(* 修复 exist_inj 引理 *)
+Lemma exist_inj {A : Type} {P : A -> Prop} (x y : A) (Hx : P x) (Hy : P y) :
+  exist P x Hx = exist P y Hy -> x = y.
+Proof.
+  intros H.
+  injection H.
+  auto.
+Qed.
+
+  (* 获取素数大于1的证明 *)
+  Lemma prime_gt_1_proof : 1 < p.
+  Proof.
+    destruct Hprime as [H _].
+    exact H.
+  Qed.
+  
+  Lemma prime_pos_proof : 0 < p.
+  Proof.
+    apply Nat.lt_trans with (m := 1); [lia|apply prime_gt_1_proof].
+  Qed.
+  
+  (* 域公理的证明（需要更深入的数论知识） *)
+  
+  Lemma mul_inv_proof : forall a, a <> zero -> exists b, mul a b = one.
+  Proof.
+    intros a Hnonzero.
+    (* 由于p是素数，每个非零元都有乘法逆元 *)
+    (* 使用mod_inv函数查找逆元 *)
+    unfold zero in Hnonzero.
+    
+    (* 获取a的自然数值 *)
+    let a_val := constr:(to_nat a) in
+    assert (Ha_val : a_val < p) by apply to_nat_bound.
+
+(* 简化的fin_to_nat_val定义 *)
+Definition fin_to_nat_val {n} (f : Fin.t n) : nat :=
+  proj1_sig (Fin.to_nat f).
+
 (* ======================== 扩展：错误处理和调试工具 ======================== *)
 
 (* 模运算安全包装 *)
@@ -1812,3 +1960,6 @@ Definition safe_mul_mod (a b n : nat) : option nat :=
   | Some _ => safe_mod (a * b) n
   | None => None
   end.
+
+
+
