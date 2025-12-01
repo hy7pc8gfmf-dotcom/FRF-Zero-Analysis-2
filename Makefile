@@ -1,6 +1,7 @@
 # ===========================================
 # FRF Formal Verification Framework - Makefile
 # 优化版本：修复关键路径问题并增强环境检测
+# 更新：修复OPAM过时警告和shell未更新问题
 # ===========================================
 # ========================
 # CONFIGURATION
@@ -229,24 +230,35 @@ echo "   2. 或使用Docker: make docker-build"; \
 exit 1; \
 ;; \
 esac
+# ========================
+# OPAM ENVIRONMENT MANAGEMENT (UPDATED)
+# ========================
 setup-env:
 @echo "🛠️  设置推荐的开发环境..."
-@echo "1. 确保OPAM已安装..."
-@command -v opam >/dev/null 2>&1 || (echo "❌ OPAM未安装，请先安装OPAM" && exit 1)
+@echo "1. 检查OPAM状态..."
+@command -v opam >/dev/null 2>&1 || (echo "❌ OPAM未安装，请先安装OPAM (参考: https://opam.ocaml.org/doc/Install.html)" && exit 1)
 @echo "✅ OPAM可用"
-@echo "2. 初始化OPAM环境..."
-@opam init --disable-sandboxing -y --compiler=4.14.0 2>/dev/null || echo "ℹ️ OPAM环境已初始化"
-@echo "3. 创建专用OPAM切换环境..."
-@opam switch list | grep -q 'coq-8.18.0' || opam switch create coq-8.18.0 4.14.0 --no-install
-@eval $$(opam env --switch=coq-8.18.0)
-@echo "4. 安装Coq 8.18.0及依赖..."
+@echo "2. 更新OPAM自身..."
+@opam update --self >/dev/null 2>&1 || echo "ℹ️ OPAM已更新到最新版本"
+@echo "3. 初始化OPAM环境(带shell设置)..."
+@opam init --disable-sandboxing --shell-setup -y --compiler=4.14.0 >/dev/null 2>&1 || echo "ℹ️ OPAM环境已初始化"
+@echo "4. 创建专用OPAM切换环境..."
+@if ! opam switch list | grep -q 'coq-8.18.0'; then \
+echo "创建新的OPAM切换环境: coq-8.18.0"; \
+opam switch create coq-8.18.0 ocaml-base-compiler.4.14.0 --no-install >/dev/null 2>&1 || true; \
+else \
+echo "✅ OPAM切换环境 'coq-8.18.0' 已存在"; \
+fi
+@echo "5. 激活环境..."
+@eval $$(opam env --switch=coq-8.18.0 --set-switch)
+@echo "6. 安装Coq 8.18.0及依赖..."
 @opam install -y coq.8.18.0 coq-mathcomp-ssreflect.1.17.0 coq-equations coq-bignums coq-stdlib
-@echo "5. 验证安装..."
-@eval $$(opam env --switch=coq-8.18.0)
+@echo "7. 验证安装..."
+@eval $$(opam env --switch=coq-8.18.0 --set-switch)
 @coqc --version | grep "8.18.0" && echo "✅ Coq 8.18.0安装成功" || (echo "❌ 安装失败" && exit 1)
 @echo ""
 @echo "✅ 环境设置完成！"
-@echo "   要使用此环境，请运行: eval $$(opam env --switch=coq-8.18.0)"
+@echo "   要使用此环境，请运行: eval $$(opam env --switch=coq-8.18.0 --set-switch)"
 @echo "   然后运行: make compile"
 # ========================
 # COMPILATION TARGETS
@@ -343,8 +355,15 @@ fi
 # ========================
 deps:
 @echo "📦 安装Coq依赖..."
+@command -v opam >/dev/null 2>&1 || (echo "❌ OPAM未安装，请先安装OPAM" && exit 1)
+@current_switch=$$(opam switch show 2>/dev/null || echo ""); \
+if [ -z "$$current_switch" ]; then \
+echo "⚠️ 未检测到OPAM环境，将使用默认环境"; \
+else \
+echo "✅ 当前OPAM环境: $$current_switch"; \
+fi
 @echo "安装基础依赖包..."
-opam install -y \
+@opam install -y \
 coq-mathcomp-ssreflect.1.17.0 \
 coq-equations \
 coq-bignums \
@@ -352,6 +371,13 @@ coq-stdlib
 @echo "✅ 依赖安装完成！"
 check-deps:
 @echo "🔍 检查依赖..."
+@command -v opam >/dev/null 2>&1 || (echo "❌ OPAM未安装，请先安装OPAM" && exit 1)
+@current_switch=$$(opam switch show 2>/dev/null || echo ""); \
+if [ -z "$$current_switch" ]; then \
+echo "⚠️ 未检测到OPAM环境"; \
+else \
+echo "✅ 当前OPAM环境: $$current_switch"; \
+fi
 @dep_issues=0; \
 for pkg in coq-mathcomp-ssreflect.1.17.0 coq-equations coq-bignums coq-stdlib; do \
 if opam list --installed | grep -q "$$pkg"; then \
@@ -408,7 +434,7 @@ distclean: clean
 # ========================
 help:
 @echo "=================================================="
-@echo "📌 FRF形式验证框架 Makefile (修复路径问题版本)"
+@echo "📌 FRF形式验证框架 Makefile (修复OPAM警告版本)"
 @echo "=================================================="
 @echo "当前环境:"
 @current_version=$$($(COQC) --version 2>/dev/null | head -n1 | awk '{print $$3}' || echo "unknown"); \
@@ -430,7 +456,7 @@ fi
 @echo ""
 @echo "环境管理："
 @echo "  check-version - 检查Coq版本兼容性"
-@echo "  setup-env     - 设置推荐的Coq 8.18.0环境（含Reflection依赖）"
+@echo "  setup-env     - 设置推荐的Coq 8.18.0环境（已修复OPAM警告）"
 @echo "  docker-build  - 使用Docker构建 (无需本地安装)"
 @echo "  deps          - 安装所有依赖包（含coq-stdlib）"
 @echo ""
@@ -444,7 +470,7 @@ fi
 @echo "  1. make check-version   # 检查版本兼容性"
 @echo "  2. make check-paths     # 检查路径配置"
 @echo "  3. make setup-env       # 如果版本/路径不匹配，设置推荐环境"
-@echo "  4. eval $$(opam env --switch=coq-8.18.0)  # 激活环境"
+@echo "  4. eval $$(opam env --switch=coq-8.18.0 --set-switch)  # 激活环境"
 @echo "  5. make compile         # 编译项目"
 @echo ""
 @echo "🔍 详细帮助: https://github.com/FRF-Project/docs/wiki/Build-Instructions"
