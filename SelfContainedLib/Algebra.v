@@ -1601,6 +1601,54 @@ Proof. exact I. Qed.
 
 (* ======================== 测试和示例优化结束 ======================== *)
 
+(* ======================== 5. 多项式求值模运算 ======================== *)
+(* 辅助引理：幂运算展开（兼容Coq 8.17+标准库） *)
+Lemma pow_2_expansion : forall x, x^2 = x * x.
+Proof.
+  intro x.
+  unfold Nat.pow. (* 展开Nat.pow的定义 *)
+  simpl. (* 简化2次递归: x^2 = x * (x * 1) *)
+  (* 通过直接计算证明x * 1 = x *)
+  assert (H: x * 1 = x).
+  { induction x as [|x' IH].
+    - (* 基础情况: 0 * 1 = 0 *)
+      simpl. reflexivity.
+    - (* 归纳步骤: (S x') * 1 = S x' *)
+      simpl. rewrite IH. reflexivity.
+  }
+  rewrite H. (* 将x * (x * 1)重写为x * x *)
+  reflexivity.
+Qed.
+
+Lemma pow_3_expansion : forall x, x^3 = x * (x * x).
+Proof.
+  intro x.
+  unfold Nat.pow. (* 展开Nat.pow的定义 *)
+  simpl. (* 简化3次递归: x^3 = x * (x * (x * 1)) *)
+  (* 通过直接计算证明x * 1 = x *)
+  assert (H: x * 1 = x).
+  { induction x as [|x' IH].
+    - (* 基础情况: 0 * 1 = 0 *)
+      simpl. reflexivity.
+    - (* 归纳步骤: (S x') * 1 = S x' *)
+      simpl. rewrite IH. reflexivity.
+  }
+  (* 应用等式重写内部表达式 *)
+  rewrite H.
+  reflexivity.
+Qed.
+
+(* 辅助引理：加法结合律在模运算中的应用 *)
+Lemma mod_add_assoc_l : forall a b c n (Hpos : 0 < n),
+  ((a + b) mod n + c) mod n = (a + (b + c) mod n) mod n.
+Proof.
+  intros a b c n Hpos.
+  rewrite (add_mod_idemp_l (a + b) c n Hpos).
+  rewrite (add_mod_idemp_r a (b + c) n Hpos).
+  rewrite Nat.add_assoc.
+  reflexivity.
+Qed.
+
 (* ======================== 测试用例和性能测试优化 ======================== *)
 
 (* 扩展测试用例 *)
