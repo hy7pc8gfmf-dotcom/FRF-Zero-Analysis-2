@@ -2409,6 +2409,62 @@ Module IntRing : Ring with Definition T := Z.
     reflexivity.
   Qed.
   Definition neg_zero := neg_zero_lemma.
+  
+  (* 新增：左分配律 *)
+  Lemma distrib_l_lemma : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+  Proof.
+    intros a b c.
+    unfold mul, add.
+    apply Z.mul_add_distr_l.
+  Qed.
+  Definition distrib_l := distrib_l_lemma.
+  
+  (* 新增：左零乘 *)
+  Lemma mul_zero_l_lemma : forall a, mul zero a = zero.
+  Proof.
+    intros a.
+    unfold zero, mul.
+    apply Z.mul_0_l.
+  Qed.
+  Definition mul_zero_l := mul_zero_l_lemma.
+  
+  (* 新增：右零乘 *)
+  Lemma mul_zero_r_lemma : forall a, mul a zero = zero.
+  Proof.
+    intros a.
+    unfold zero, mul.
+    apply Z.mul_0_r.
+  Qed.
+  Definition mul_zero_r := mul_zero_r_lemma.
+  
+  (* 新增：左负乘 *)
+  Lemma neg_mul_l_lemma : forall a b, mul (neg a) b = neg (mul a b).
+  Proof.
+    intros a b.
+    unfold mul, neg.
+    apply Z.mul_opp_l.
+  Qed.
+  Definition neg_mul_l := neg_mul_l_lemma.
+  
+  (* 新增：右负乘 *)
+  Lemma neg_mul_r_lemma : forall a b, mul a (neg b) = neg (mul a b).
+  Proof.
+    intros a b.
+    unfold mul, neg.
+    apply Z.mul_opp_r.
+  Qed.
+  Definition neg_mul_r := neg_mul_r_lemma.
+  
+  (* 新增：负加 *)
+  Lemma neg_add_lemma : forall a b, neg (add a b) = add (neg a) (neg b).
+  Proof.
+    intros a b.
+    unfold neg, add.
+    apply Z.opp_add_distr.
+  Qed.
+  Definition neg_add := neg_add_lemma.
+  
+End IntRing.
 
 (* ======================== 8. 库完成度声明 ======================== *)
 
@@ -2424,6 +2480,7 @@ Theorem algebra_ext_library_is_complete : algebra_ext_library_complete.
 Proof.
   exact I.
 Qed.
+
 (* End of SelfContainedLib/Algebra+.v *)
 
 
