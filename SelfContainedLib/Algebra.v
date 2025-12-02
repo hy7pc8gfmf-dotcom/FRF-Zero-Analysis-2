@@ -64,9 +64,6 @@ Record BasicAlgebra : Type := {
   mul_ident : forall x : T, mul x one = x
 }.
 
-
-
-
 (* ======================== 自然数代数实现 ======================== *)
 Module FixedNatAlgebra_Corrected.
   
@@ -989,6 +986,51 @@ Definition get_error_type (err : ModInvError) : nat :=
 
 (* ======================== 素数定义 ======================== *)
 
+
+(* ======================== 迁移：改进的素数定义和证明 ======================== *)
+
+(* 改进的素数定义 - 更明确的边界条件 *)
+Definition is_prime_improved (p : nat) : Prop :=
+  (1 < p)%nat /\ forall n, 
+    ((1 < n)%nat /\ (n < p)%nat) ->  
+    ~ (Nat.divide n p).
+
+Lemma prime_gt_1_improved : forall p, is_prime_improved p -> 1 < p.
+Proof. 
+  intros p [H _]; exact H. 
+Qed.
+
+Lemma prime_pos_improved : forall p, is_prime_improved p -> 0 < p.
+Proof.
+  intros p Hprime.
+  apply prime_gt_1_improved in Hprime.
+  lia.
+Qed.
+
+(* 具体素数的证明 *)
+Lemma prime_2_proof : is_prime_improved 2.
+Proof.
+  unfold is_prime_improved.
+  split. 
+  - lia.
+  - intros n [H1 H2].
+    lia.
+Qed.
+
+Lemma prime_3_proof : is_prime_improved 3.
+Proof.
+  unfold is_prime_improved.
+  split.
+  - lia.
+  - intros n [H1 H2].
+    assert (n = 2) by lia.
+    subst n.
+    intro Hdiv.
+    unfold Nat.divide in Hdiv.
+    destruct Hdiv as [k Hk].
+    lia.
+Qed.
+
 (* 定义素数谓词 *)
 Definition is_prime (p : nat) : Prop :=
   (1 < p) /\ forall n, (1 < n < p) -> ~ (Nat.divide n p).
@@ -1358,6 +1400,40 @@ Proof.
   - lia.
 Qed.
 
+(* ======================== 迁移：互质和GCD相关引理 ======================== *)
+
+Definition coprime_improved (a b : nat) : Prop := 
+  Nat.gcd a b = 1%nat.
+
+Lemma gcd_nonneg_improved : forall a b, 0 <= Nat.gcd a b.
+Proof. intros a b; apply Nat.le_0_l. Qed.
+
+Lemma gcd_greatest_improved : forall a b d,
+  Nat.divide d a -> Nat.divide d b -> Nat.divide d (Nat.gcd a b).
+Proof.
+  intros a b d Hd_a Hd_b.
+  apply Nat.gcd_greatest; assumption.
+Qed.
+
+Lemma gcd_divides_improved : forall a b,
+  Nat.divide (Nat.gcd a b) a /\ Nat.divide (Nat.gcd a b) b.
+Proof.
+  intros a b.
+  split; [apply Nat.gcd_divide_l | apply Nat.gcd_divide_r].
+Qed.
+
+Lemma gcd_ge_1_improved : forall a b, 0 < a -> 1 <= Nat.gcd a b.
+Proof.
+  intros a b Ha.
+  destruct (Nat.gcd a b) as [|n] eqn:Hgcd.
+  - assert (Hdiv : Nat.divide 0 a) by (rewrite <- Hgcd; apply Nat.gcd_divide_l).
+    destruct Hdiv as [k Hk].
+    simpl in Hk.
+    rewrite Hk in Ha.
+    lia.
+  - lia.
+Qed.
+
 (* ======================== 作用域设置（避免命名冲突） ======================== *)
 Local Open Scope nat_scope.
 
@@ -1418,11 +1494,6 @@ Proof.
   - contradiction Hneq. reflexivity.
   - apply Nat.lt_0_succ.
 Qed.
-
-(* ======================== 1. 基础代数接口定义（自包含实现） ======================== *)
-
-
-(* ======================== 2. 标准代数实现（自包含，证明完备） ======================== *)
 
 (* ======================== 4. 高级代数实现（增量适配，确保完全兼容） ======================== *)
 
@@ -1558,9 +1629,6 @@ Module IntRing : Ring with Definition T := Z.
 End IntRing.
 
 (* ======================== 有限域构造器基础定义 ======================== *)
-
-
-(* ======================== FiniteField 模块完整实现 ======================== *)
 
 (* ======================== FiniteField 模块完整实现 ======================== *)
 
