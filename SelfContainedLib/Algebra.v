@@ -1322,15 +1322,11 @@ Proof.
     reflexivity.
 Qed.
 
-(* ======================== 作用域设置（避免命名冲突） ======================== *)
-Local Open Scope nat_scope.
+(* ======================== 互质和GCD性质 ======================== *)
 
-(* 注意：文件前面已正确定义 is_prime，此处移除重复定义 *)
-(* 互质定义 - 使用标准库gcd实现，添加类型标注避免歧义 *)
 Definition coprime (a b : nat) : Prop := 
   Nat.gcd a b = 1%nat.
 
-(* 辅助引理：gcd为非负 *)
 Lemma gcd_nonneg : forall a b, 0 <= Nat.gcd a b.
 Proof. intros a b; apply Nat.le_0_l. Qed.
 
@@ -1349,6 +1345,21 @@ Proof.
   intros a b.
   split; [apply Nat.gcd_divide_l | apply Nat.gcd_divide_r].
 Qed.
+
+Lemma gcd_ge_1 : forall a b, 0 < a -> 1 <= Nat.gcd a b.
+Proof.
+  intros a b Ha.
+  destruct (Nat.gcd a b) as [|n] eqn:Hgcd.
+  - assert (Hdiv : Nat.divide 0 a) by (rewrite <- Hgcd; apply Nat.gcd_divide_l).
+    destruct Hdiv as [k Hk].
+    simpl in Hk.
+    rewrite Hk in Ha.
+    lia.
+  - lia.
+Qed.
+
+(* ======================== 作用域设置（避免命名冲突） ======================== *)
+Local Open Scope nat_scope.
 
 (* 使用Znumtheory中的贝祖定理 *)
 Require Import ZArith.
@@ -1387,21 +1398,6 @@ Proof. intros p [H _]; exact H. Qed.
 
 (* 完全自包含的版本：素数与小于它的数互质 *)
 Require Import Arith Lia.
-
-(* 辅助引理：如果 a > 0，则 gcd(a,b) >= 1 *)
-Lemma gcd_ge_1 : forall a b, 0 < a -> 1 <= Nat.gcd a b.
-Proof.
-  intros a b Ha.
-  destruct (Nat.gcd a b) as [|n] eqn:Hgcd.
-  - (* gcd=0 *)
-    assert (Hdiv : Nat.divide 0 a) by (rewrite <- Hgcd; apply Nat.gcd_divide_l).
-    destruct Hdiv as [k Hk].
-    simpl in Hk.
-    rewrite Hk in Ha.
-    lia.
-  - (* gcd=S n，所以>=1 *)
-    lia.
-Qed.
 
 (* ======================== 基础辅助定理与引理（自包含实现） ======================== *)
 
