@@ -524,6 +524,165 @@ Proof.
   reflexivity. (* 完成证明 *)
 Qed.
 
+(* ======================== 模运算引理 ======================== *)
+
+(* 改进的模运算边界引理 *)
+Lemma mod_sum_bound_plus : forall a b m, 0 < m -> a mod m + b mod m < 2 * m.
+Proof. 
+  intros a b m Hpos.
+  
+  (* 方法1：先证明 m ≠ 0 *)
+  assert (Hm_ne_0 : m <> 0) by lia.
+  
+  (* 方法2：直接使用 mod_upper_bound，提供两种证明方式 *)
+  assert (Ha : a mod m < m) by (apply Nat.mod_upper_bound; exact Hm_ne_0).
+  assert (Hb : b mod m < m) by (apply Nat.mod_upper_bound; exact Hm_ne_0).
+  
+  lia.
+Qed.
+
+(* ======================== 模运算幂等性引理 ======================== *)
+
+(* 辅助引理：从 0 < n 推导 n ≠ 0 *)
+Lemma pos_to_nonzero_plus (n : nat) : 0 < n -> n <> 0.
+Proof. lia. Qed.
+
+(* 加法左幂等性引理 *)
+Lemma add_mod_idemp_l_plus : forall a b n, 0 < n -> (a mod n + b) mod n = (a + b) mod n.
+Proof.
+  intros a b n Hpos.
+  (* 从 0 < n 得到 n ≠ 0 *)
+  pose proof (pos_to_nonzero_plus n Hpos) as Hnz.
+  (* 使用 Nat.add_mod_idemp_l *)
+  rewrite Nat.add_mod_idemp_l by exact Hnz.
+  reflexivity.
+Qed.
+
+(* 加法右幂等性引理 *)
+Lemma add_mod_idemp_r_plus : forall a b n, 0 < n -> (a + b mod n) mod n = (a + b) mod n.
+Proof.
+  intros a b n Hpos.
+  pose proof (pos_to_nonzero_plus n Hpos) as Hnz.
+  rewrite Nat.add_mod_idemp_r by exact Hnz.
+  reflexivity.
+Qed.
+
+(* 乘法左幂等性引理 *)
+Lemma mul_mod_idemp_l_plus : forall a b n, 0 < n -> (a mod n * b) mod n = (a * b) mod n.
+Proof.
+  intros a b n Hpos.
+  pose proof (pos_to_nonzero_plus n Hpos) as Hnz.
+  rewrite Nat.mul_mod_idemp_l by exact Hnz.
+  reflexivity.
+Qed.
+
+(* 乘法幂等性引理 - 修复版本 *)
+(* 注意：标准库中的名称可能是 Nat.mod_mod 或 Nat.mod_mod_idemp_r *)
+Lemma mul_mod_idemp_r_plus : forall a b n, 0 < n -> (a * (b mod n)) mod n = (a * b) mod n.
+Proof.
+  intros a b n Hpos.
+  pose proof (pos_to_nonzero_plus n Hpos) as Hnz.
+  (* 使用 Nat.mul_mod_idemp_r，注意参数顺序 *)
+  rewrite Nat.mul_mod_idemp_r by exact Hnz.
+  reflexivity.
+Qed.
+
+(* 模运算的幂等性引理 *)
+Lemma mod_mod_idemp_plus : forall a n, 0 < n -> (a mod n) mod n = a mod n.
+Proof.
+  intros a n Hpos.
+  pose proof (pos_to_nonzero_plus n Hpos) as Hnz.
+  apply Nat.mod_mod; exact Hnz.
+Qed.
+
+(* ======================== 模运算结合律 ======================== *)
+(* 模运算结合律 *)
+Lemma mod_add_assoc_plus : forall (a b c m : nat) (Hpos : 0 < m),
+  ((a + b) mod m + c) mod m = (a + (b + c) mod m) mod m.
+Proof.
+  intros a b c m Hpos.
+  rewrite add_mod_idemp_l_plus by exact Hpos.
+  rewrite add_mod_idemp_r_plus by exact Hpos.
+  rewrite Nat.add_assoc.
+  reflexivity.
+Qed.
+
+Lemma mod_mul_assoc_plus_simple : forall (a b c m : nat) (Hpos : 0 < m),
+  ((a * b) mod m * c) mod m = ((a * (b * c)) mod m) mod m.
+Proof.
+  intros a b c m Hpos.
+  
+  (* 从0<m推导m≠0 *)
+  assert (Hmz : m <> 0) by lia.
+  
+  (* 使用等式转换链证明 *)
+  transitivity ((a * (b * c)) mod m).
+  - (* 将左边转换为 (a*(b*c)) mod m *)
+    rewrite (Nat.mul_mod_idemp_l (a * b) c m Hmz).
+    rewrite Nat.mul_assoc.
+    reflexivity.
+  - (* 证明 (a*(b*c)) mod m = ((a*(b*c)) mod m) mod m *)
+    symmetry.
+    apply Nat.mod_mod.
+    exact Hmz.
+Qed.
+
+(* 验证函数，用于测试引理是否正确 *)
+Definition verify_mod_mul_assoc_plus (a b c m : nat) : bool :=
+  match m with
+  | 0 => true  (* 当 m=0 时，两边都未定义，但我们返回 true 以避免错误 *)
+  | _ => 
+      let lhs := ((a * b) mod m * c) mod m in
+      let rhs := ((a * (b * c)) mod m) mod m in
+      Nat.eqb lhs rhs
+  end.
+
+(* 测试用例 *)
+Example test_mod_mul_assoc_plus_1 : verify_mod_mul_assoc_plus 2 3 4 5 = true.
+Proof.
+  compute.
+  reflexivity.
+Qed.
+
+Example test_mod_mul_assoc_plus_2 : verify_mod_mul_assoc_plus 1 1 1 2 = true.
+Proof.
+  compute.
+  reflexivity.
+Qed.
+
+Example test_mod_mul_assoc_plus_3 : verify_mod_mul_assoc_plus 10 20 30 7 = true.
+Proof.
+  compute.
+  reflexivity.
+Qed.
+
+(* 批量验证 *)
+Lemma all_tests_mod_mul_assoc_plus_pass :
+  verify_mod_mul_assoc_plus 2 3 4 5 = true /\
+  verify_mod_mul_assoc_plus 1 1 1 2 = true /\
+  verify_mod_mul_assoc_plus 10 20 30 7 = true.
+Proof.
+  split; [|split];
+  compute; reflexivity.
+Qed.
+
+(* 编译检查：确保所有需要的标准库函数都存在 *)
+Section CompilationCheck.
+  
+  (* 检查 Nat.mul_mod_idemp_l 是否存在 *)
+  Check Nat.mul_mod_idemp_l.
+  (* 应返回: Nat.mul_mod_idemp_l : ∀ a b n, n ≠ 0 → (a mod n * b) mod n = (a * b) mod n *)
+  
+  (* 检查 Nat.mod_mod 是否存在 *)
+  Check Nat.mod_mod.
+  (* 应返回: Nat.mod_mod : ∀ a n, n ≠ 0 → (a mod n) mod n = a mod n *)
+  
+  (* 检查 Nat.mul_assoc 是否存在 *)
+  Check Nat.mul_assoc.
+  (* 应返回: Nat.mul_assoc : ∀ n m p, n * (m * p) = n * m * p *)
+  
+End CompilationCheck.
+
 (* ======================== 环接口扩展 ======================== *)
 Module Type Ring.
   Include BasicAlgebra.
