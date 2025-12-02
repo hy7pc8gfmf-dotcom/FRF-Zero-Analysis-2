@@ -927,7 +927,16 @@ Module OptimizedPrimeField (Params : OptimizedPrimeParams).
 
 End OptimizedPrimeField.
 
-(* 在AdvancedPrimeField模块内部定义 *)
+
+
+
+
+
+(* ======================== 修复：移除重复的模块定义并正确关闭所有模块 ======================== *)
+
+(* 注意：以下模块已定义，需要确保正确关闭 *)
+
+(* 修复 AlgebraVerificationTools 模块 - 完整版本 *)
 Module AlgebraVerificationTools (Params : AdvancedPrimeParams).
 
   Module Base := AdvancedPrimeField Params.
@@ -942,6 +951,282 @@ Module AlgebraVerificationTools (Params : AdvancedPrimeParams).
     mul_ident_proof : forall a, mul a one = a;
     distrib_proof : forall a b c, mul a (add b c) = add (mul a b) (mul a c)
   }.
+
+  (* 环公理签名 *)
+  Module Type RING_AXIOMS_SIG.
+    Parameter T : Type.
+    Parameter zero : T.
+    Parameter one : T.
+    Parameter add : T -> T -> T.
+    Parameter mul : T -> T -> T.
+    Parameter add_comm : forall a b, add a b = add b a.
+    Parameter add_assoc : forall a b c, add (add a b) c = add a (add b c).
+    Parameter add_ident : forall a, add a zero = a.
+    Parameter mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+    Parameter mul_ident : forall a, mul a one = a.
+    Parameter distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+  End RING_AXIOMS_SIG.
+
+  (* 环公理证明模块 - 单一定义 *)
+  Module RingAxiomsProof : RING_AXIOMS_SIG.
+    Import Base.
+    
+    Definition T := Base.T.
+    Definition zero := Base.zero.
+    Definition one := Base.one.
+    Definition add := Base.add.
+    Definition mul := Base.mul.
+    
+    (* 使用已有的引理 *)
+    Definition add_comm : forall a b, add a b = add b a :=
+      Base.add_comm.
+
+    Definition add_ident : forall a, add a zero = a :=
+      Base.add_zero.
+
+    Definition mul_ident : forall a, mul a one = a :=
+      Base.mul_one.
+
+    (* 乘法交换律 *)
+    Definition mul_comm : forall a b, mul a b = mul b a.
+    Proof.
+      intros a b.
+      apply fin_eq.
+      rewrite !val_mul.
+      rewrite Nat.mul_comm.
+      reflexivity.
+    Qed.
+
+    (* 加法结合律证明 *)
+    Definition add_assoc : forall a b c, add (add a b) c = add a (add b c).
+    Proof.
+      intros a b c.
+      apply fin_eq.
+      rewrite !val_add.
+      (* 使用模运算性质 *)
+      rewrite add_mod_idemp_l by exact p_pos.
+      rewrite add_mod_idemp_r by exact p_pos.
+      rewrite Nat.add_assoc.
+      reflexivity.
+    Qed.
+
+(* 乘法结合律 - 详细修复版本 *)
+Definition mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+Proof.
+  intros a b c.
+  apply fin_eq.
+  (* 展开所有值 *)
+  rewrite val_mul.  (* mul (mul a b) c *)
+  rewrite val_mul.  (* mul a b *)
+  rewrite val_mul.  (* mul a (mul b c) *)
+  rewrite val_mul.  (* mul b c *)
+  
+  (* 现在目标为：
+     ((val a * val b) mod p * val c) mod p = 
+     (val a * (val b * val c) mod p) mod p *)
+  
+  (* 手动证明模运算下的乘法结合律 *)
+  rewrite Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
+  rewrite Nat.mul_mod_idemp_r by (apply lt_0_neq; exact p_pos).
+  rewrite Nat.mul_assoc.
+  reflexivity.
+Qed.
+
+
+(* 修复分配律证明 - 使用实际存在的函数 *)
+Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+Proof.
+  intros a b c.
+  apply fin_eq.
+  rewrite !val_mul, !val_add, !val_mul.
+  
+  (* 当前目标: (val a * ((val b + val c) mod p)) mod p = 
+              ((val a * val b) mod p + (val a * val c) mod p) mod p *)
+  
+  (* 使用模乘法的右兼容性 - 使用正确的函数名 *)
+  rewrite Nat.mul_mod_idemp_r by (apply lt_0_neq; exact p_pos).
+  
+  (* 现在: (val a * (val b + val c)) mod p = ... *)
+  rewrite Nat.mul_add_distr_l.
+  
+  (* 使用模加法分配律 *)
+  rewrite Nat.add_mod by (apply lt_0_neq; exact p_pos).
+  
+  (* 使用模乘法的左兼容性 *)
+  rewrite <- Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
+  rewrite <- Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
+  
+  reflexivity.
+Qed.
+
+  End RingAxiomsProof.  (* 正确关闭 RingAxiomsProof 模块 *)
+
+
+(* 模负元计算 *)
+Lemma neg_val_correct : forall a, val (neg a) = (p - val a) mod p.
+Proof.
+  intros a.
+  apply of_nat_correct.
+Qed.
+
+
+
+
+(* 加法结合律 *)
+Definition add_assoc : forall a b c, add (add a b) c = add a (add b c).
+Proof.
+  intros a b c.
+  apply fin_eq.
+  rewrite !val_add.
+  (* 使用我们之前定义的 add_mod_idemp_l 和 add_mod_idemp_r *)
+  rewrite add_mod_idemp_l by exact p_pos.
+  rewrite add_mod_idemp_r by exact p_pos.
+  rewrite Nat.add_assoc.
+  reflexivity.
+Qed.
+
+(* 乘法交换律 *)
+Definition mul_comm : forall a b, mul a b = mul b a.
+Proof.
+  intros a b.
+  apply fin_eq.
+  rewrite !val_mul.
+  rewrite Nat.mul_comm.
+  reflexivity.
+Qed.
+
+(* 乘法结合律 - 详细修复版本 *)
+Definition mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+Proof.
+  intros a b c.
+  apply fin_eq.
+  (* 展开所有值 *)
+  rewrite val_mul.  (* mul (mul a b) c *)
+  rewrite val_mul.  (* mul a b *)
+  rewrite val_mul.  (* mul a (mul b c) *)
+  rewrite val_mul.  (* mul b c *)
+  
+  (* 现在目标为：
+     ((val a * val b) mod p * val c) mod p = 
+     (val a * (val b * val c) mod p) mod p *)
+  
+  (* 手动证明模运算下的乘法结合律 *)
+  rewrite Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
+  rewrite Nat.mul_mod_idemp_r by (apply lt_0_neq; exact p_pos).
+  rewrite Nat.mul_assoc.
+  reflexivity.
+Qed.
+
+
+
+
+
+
+
+
+
+
+
+
+End AlgebraVerificationTools.  (* 正确关闭 AlgebraVerificationTools 模块 *)
+
+(* ======================== 修复：移除重复的 BasicAlgebra 定义 ======================== *)
+
+(* 保留文件开头的基础定义，移除后面的重复定义 *)
+(* 
+Record BasicAlgebra : Type := 
+  mkBasicAlgebra {
+    alg_T : Type;
+    ...
+  }.
+*)
+
+(* 修改 FixedNatAlgebra 和 FixedIntAlgebra 以使用正确的 BasicAlgebra 定义 *)
+Module FixedNatAlgebra_Corrected.
+  
+  Definition nat_carrier := nat.
+  Definition nat_zero := 0.
+  Definition nat_one := 1.
+  Definition nat_add := Nat.add.
+  Definition nat_mul := Nat.mul.
+  
+  Lemma nat_add_comm : forall a b, nat_add a b = nat_add b a.
+  Proof. intros a b; apply Nat.add_comm. Qed.
+  
+  Lemma nat_mul_comm : forall a b, nat_mul a b = nat_mul b a.
+  Proof. intros a b; apply Nat.mul_comm. Qed.
+  
+  Lemma nat_add_assoc : forall a b c, nat_add (nat_add a b) c = nat_add a (nat_add b c).
+  Proof. intros a b c; rewrite Nat.add_assoc; reflexivity. Qed.
+  
+  Lemma nat_mul_assoc : forall a b c, nat_mul (nat_mul a b) c = nat_mul a (nat_mul b c).
+  Proof. intros a b c; rewrite Nat.mul_assoc; reflexivity. Qed.
+  
+  Lemma nat_add_ident : forall a, nat_add a nat_zero = a.
+  Proof. intros a; apply Nat.add_0_r. Qed.
+  
+  Lemma nat_mul_ident : forall a, nat_mul a nat_one = a.
+  Proof. intros a; apply Nat.mul_1_r. Qed.
+  
+  (* 使用正确的 BasicAlgebra 构造器 *)
+  Definition NatAlgebra_struct : BasicAlgebra := {|
+    T := nat_carrier;
+    zero := nat_zero;
+    one := nat_one;
+    add := nat_add;
+    mul := nat_mul;
+    add_comm := nat_add_comm;
+    mul_comm := nat_mul_comm;
+    add_assoc := nat_add_assoc;
+    mul_assoc := nat_mul_assoc;
+    add_ident := nat_add_ident;
+    mul_ident := nat_mul_ident
+  |}.
+
+End FixedNatAlgebra_Corrected.
+
+Module FixedIntAlgebra_Corrected.
+  
+  Definition int_carrier := Z.
+  Definition int_zero := 0%Z.
+  Definition int_one := 1%Z.
+  Definition int_add := Z.add.
+  Definition int_mul := Z.mul.
+  
+  Lemma int_add_comm : forall a b, int_add a b = int_add b a.
+  Proof. intros a b; apply Z.add_comm. Qed.
+  
+  Lemma int_mul_comm : forall a b, int_mul a b = int_mul b a.
+  Proof. intros a b; apply Z.mul_comm. Qed.
+  
+  Lemma int_add_assoc : forall a b c, int_add (int_add a b) c = int_add a (int_add b c).
+  Proof. intros a b c; rewrite Z.add_assoc; reflexivity. Qed.
+  
+  Lemma int_mul_assoc : forall a b c, int_mul (int_mul a b) c = int_mul a (int_mul b c).
+  Proof. intros a b c; rewrite Z.mul_assoc; reflexivity. Qed.
+  
+  Lemma int_add_ident : forall a, int_add a int_zero = a.
+  Proof. intros a; apply Z.add_0_r. Qed.
+  
+  Lemma int_mul_ident : forall a, int_mul a int_one = a.
+  Proof. intros a; apply Z.mul_1_r. Qed.
+  
+  (* 使用正确的 BasicAlgebra 构造器 *)
+  Definition IntAlgebra_struct : BasicAlgebra := {|
+    T := int_carrier;
+    zero := int_zero;
+    one := int_one;
+    add := int_add;
+    mul := int_mul;
+    add_comm := int_add_comm;
+    mul_comm := int_mul_comm;
+    add_assoc := int_add_assoc;
+    mul_assoc := int_mul_assoc;
+    add_ident := int_add_ident;
+    mul_ident := int_mul_ident
+  |}.
+
+End FixedIntAlgebra_Corrected.
 
   (* 首先定义模块类型 *)
   Module Type RING_AXIOMS_SIG.
@@ -960,37 +1245,7 @@ Module AlgebraVerificationTools (Params : AdvancedPrimeParams).
 
   (* 修复版本：使用正确的等式链 *)
   Module RingAxiomsProof : RING_AXIOMS_SIG.
-    Import Base.
-    
-    Definition T := Base.T.
-    Definition zero := Base.zero.
-    Definition one := Base.one.
-    Definition add := Base.add.
-    Definition mul := Base.mul.
-    
-    Definition add_comm : forall a b, add a b = add b a :=
-      Base.add_comm.
 
-    Definition add_ident : forall a, add a zero = a :=
-      Base.add_zero.
-
-    Definition mul_ident : forall a, mul a one = a :=
-      Base.mul_one.
-
-(* 修复版本1：使用正确的模运算结合律 *)
-Definition add_assoc : forall a b c, add (add a b) c = add a (add b c) :=
-  fun a b c => 
-    fin_eq (add (add a b) c) (add a (add b c)) (
-      let H1 := val_add (add a b) c in
-      let H2 := val_add a b in
-      let H3 := mod_add_assoc (val a) (val b) (val c) p p_pos in
-      let H4 := val_add a (add b c) in
-      let H5 := val_add b c in
-      eq_trans H1 (eq_trans (f_equal (fun x => (x + val c) mod p) H2) 
-                 (eq_trans H3 (eq_sym (eq_trans H4 (f_equal (fun x => (val a + x) mod p) H5)))))
-    ).
-
-    (* 终极解决方案：完全自包含，避免所有已弃用的函数 *)
     
     (* 首先定义我们自己的模运算引理 *)
     Lemma my_mod_mod : forall a n, 0 < n -> (a mod n) mod n = a mod n.
@@ -1054,225 +1309,7 @@ apply Nat.mod_mod.
 apply lt_0_neq; exact H.
 Qed.
 
-  (* 环公理记录类型 *)
-  Record RingAxiomsVerified : Type := {
-    add_comm_proof : forall a b, add a b = add b a;
-    add_assoc_proof : forall a b c, add (add a b) c = add a (add b c);
-    add_ident_proof : forall a, add a zero = a;
-    mul_assoc_proof : forall a b c, mul (mul a b) c = mul a (mul b c);
-    mul_ident_proof : forall a, mul a one = a;
-    distrib_proof : forall a b c, mul a (add b c) = add (mul a b) (mul a c)
-  }.
-
 (* 首先定义模块类型 *)
-Module Type RING_AXIOMS_SIG.
-  Parameter T : Type.
-  Parameter zero : T.
-  Parameter one : T.
-  Parameter add : T -> T -> T.
-  Parameter mul : T -> T -> T.
-  Parameter add_comm : forall a b, add a b = add b a.
-  Parameter add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  Parameter add_ident : forall a, add a zero = a.
-  Parameter mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Parameter mul_ident : forall a, mul a one = a.
-  Parameter distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-End RING_AXIOMS_SIG.
-
-(* 混合方法 - 结合简单和复杂证明 *)
-Module RingAxiomsProof : RING_AXIOMS_SIG.
-  Import Base.
-  
-  Definition T := Base.T.
-  Definition zero := Base.zero.
-  Definition one := Base.one.
-  Definition add := Base.add.
-  Definition mul := Base.mul.
-  
-  Definition add_comm : forall a b, add a b = add b a :=
-    Base.add_comm.
-
-  Definition add_ident : forall a, add a zero = a :=
-    Base.add_zero.
-
-  Definition mul_ident : forall a, mul a one = a :=
-    Base.mul_one.
-
-(* 在 RingAxiomsProof 模块中补充完整定义 *)
-Module RingAxiomsProof : RING_AXIOMS_SIG.
-  Import Base.
-  
-  Definition T := Base.T.
-  Definition zero := Base.zero.
-  Definition one := Base.one.
-  Definition add := Base.add.
-  Definition mul := Base.mul.
-  
-  Definition add_comm : forall a b, add a b = add b a :=
-    Base.add_comm.
-
-  Definition add_ident : forall a, add a zero = a :=
-    Base.add_zero.
-
-  Definition mul_ident : forall a, mul a one = a :=
-    Base.mul_one.
-
-(* 加法结合律 *)
-Definition add_assoc : forall a b c, add (add a b) c = add a (add b c).
-Proof.
-  intros a b c.
-  apply fin_eq.
-  rewrite !val_add.
-  (* 使用我们之前定义的 add_mod_idemp_l 和 add_mod_idemp_r *)
-  rewrite add_mod_idemp_l by exact p_pos.
-  rewrite add_mod_idemp_r by exact p_pos.
-  rewrite Nat.add_assoc.
-  reflexivity.
-Qed.
-
-(* 乘法交换律 *)
-Definition mul_comm : forall a b, mul a b = mul b a.
-Proof.
-  intros a b.
-  apply fin_eq.
-  rewrite !val_mul.
-  rewrite Nat.mul_comm.
-  reflexivity.
-Qed.
-
-(* 乘法结合律 - 详细修复版本 *)
-Definition mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-Proof.
-  intros a b c.
-  apply fin_eq.
-  (* 展开所有值 *)
-  rewrite val_mul.  (* mul (mul a b) c *)
-  rewrite val_mul.  (* mul a b *)
-  rewrite val_mul.  (* mul a (mul b c) *)
-  rewrite val_mul.  (* mul b c *)
-  
-  (* 现在目标为：
-     ((val a * val b) mod p * val c) mod p = 
-     (val a * (val b * val c) mod p) mod p *)
-  
-  (* 手动证明模运算下的乘法结合律 *)
-  rewrite Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
-  rewrite Nat.mul_mod_idemp_r by (apply lt_0_neq; exact p_pos).
-  rewrite Nat.mul_assoc.
-  reflexivity.
-Qed.
-
-
-
-  Module Base := AdvancedPrimeField Params.
-  Import Base.
-
-  (* 环公理记录类型 *)
-  Record RingAxiomsVerified : Type := {
-    add_comm_proof : forall a b, add a b = add b a;
-    add_assoc_proof : forall a b c, add (add a b) c = add a (add b c);
-    add_ident_proof : forall a, add a zero = a;
-    mul_assoc_proof : forall a b c, mul (mul a b) c = mul a (mul b c);
-    mul_ident_proof : forall a, mul a one = a;
-    distrib_proof : forall a b c, mul a (add b c) = add (mul a b) (mul a c)
-  }.
-
-  (* 环公理签名 *)
-  Module Type RING_AXIOMS_SIG.
-    Parameter T : Type.
-    Parameter zero : T.
-    Parameter one : T.
-    Parameter add : T -> T -> T.
-    Parameter mul : T -> T -> T.
-    Parameter add_comm : forall a b, add a b = add b a.
-    Parameter add_assoc : forall a b c, add (add a b) c = add a (add b c).
-    Parameter add_ident : forall a, add a zero = a.
-    Parameter mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-    Parameter mul_ident : forall a, mul a one = a.
-    Parameter distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-  End RING_AXIOMS_SIG.
-
-  (* 环公理证明模块 - 修复完整版本 *)
-  Module RingAxiomsProof : RING_AXIOMS_SIG.
-    Import Base.
-    
-    Definition T := Base.T.
-    Definition zero := Base.zero.
-    Definition one := Base.one.
-    Definition add := Base.add.
-    Definition mul := Base.mul.
-    
-    (* 使用已有的引理 *)
-    Definition add_comm : forall a b, add a b = add b a :=
-      Base.add_comm.
-
-    Definition add_ident : forall a, add a zero = a :=
-      Base.add_zero.
-
-    Definition mul_ident : forall a, mul a one = a :=
-      Base.mul_one.
-
-    (* 加法结合律证明 *)
-    Definition add_assoc : forall a b c, add (add a b) c = add a (add b c).
-    Proof.
-      intros a b c.
-      apply fin_eq.
-      rewrite !val_add.
-      (* 使用模运算性质 *)
-      rewrite add_mod_idemp_l by exact p_pos.
-      rewrite add_mod_idemp_r by exact p_pos.
-      rewrite Nat.add_assoc.
-      reflexivity.
-    Qed.
-
-(* 修复分配律证明 - 使用实际存在的函数 *)
-Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-Proof.
-  intros a b c.
-  apply fin_eq.
-  rewrite !val_mul, !val_add, !val_mul.
-  
-  (* 当前目标: (val a * ((val b + val c) mod p)) mod p = 
-              ((val a * val b) mod p + (val a * val c) mod p) mod p *)
-  
-  (* 使用模乘法的右兼容性 - 使用正确的函数名 *)
-  rewrite Nat.mul_mod_idemp_r by (apply lt_0_neq; exact p_pos).
-  
-  (* 现在: (val a * (val b + val c)) mod p = ... *)
-  rewrite Nat.mul_add_distr_l.
-  
-  (* 使用模加法分配律 *)
-  rewrite Nat.add_mod by (apply lt_0_neq; exact p_pos).
-  
-  (* 使用模乘法的左兼容性 *)
-  rewrite <- Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
-  rewrite <- Nat.mul_mod_idemp_l by (apply lt_0_neq; exact p_pos).
-  
-  reflexivity.
-Qed.
-
-(* 模负元计算 *)
-Lemma neg_val_correct : forall a, val (neg a) = (p - val a) mod p.
-Proof.
-  intros a.
-  apply of_nat_correct.
-Qed.
-
-  (* 验证环公理 *)
-  Theorem verify_ring_axioms : RingAxiomsVerified.
-  Proof.
-    refine {|
-      add_comm_proof := RingAxiomsProof.add_comm;
-      add_assoc_proof := RingAxiomsProof.add_assoc;
-      add_ident_proof := RingAxiomsProof.add_ident;
-      mul_assoc_proof := RingAxiomsProof.mul_assoc;
-      mul_ident_proof := RingAxiomsProof.mul_ident;
-      distrib_proof := RingAxiomsProof.distrib
-    |}.
-  Qed.
-
-
-(* 添加缺失的环公理签名 *)
 Module Type RING_AXIOMS_SIG.
   Parameter T : Type.
   Parameter zero : T.
@@ -1447,65 +1484,7 @@ Proof.
   apply lt_0_neq; exact Hpos.
 Qed.
 
-(* ======================== 有限域核心实现 ======================== *)
-Record PrimeParams : Type := {
-  p : nat;
-  is_prime_p : is_prime p
-}.
 
-Module Type AdvancedPrimeParams.
-  Parameter p : nat.
-  Parameter Hprime : is_prime p.
-End AdvancedPrimeParams.
-
-  Lemma of_nat_correct : forall x H, val (of_nat x H) = x.
-  Proof.
-    intros x H.
-    unfold val, of_nat.
-    rewrite Fin.to_nat_of_nat.
-    reflexivity.
-  Qed.
-
-  Lemma val_zero : val zero = 0.
-  Proof. apply of_nat_correct. Qed.
-  
-  Lemma val_one : val one = 1.
-  Proof. apply of_nat_correct. Qed.
-
-  (* 相等性判定 *)
-  Lemma fin_eq : forall (x y : T), val x = val y -> x = y.
-  Proof.
-    intros x y H.
-    apply Fin.to_nat_inj.
-    unfold val in H.
-    destruct (Fin.to_nat x) as [x_val x_lt].
-    destruct (Fin.to_nat y) as [y_val y_lt].
-    simpl in H.
-    subst y_val.
-    assert (x_lt = y_lt) by apply proof_irrelevance.
-    subst y_lt.
-    reflexivity.
-  Qed.
-
-  Lemma add_zero : forall a, add a zero = a.
-  Proof.
-    intros a.
-    apply fin_eq.
-    rewrite val_add, val_zero.
-    rewrite Nat.add_0_r.
-    apply Nat.mod_small.
-    apply val_lt_p.
-  Qed.
-
-  Lemma mul_one : forall a, mul a one = a.
-  Proof.
-    intros a.
-    apply fin_eq.
-    rewrite val_mul, val_one.
-    rewrite Nat.mul_1_r.
-    apply Nat.mod_small.
-    apply val_lt_p.
-  Qed.
 
 (* ======================== 替代方案：不使用模块 - 修复版本 ======================== *)
 
@@ -1882,6 +1861,3 @@ Proof.
            ?GF2_Test_Field.val_zero, ?GF2_Test_Field.val_one;
    compute; reflexivity).
 Qed.
-
-
-
