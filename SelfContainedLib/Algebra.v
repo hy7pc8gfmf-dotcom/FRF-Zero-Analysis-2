@@ -1012,18 +1012,57 @@ Module Type PrimeParams.
   Parameter Hprime : is_prime p.
 End PrimeParams.
 
-(* ======================== 素数辅助引理 ======================== *)
+(* ======================== 素数定义和基本性质 ======================== *)
+
+Lemma prime_gt_1 : forall p, is_prime p -> 1 < p.
+Proof. intros p [H _]; exact H. Qed.
+
 Lemma prime_pos : forall p, is_prime p -> 0 < p.
 Proof.
-  intros p [H _].
+  intros p Hprime.
+  apply prime_gt_1 in Hprime.
   lia.
 Qed.
 
-Lemma prime_gt_1 : forall p, is_prime p -> 1 < p.
+Lemma prime_2 : is_prime 2.
 Proof.
-  intros p [H _].
-  exact H.
+  unfold is_prime.
+  split. 
+  - lia.
+  - intros n [H1 H2].
+    lia.
 Qed.
+
+Lemma prime_3 : is_prime 3.
+Proof.
+  unfold is_prime.
+  split.
+  - lia.
+  - intros n [H1 H2].
+    assert (n = 2) by lia.
+    subst n.
+    intro Hdiv.
+    unfold Nat.divide in Hdiv.
+    destruct Hdiv as [k Hk].
+    lia.
+Qed.
+
+(* 更高效的素数判定方法 *)
+Definition is_prime_bool (p : nat) : bool :=
+  match p with
+  | 0 | 1 => false
+  | 2 => true
+  | _ => 
+    let fix check (d : nat) : bool :=
+      match d with
+      | 0 | 1 => true
+      | S d' => 
+        if Nat.eqb (p mod d) 0 then false
+        else check d'
+      end
+    in
+    check (Nat.sqrt p)
+  end.
 
 (* ======================== 测试用例和应用示例结束 ======================== *)
 
@@ -1264,35 +1303,6 @@ Local Open Scope nat_scope.
 From Coq Require Import Arith.PeanoNat.  (* 保留自然数支持 *)
 
 (* ======================== 修复：正确的素数定义和证明 ======================== *)
-
-(* 定义2是素数 *)
-Lemma prime_2 : is_prime 2.
-Proof.
-  unfold is_prime.
-  split. 
-  - lia.  (* 1 < 2 *)
-  - intros n [H1 H2].
-    (* 在1 < n < 2范围内，n只能是1，但1 < 1不成立，所以这个情况不可能 *)
-    lia.
-Qed.
-
-(* 定义3是素数 *)
-Lemma prime_3 : is_prime 3.
-Proof.
-  unfold is_prime.
-  split.
-  - lia.  (* 1 < 3 *)
-  - intros n [H1 H2].
-    (* 在1 < n < 3范围内，n只能是2 *)
-    assert (n = 2) by lia.
-    subst n.
-    intro Hdiv.
-    (* 证明2不整除3 *)
-    unfold Nat.divide in Hdiv.
-    destruct Hdiv as [k Hk].
-    (* 3 = 2 * k，在自然数中k只能是1，但2*1=2≠3 *)
-    lia.
-Qed.
 
 (* 贝祖定理 - 完全自包含实现 *)
 Lemma coprime_div_mult_independent : forall a b c : nat,
@@ -2378,23 +2388,6 @@ Proof.
   rewrite Z.add_opp_diag_r.
   reflexivity.
 Qed.
-
-(* 更高效的素数判定方法 *)
-Definition is_prime_bool (p : nat) : bool :=
-  match p with
-  | 0 | 1 => false
-  | 2 => true
-  | _ => 
-    let fix check (d : nat) : bool :=
-      match d with
-      | 0 | 1 => true
-      | S d' => 
-        if Nat.eqb (p mod d) 0 then false
-        else check d'
-      end
-    in
-    check (Nat.sqrt p)
-  end.
 
 (* ======================== 修复：有限域实现中的引用 ======================== *)
 
