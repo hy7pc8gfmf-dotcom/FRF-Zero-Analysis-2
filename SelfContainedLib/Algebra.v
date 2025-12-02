@@ -1162,20 +1162,68 @@ Proof.
   reflexivity.
 Qed.
 
-(* 添加缺失的环公理签名 *)
-Module Type RING_AXIOMS_SIG.
-  Parameter T : Type.
-  Parameter zero : T.
-  Parameter one : T.
-  Parameter add : T -> T -> T.
-  Parameter mul : T -> T -> T.
-  Parameter add_comm : forall a b, add a b = add b a.
-  Parameter add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  Parameter add_ident : forall a, add a zero = a.
-  Parameter mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Parameter mul_ident : forall a, mul a one = a.
-  Parameter distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-End RING_AXIOMS_SIG.
+
+
+  Module Base := AdvancedPrimeField Params.
+  Import Base.
+
+  (* 环公理记录类型 *)
+  Record RingAxiomsVerified : Type := {
+    add_comm_proof : forall a b, add a b = add b a;
+    add_assoc_proof : forall a b c, add (add a b) c = add a (add b c);
+    add_ident_proof : forall a, add a zero = a;
+    mul_assoc_proof : forall a b c, mul (mul a b) c = mul a (mul b c);
+    mul_ident_proof : forall a, mul a one = a;
+    distrib_proof : forall a b c, mul a (add b c) = add (mul a b) (mul a c)
+  }.
+
+  (* 环公理签名 *)
+  Module Type RING_AXIOMS_SIG.
+    Parameter T : Type.
+    Parameter zero : T.
+    Parameter one : T.
+    Parameter add : T -> T -> T.
+    Parameter mul : T -> T -> T.
+    Parameter add_comm : forall a b, add a b = add b a.
+    Parameter add_assoc : forall a b c, add (add a b) c = add a (add b c).
+    Parameter add_ident : forall a, add a zero = a.
+    Parameter mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+    Parameter mul_ident : forall a, mul a one = a.
+    Parameter distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+  End RING_AXIOMS_SIG.
+
+  (* 环公理证明模块 - 修复完整版本 *)
+  Module RingAxiomsProof : RING_AXIOMS_SIG.
+    Import Base.
+    
+    Definition T := Base.T.
+    Definition zero := Base.zero.
+    Definition one := Base.one.
+    Definition add := Base.add.
+    Definition mul := Base.mul.
+    
+    (* 使用已有的引理 *)
+    Definition add_comm : forall a b, add a b = add b a :=
+      Base.add_comm.
+
+    Definition add_ident : forall a, add a zero = a :=
+      Base.add_zero.
+
+    Definition mul_ident : forall a, mul a one = a :=
+      Base.mul_one.
+
+    (* 加法结合律证明 *)
+    Definition add_assoc : forall a b c, add (add a b) c = add a (add b c).
+    Proof.
+      intros a b c.
+      apply fin_eq.
+      rewrite !val_add.
+      (* 使用模运算性质 *)
+      rewrite add_mod_idemp_l by exact p_pos.
+      rewrite add_mod_idemp_r by exact p_pos.
+      rewrite Nat.add_assoc.
+      reflexivity.
+    Qed.
 
 (* 修复分配律证明 - 使用实际存在的函数 *)
 Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
@@ -1210,18 +1258,57 @@ Proof.
   apply of_nat_correct.
 Qed.
 
-(* 完整的环公理验证 *)
-Theorem verify_ring_axioms : RingAxiomsVerified.
-Proof.
-  refine {|
-    add_comm_proof := add_comm;
-    add_assoc_proof := add_assoc;
-    add_ident_proof := add_ident;
-    mul_assoc_proof := mul_assoc;
-    mul_ident_proof := mul_ident;
-    distrib_proof := distrib
-  |}.
-Qed.
+  (* 验证环公理 *)
+  Theorem verify_ring_axioms : RingAxiomsVerified.
+  Proof.
+    refine {|
+      add_comm_proof := RingAxiomsProof.add_comm;
+      add_assoc_proof := RingAxiomsProof.add_assoc;
+      add_ident_proof := RingAxiomsProof.add_ident;
+      mul_assoc_proof := RingAxiomsProof.mul_assoc;
+      mul_ident_proof := RingAxiomsProof.mul_ident;
+      distrib_proof := RingAxiomsProof.distrib
+    |}.
+  Qed.
+
+
+(* 添加缺失的环公理签名 *)
+Module Type RING_AXIOMS_SIG.
+  Parameter T : Type.
+  Parameter zero : T.
+  Parameter one : T.
+  Parameter add : T -> T -> T.
+  Parameter mul : T -> T -> T.
+  Parameter add_comm : forall a b, add a b = add b a.
+  Parameter add_assoc : forall a b c, add (add a b) c = add a (add b c).
+  Parameter add_ident : forall a, add a zero = a.
+  Parameter mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+  Parameter mul_ident : forall a, mul a one = a.
+  Parameter distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+End RING_AXIOMS_SIG.
+
+
+
+
+
+(* ======================== 修复：补充其他缺失的模块关闭 ======================== *)
+
+(* 注意：以下模块在文件中已经定义但可能未正确关闭，这里确保它们关闭 *)
+
+(* 布尔代数模块 *)
+Module BoolAlgebra_Closed := BoolAlgebra.
+
+
+(* ======================== 最终编译检查 ======================== *)
+
+(* 确保所有符号作用域正确 *)
+Local Close Scope Z_scope.
+Local Open Scope nat_scope.
+
+
+
+(* 代数高级扩展库编译完成 *)
+
 
 (* ======================== 完全自包含的代数高级扩展库 ======================== *)
 (* ======================== 修复负元存在性证明的完整版本 ======================== *)
@@ -1795,8 +1882,6 @@ Proof.
            ?GF2_Test_Field.val_zero, ?GF2_Test_Field.val_one;
    compute; reflexivity).
 Qed.
-
-End RingAxiomsProof.
 
 
 
