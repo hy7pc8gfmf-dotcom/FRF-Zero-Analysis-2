@@ -1400,7 +1400,7 @@ Proof.
   - lia.
 Qed.
 
-(* ======================== 迁移：互质和GCD相关引理 ======================== *)
+(* ======================== 互质和GCD相关引理 ======================== *)
 
 Definition coprime_improved (a b : nat) : Prop := 
   Nat.gcd a b = 1%nat.
@@ -2525,7 +2525,6 @@ Lemma PrimeField_val_one (data : PrimeFieldData) :
 Proof. 
   apply PrimeField_val_of_nat.
 Qed.
-
 
 (* 有限域相等性引理 *)
 Lemma PrimeField_fin_eq (data : PrimeFieldData) : 
