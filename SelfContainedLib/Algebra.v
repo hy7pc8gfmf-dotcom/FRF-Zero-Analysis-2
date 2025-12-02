@@ -1569,6 +1569,8 @@ End IntRing.
 
 (* ======================== FiniteField 模块完整实现 ======================== *)
 
+(* ======================== FiniteField 模块完整实现 ======================== *)
+
 Module FiniteField (P : PrimeParams) <: Field.
   (* 从参数模块中获取 p 和 Hprime *)
   Definition p := P.p.
