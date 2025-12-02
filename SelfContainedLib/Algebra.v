@@ -2297,5 +2297,21 @@ Proof.
   exact I.
 Qed.
 
+  (* ======================== 环公理证明 ======================== *)
+
+  (* 获取素数大于1的证明 *)
+  Lemma prime_gt_1_proof : 1 < p.
+  Proof.
+    destruct Hprime as [H _].
+    exact H.
+  Qed.
+  
+  Lemma prime_pos_proof : 0 < p.
+  Proof.
+    apply Nat.lt_trans with (m := 1); [lia|apply prime_gt_1_proof].
+  Qed.
+  
+End FiniteField.
+
 (* End of SelfContainedLib/Algebra+.v *)
 
