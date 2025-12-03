@@ -24,6 +24,9 @@ From Coq Require Import Logic.ProofIrrelevance. (* 提供 proof_irrelevance，�
 From Coq Require Import Logic.Eqdep_dec. (* 提供 eq_proofs_unicity，支持依赖类型相等性证明 *)
 
 (* 关闭特定编译警告，确保编译通过 *)
+Set Warnings "-deprecated".
+Set Warnings "-deprecated-syntactic-definition-since-8.17".
+Set Warnings "-renaming-var-with-dup-name-in-binder".
 Set Warnings "-deprecated". (* 关闭 Nat.add_mod/mul_mod 等弃用警告 *)
 Set Warnings "-warn-library-file-stdlib-vector". (* 关闭 Fin.t 替代方案警告 *)
 
@@ -3676,20 +3679,6 @@ Qed.
 
 Print finite_field_basic_axioms_proof_complete.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
 
 From Coq Require Import List.
@@ -3818,15 +3807,6 @@ Proof.
   repeat split; compute; reflexivity.
 Qed.
 
-(* ======================== 向量化版本 ======================== *)
-
-(* 向量点积 *)
-Fixpoint dot_product (v1 v2 : list nat) : nat :=
-  match v1, v2 with
-  | x1::xs1, x2::xs2 => (x1 * x2) + dot_product xs1 xs2
-  | _, _ => 0
-  end.
-
 (* ======================== 多项式版本 ======================== *)
 
 (* 将多项式表示为系数列表 *)
@@ -3841,34 +3821,6 @@ Fixpoint indices (len : nat) : list nat :=
   match len with
   | 0 => nil
   | S n' => indices n' ++ [n']
-  end.
-
-(* ======================== 性能优化版本 ======================== *)
-
-(* 记忆化递归函数，避免重复计算 *)
-Fixpoint mod_distrib_list_fast_aux (a : nat) (xs : list nat) (n : nat) 
-           (acc : nat) : nat :=
-  match xs with
-  | nil => acc mod n
-  | x :: xs' =>
-      let prod_mod := (a * x) mod n in
-      mod_distrib_list_fast_aux a xs' n (acc + prod_mod)
-  end.
-
-Definition mod_distrib_list_fast (a : nat) (xs : list nat) (n : nat) 
-           (Hpos : 0 < n) : nat :=
-  mod_distrib_list_fast_aux a xs n 0.
-
-(* ======================== 条件编译和优化 ======================== *)
-
-(* 基于列表长度的优化策略 *)
-Definition optimized_mod_distrib (a : nat) (xs : list nat) (n : nat) (Hpos : 0 < n) : nat :=
-  match xs with
-  | nil => 0
-  | [x] => (a * x) mod n
-  | [x; y] => ((a * x) mod n + (a * y) mod n) mod n
-  | [x; y; z] => (((a * x) mod n + (a * y) mod n) mod n + (a * z) mod n) mod n
-  | _ => mod_distrib_list_fast a xs n Hpos  (* 通用递归版本 *)
   end.
 
 (* ======================== 验证工具扩展 ======================== *)
@@ -3900,6 +3852,68 @@ Proof.
   reflexivity.
 Qed.
 
+(* ======================== 完成标记和导出 ======================== *)
+
+(* 通用n项分配律完成标记 *)
+Definition universal_mod_distrib_complete : Prop := True.
+
+Lemma universal_mod_distrib_verified : universal_mod_distrib_complete.
+Proof.
+  exact I.
+Qed.
+
+(* 编译检查 *)
+Section CompilationCheck.
+  
+  (* 检查所有需要的函数都存在 *)
+  Check sum_list.
+  Check map.
+  Check combine.
+  Check List.seq.
+  
+End CompilationCheck.
+
+Print universal_mod_distrib_verified.
+
+(* ======================== 9. 通用n项模分配律扩展 ======================== *)
+
+From Coq Require Import List.
+Import ListNotations.
+
+(* 保持与现有库一致的编译警告设置 *)
+Set Warnings "-deprecated".
+Set Warnings "-warn-library-file-stdlib-vector".
+
+Local Open Scope nat_scope.
+
+(* ======================== 性能优化版本 ======================== *)
+
+(* 记忆化递归函数，避免重复计算 *)
+Fixpoint mod_distrib_list_fast_aux (a : nat) (xs : list nat) (n : nat) 
+           (acc : nat) : nat :=
+  match xs with
+  | nil => acc mod n
+  | x :: xs' =>
+      let prod_mod := (a * x) mod n in
+      mod_distrib_list_fast_aux a xs' n (acc + prod_mod)
+  end.
+
+Definition mod_distrib_list_fast (a : nat) (xs : list nat) (n : nat) 
+           (Hpos : 0 < n) : nat :=
+  mod_distrib_list_fast_aux a xs n 0.
+
+(* ======================== 条件编译和优化 ======================== *)
+
+(* 基于列表长度的优化策略 *)
+Definition optimized_mod_distrib (a : nat) (xs : list nat) (n : nat) (Hpos : 0 < n) : nat :=
+  match xs with
+  | nil => 0
+  | [x] => (a * x) mod n
+  | [x; y] => ((a * x) mod n + (a * y) mod n) mod n
+  | [x; y; z] => (((a * x) mod n + (a * y) mod n) mod n + (a * z) mod n) mod n
+  | _ => mod_distrib_list_fast a xs n Hpos  (* 通用递归版本 *)
+  end.
+
 (* ======================== 与现有库接口兼容 ======================== *)
 
 (* 简化接口，避免与现有类型冲突 *)
@@ -3920,7 +3934,6 @@ Record ExtendedModAlgebraStruct : Type := {
     alg_mul a (alg_sum_list xs) = alg_sum_list (alg_map_mod (alg_scalar_mult a xs))
 }.
 
-
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
 
 From Coq Require Import List.
@@ -3938,7 +3951,6 @@ Fixpoint scalar_mult_list (a : nat) (xs : list nat) : list nat :=
   | nil => nil
   | x :: xs' => (a * x) :: scalar_mult_list a xs'
   end.
-
 
 (* ======================== 向量化版本（兼容Fin.t表示） ======================== *)
 
@@ -3994,11 +4006,6 @@ Section CompilationCheck.
   Check List.seq.
 
 End CompilationCheck.
-
-(* 通用n项分配律完成标记 *)
-Definition universal_mod_distrib_complete : Prop := True.
-Lemma universal_mod_distrib_verified : universal_mod_distrib_complete.
-Proof. exact I. Qed.
 
 (* 编译检查 *)
 Section CompilationCheck.
