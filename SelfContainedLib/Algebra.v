@@ -3679,6 +3679,29 @@ Qed.
 
 Print finite_field_basic_axioms_proof_complete.
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
 
 From Coq Require Import List.
@@ -3750,17 +3773,107 @@ Qed.
 
 (* ======================== 核心定理：通用n项分配律 ======================== *)
 
-(* 定理：标量乘法与列表求和的分配律 *)
-Theorem scalar_mult_sum_list : forall (a : nat) (xs : list nat),
-  a * (sum_list xs) = sum_list (map (fun x => a * x) xs).
+
+(* 定理：列表求和取模等于元素取模后求和再取模 - 增强版本 *)
+Theorem sum_list_mod_eq_enhanced : forall (xs : list nat) (n : nat) (Hpos : 0 < n),
+  (sum_list xs) mod n = (sum_list (map_mod xs n)) mod n.
 Proof.
-  intros a xs.
+  (* 方法1：使用标准归纳法 *)
+  intros xs n Hpos.
   induction xs as [|x xs' IH].
-  - simpl. rewrite Nat.mul_0_r. reflexivity.
-  - simpl.
-    rewrite Nat.mul_add_distr_l.
-    rewrite IH.
+  
+  - (* 基础情况：空列表 *)
+    simpl. 
+    (* 使用多种方式证明 n ≠ 0 *)
+    assert (Hneq : n <> 0) by (apply pos_to_nonzero; exact Hpos).
+    rewrite Nat.mod_0_l by exact Hneq.
     reflexivity.
+    
+  - (* 归纳步骤：非空列表 *)
+    simpl.
+    
+    (* 证明 n ≠ 0（提供多种证明方法） *)
+    assert (Hneq : n <> 0) by lia.  (* 方法1：使用lia *)
+    (* 也可以使用：apply pos_to_nonzero; exact Hpos. *)
+    
+    (* 核心证明：对称地处理两边 *)
+    
+    (* 步骤1：展开左边的模加法 *)
+    rewrite (Nat.add_mod x (sum_list xs') n Hneq).
+    (* 左边变为: ((x mod n) + (sum_list xs' mod n)) mod n *)
+    
+    (* 步骤2：应用归纳假设 *)
+    rewrite IH.
+    (* 左边变为: ((x mod n) + (sum_list (map_mod xs' n) mod n)) mod n *)
+    
+    (* 步骤3：展开右边的模加法 *)
+    rewrite (Nat.add_mod (x mod n) (sum_list (map_mod xs' n)) n Hneq).
+    (* 右边变为: ((x mod n mod n) + (sum_list (map_mod xs' n) mod n)) mod n *)
+    
+    (* 步骤4：简化 (x mod n) mod n *)
+    rewrite Nat.mod_mod by exact Hneq.
+    (* 现在两边完全相等 *)
+    
+    reflexivity.
+Qed.
+
+(* ======================== 扩展功能 ======================== *)
+
+(* 扩展1：提供反向引理 *)
+Lemma sum_list_mod_eq_sym : forall (xs : list nat) (n : nat) (Hpos : 0 < n),
+  (sum_list (map_mod xs n)) mod n = (sum_list xs) mod n.
+Proof.
+  intros xs n Hpos.
+  symmetry.
+  apply sum_list_mod_eq_enhanced.
+  exact Hpos.
+Qed.
+
+(* 扩展2：提供无Hpos条件的版本（当n>0不保证时返回相等或默认值） *)
+Definition sum_list_mod_eq_conditional (xs : list nat) (n : nat) : option Prop :=
+  match n with
+  | 0 => None  (* 模0未定义 *)
+  | S _ => Some ((sum_list xs) mod n = (sum_list (map_mod xs n)) mod n)
+  end.
+
+Lemma sum_list_mod_eq_conditional_correct : forall xs n,
+  match sum_list_mod_eq_conditional xs n with
+  | None => True
+  | Some P => P
+  end.
+Proof.
+  intros xs n.
+  unfold sum_list_mod_eq_conditional.
+  destruct n.
+  - exact I.  (* n=0，返回True *)
+  - (* n = S n'，需要证明等式 *)
+    apply sum_list_mod_eq_enhanced.
+    lia.  (* 0 < S n' *)
+Qed.
+
+(* 扩展3：提供批量验证函数 *)
+Fixpoint verify_sum_list_mod_eq_batch 
+  (tests : list (list nat * nat)) : list bool :=
+  match tests with
+  | nil => nil
+  | (xs, n) :: rest =>
+      match n with
+      | 0 => false :: verify_sum_list_mod_eq_batch rest
+      | _ =>
+          let lhs := (sum_list xs) mod n in
+          let rhs := (sum_list (map_mod xs n)) mod n in
+          (Nat.eqb lhs rhs) :: verify_sum_list_mod_eq_batch rest
+      end
+  end.
+
+
+
+(* 验证 map_mod 满足 Hf_mod 条件 *)
+Lemma map_mod_satisfies_condition : forall n (Hpos : 0 < n) x,
+  (map_mod [x] n) = [x mod n].
+Proof.
+  intros n Hpos x.
+  simpl. reflexivity.
 Qed.
 
 (* ======================== 验证工具 ======================== *)
@@ -3807,21 +3920,46 @@ Proof.
   repeat split; compute; reflexivity.
 Qed.
 
-(* ======================== 多项式版本 ======================== *)
+(* ======================== 验证和测试 ======================== *)
 
-(* 将多项式表示为系数列表 *)
-Fixpoint eval_poly (coeffs : list nat) (x : nat) : nat :=
-  match coeffs with
-  | nil => 0
-  | c :: cs => c + x * eval_poly cs x
-  end.
+(* 测试用例 *)
+Example test_sum_list_mod_eq_1 :
+  forall n, 0 < n -> (sum_list [1;2;3]) mod n = (sum_list (map_mod [1;2;3] n)) mod n.
+Proof.
+  intros n Hpos.
+  apply sum_list_mod_eq_enhanced.
+  exact Hpos.
+Qed.
 
-(* 辅助函数：生成索引列表 *)
-Fixpoint indices (len : nat) : list nat :=
-  match len with
-  | 0 => nil
-  | S n' => indices n' ++ [n']
-  end.
+Example test_sum_list_mod_eq_2 :
+  forall n, 0 < n -> (sum_list []) mod n = (sum_list (map_mod [] n)) mod n.
+Proof.
+  intros n Hpos.
+  apply sum_list_mod_eq_enhanced.
+  exact Hpos.
+Qed.
+
+(* 性能测试：比较不同版本的执行时间 *)
+Time Lemma perf_test_original : forall n, 0 < n -> 
+  (sum_list (List.seq 0 1000)) mod n = (sum_list (map_mod (List.seq 0 1000) n)) mod n.
+Proof.
+  intros n Hpos.
+  Time apply sum_list_mod_eq_enhanced.  (* 测量时间 *)
+  exact Hpos.
+Qed.
+
+(* 定理：标量乘法与列表求和的分配律 *)
+Theorem scalar_mult_sum_list : forall (a : nat) (xs : list nat),
+  a * (sum_list xs) = sum_list (map (fun x => a * x) xs).
+Proof.
+  intros a xs.
+  induction xs as [|x xs' IH].
+  - simpl. rewrite Nat.mul_0_r. reflexivity.
+  - simpl.
+    rewrite Nat.mul_add_distr_l.
+    rewrite IH.
+    reflexivity.
+Qed.
 
 (* ======================== 验证工具扩展 ======================== *)
 
