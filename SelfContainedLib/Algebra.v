@@ -3679,29 +3679,6 @@ Qed.
 
 Print finite_field_basic_axioms_proof_complete.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
 
 From Coq Require Import List.
@@ -3729,6 +3706,15 @@ Fixpoint map_mod (xs : list nat) (n : nat) : list nat :=
   | x :: xs' => (x mod n) :: map_mod xs' n
   end.
 
+Local Open Scope nat_scope.
+
+(* 辅助函数：列表乘积（左乘一个系数） *)
+Fixpoint scalar_mult_list (a : nat) (xs : list nat) : list nat :=
+  match xs with
+  | nil => nil
+  | x :: xs' => (a * x) :: scalar_mult_list a xs'
+  end.
+
 (* 辅助函数：元素与常数相乘后取模 *)
 Definition scalar_mult_mod (a : nat) (x : nat) (n : nat) : nat :=
   (a * x) mod n.
@@ -3739,6 +3725,8 @@ Proof.
   intros Hpos.
   lia.
 Qed.
+
+Local Open Scope nat_scope.
 
 (* ======================== 基础模运算引理 ======================== *)
 
@@ -3772,7 +3760,6 @@ Proof.
 Qed.
 
 (* ======================== 核心定理：通用n项分配律 ======================== *)
-
 
 (* 定理：列表求和取模等于元素取模后求和再取模 - 增强版本 *)
 Theorem sum_list_mod_eq_enhanced : forall (xs : list nat) (n : nat) (Hpos : 0 < n),
@@ -3865,8 +3852,6 @@ Fixpoint verify_sum_list_mod_eq_batch
           (Nat.eqb lhs rhs) :: verify_sum_list_mod_eq_batch rest
       end
   end.
-
-
 
 (* 验证 map_mod 满足 Hf_mod 条件 *)
 Lemma map_mod_satisfies_condition : forall n (Hpos : 0 < n) x,
@@ -3990,29 +3975,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* ======================== 完成标记和导出 ======================== *)
-
-(* 通用n项分配律完成标记 *)
-Definition universal_mod_distrib_complete : Prop := True.
-
-Lemma universal_mod_distrib_verified : universal_mod_distrib_complete.
-Proof.
-  exact I.
-Qed.
-
-(* 编译检查 *)
-Section CompilationCheck.
-  
-  (* 检查所有需要的函数都存在 *)
-  Check sum_list.
-  Check map.
-  Check combine.
-  Check List.seq.
-  
-End CompilationCheck.
-
-Print universal_mod_distrib_verified.
-
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
 
 From Coq Require Import List.
@@ -4074,22 +4036,6 @@ Record ExtendedModAlgebraStruct : Type := {
 
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
 
-From Coq Require Import List.
-Import ListNotations.
-
-(* 保持与现有库一致的编译警告设置 *)
-Set Warnings "-deprecated".
-Set Warnings "-warn-library-file-stdlib-vector".
-
-Local Open Scope nat_scope.
-
-(* 辅助函数：列表乘积（左乘一个系数） *)
-Fixpoint scalar_mult_list (a : nat) (xs : list nat) : list nat :=
-  match xs with
-  | nil => nil
-  | x :: xs' => (a * x) :: scalar_mult_list a xs'
-  end.
-
 (* ======================== 性能优化版本 ======================== *)
 
 (* 记忆化递归函数，避免重复计算 *)
@@ -4109,6 +4055,14 @@ Definition mod_distrib_list_l_fast (a : nat) (xs : list nat) (n : nat)
 
 (* ======================== 完成标记和导出 ======================== *)
 
+(* 通用n项分配律完成标记 *)
+Definition universal_mod_distrib_complete : Prop := True.
+
+Lemma universal_mod_distrib_verified : universal_mod_distrib_complete.
+Proof.
+  exact I.
+Qed.
+
 (* 导出所有新定义的引理 *)
 Export List ListNotations.
 
@@ -4119,50 +4073,10 @@ Section CompilationCheck.
   Check sum_list.
   Check map.
   Check combine.
+  Check List.seq.
   Check seq.
   
 End CompilationCheck.
-
-(* 编译检查 *)
-Section CompilationCheck.
-  
-  (* 检查所有需要的函数都存在 *)
-  Check sum_list.
-  Check map.
-  Check combine.
-  Check List.seq.
-
-End CompilationCheck.
-
-(* 编译检查 *)
-Section CompilationCheck.
-  
-  (* 检查所有需要的函数都存在 *)
-  Check sum_list.
-  Check map.
-  Check combine.
-  Check List.seq.
-  
-End CompilationCheck.
-
-(* ======================== 扩展总结 ======================== *)
-
-(*
-  本次扩展添加了以下内容：
-  1. 通用n项左分配律的递归证明 (mod_distrib_list_l)
-  2. 通用n项右分配律的递归证明 (mod_distrib_list_r)  
-  3. 对称形式 (mod_distrib_list_l_sym)
-  4. 向量化版本（点积分配律）
-  5. 多项式求值版本
-  6. 性能优化实现（记忆化递归）
-  7. 验证工具和测试用例
-  
-  所有证明均使用与现有库相同的：
-  - 参数约定 (n > 0 条件)
-  - 证明策略 (rewrite, induction)
-  - 错误处理模式
-  - 验证工具风格
-*)
 
 Print universal_mod_distrib_verified.
 (* 代数高级扩展库编译完成 *)
