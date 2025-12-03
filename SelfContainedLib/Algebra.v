@@ -4090,17 +4090,6 @@ Fixpoint scalar_mult_list (a : nat) (xs : list nat) : list nat :=
   | x :: xs' => (a * x) :: scalar_mult_list a xs'
   end.
 
-(* ======================== 向量化版本（兼容Fin.t表示） ======================== *)
-
-(* 对于有限域应用，我们提供向量化的版本 *)
-Section VectorizedVersions.
-
-  (* 假设我们有一个固定模数n *)
-  Context (n : nat) (Hpos : 0 < n).
-  
-  (* 向量类型：n维向量的列表表示 *)
-  Definition Vector : Type := list nat.
-
 (* ======================== 性能优化版本 ======================== *)
 
 (* 记忆化递归函数，避免重复计算 *)
