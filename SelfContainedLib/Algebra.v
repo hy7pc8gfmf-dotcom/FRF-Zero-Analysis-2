@@ -4121,6 +4121,52 @@ Module IndependentFiniteField.
       lia.
     Qed.
     
+    (* ======================== 自包含的模运算辅助引理 ======================== *)
+    
+    (* 自包含的模运算引理，不依赖外部库 *)
+    
+    Lemma mod_small_simple : forall a n, a < n -> 0 < n -> a mod n = a.
+    Proof.
+      intros a n Hlt Hpos.
+      apply Nat.mod_small.
+      exact Hlt.
+    Qed.
+    
+    Lemma mod_upper_bound_simple : forall a n, 0 < n -> a mod n < n.
+    Proof.
+      intros a n Hpos.
+      apply Nat.mod_upper_bound.
+      lia.
+    Qed.
+    
+    Lemma add_mod_simple : forall a b n, 0 < n -> 
+      (a + b) mod n = ((a mod n) + (b mod n)) mod n.
+    Proof.
+      intros a b n Hpos.
+      assert (Hneq : n <> 0) by lia.
+      rewrite (Nat.add_mod a b n Hneq).
+      reflexivity.
+    Qed.
+    
+    Lemma mul_mod_simple : forall a b n, 0 < n -> 
+      (a * b) mod n = ((a mod n) * (b mod n)) mod n.
+    Proof.
+      intros a b n Hpos.
+      assert (Hneq : n <> 0) by lia.
+      rewrite (Nat.mul_mod a b n Hneq).
+      reflexivity.
+    Qed.
+    
+    Lemma mod_mod_simple : forall a n, 0 < n -> (a mod n) mod n = a mod n.
+    Proof.
+      intros a n Hpos.
+      assert (Hneq : n <> 0) by lia.
+      apply Nat.mod_mod.
+      exact Hneq.
+    Qed.
+    
+    (* ======================== 载体类型定义 ======================== *)
+    
     (* 载体类型：简单的记录类型 *)
     Record FieldElem : Type := {
       elem_value : nat;
@@ -4133,13 +4179,26 @@ Module IndependentFiniteField.
     Definition eqb (a b : T) : bool :=
       Nat.eqb (elem_value a) (elem_value b).
     
-    (* 先定义一个辅助引理 *)
+    (* 相等性引理 *)
     Lemma exist_inj : forall (A : Type) (P : A -> Prop) (x y : A) (Hx : P x) (Hy : P y),
       exist P x Hx = exist P y Hy -> x = y.
     Proof.
       intros A P x y Hx Hy H.
       injection H.
       auto.
+    Qed.
+    
+    (* 元素相等性引理 *)
+    Lemma elem_eq : forall (a b : T),
+      elem_value a = elem_value b -> a = b.
+    Proof.
+      intros a b H.
+      destruct a as [a_val a_lt], b as [b_val b_lt].
+      simpl in H.
+      subst b_val.
+      assert (a_lt = b_lt) by apply proof_irrelevance.
+      subst b_lt.
+      reflexivity.
     Qed.
     
     (* 构造器 *)
@@ -4149,13 +4208,49 @@ Module IndependentFiniteField.
         elem_value := x mod p_val;
         elem_proof := _
       |}.
-      apply Nat.mod_upper_bound.
-      exact p_nonzero.
+      apply mod_upper_bound_simple.
+      exact prime_pos.
     Defined.
+    
+    (* 构造器性质 *)
+    Lemma mk_elem_value : forall x,
+      elem_value (mk_elem x) = x mod p_val.
+    Proof.
+      intro x.
+      unfold mk_elem.
+      simpl.
+      reflexivity.
+    Qed.
+    
+    Lemma mk_elem_small : forall x (H : x < p_val),
+      elem_value (mk_elem x) = x.
+    Proof.
+      intros x H.
+      rewrite mk_elem_value.
+      apply mod_small_simple.
+      - exact H.
+      - exact prime_pos.
+    Qed.
     
     (* 特殊元素 *)
     Definition zero : T := mk_elem 0.
     Definition one : T := mk_elem 1.
+    
+    (* 零和一的性质 *)
+    Lemma zero_value : elem_value zero = 0.
+    Proof.
+      unfold zero.
+      rewrite mk_elem_value.
+      apply Nat.mod_0_l.
+      exact p_nonzero.
+    Qed.
+    
+    Lemma one_value : elem_value one = 1.
+    Proof.
+      unfold one.
+      apply mk_elem_small.
+      exact prime_gt_1.
+    Qed.
     
     (* 代数运算 *)
     Definition add (a b : T) : T :=
@@ -4184,24 +4279,9 @@ Module IndependentFiniteField.
       | Some b_inv => Some (mul a b_inv)
       | None => None
       end.
-    
-    (* ======================== 辅助引理 ======================== *)
-    
-    (* 元素相等性引理 *)
-    Lemma elem_eq : forall (a b : T),
-      elem_value a = elem_value b -> a = b.
-    Proof.
-      intros a b H.
-      destruct a as [a_val a_lt], b as [b_val b_lt].
-      simpl in H.
-      subst b_val.
-      assert (a_lt = b_lt) by apply proof_irrelevance.
-      subst b_lt.
-      reflexivity.
-    Qed.
-    
-    (* 元素值的模性质 *)
-    
+
+(* 元素值的模性质 *)
+
 (* ======================== 元素值的模性质 - 增强版 ======================== *)
 
 (* 主要引理：元素值等于其模p_val的值 *)
@@ -4342,42 +4422,6 @@ Qed.
 Definition elem_value_mod_enhanced_complete : Prop := True.
 Lemma elem_value_mod_enhanced_verified : elem_value_mod_enhanced_complete.
 Proof. exact I. Qed.
-
-    (* 构造器的性质 *)
-    Lemma mk_elem_value : forall x,
-      elem_value (mk_elem x) = x mod p_val.
-    Proof.
-      intro x.
-      unfold mk_elem.
-      simpl.
-      reflexivity.
-    Qed.
-    
-    Lemma mk_elem_small : forall x (H : x < p_val),
-      elem_value (mk_elem x) = x.
-    Proof.
-      intros x H.
-      rewrite mk_elem_value.
-      apply Nat.mod_small.
-      exact H.
-    Qed.
-    
-    (* 零和一的性质 *)
-    Lemma zero_value : elem_value zero = 0.
-    Proof.
-      unfold zero.
-      rewrite mk_elem_value.
-      apply Nat.mod_0_l.
-      exact p_nonzero.
-    Qed.
-    
-    Lemma one_value : elem_value one = 1.
-    Proof.
-      unfold one.
-      rewrite mk_elem_small.
-      - reflexivity.
-      - exact prime_gt_1.
-    Qed.
     
     (* ======================== 代数运算的证明 ======================== *)
     
@@ -4449,7 +4493,6 @@ Proof.
 Qed.
 
 (* 辅助引理1：元素值层面的结合律 *)
-
 (* ======================== 元素值层面的乘法结合律 - 多种证明方法整合版 ======================== *)
 
 (* 方法1：使用 f_equal 策略 *)
@@ -4827,7 +4870,6 @@ Fixpoint generate_triple_tests (seed : nat) (count : nat) : list (T * T * T) :=
       (a, b, c) :: generate_triple_tests (seed + 3) n'
   end.
 
-
 (* 验证函数：检查三种方法产生相同结果 *)
 Definition verify_triple_product_assoc_methods (a b c : T) : bool :=
   let lhs := elem_value (mul (mul a b) c) in
@@ -4916,6 +4958,34 @@ Definition mul_assoc_enhanced_complete : Prop := True.
 Lemma mul_assoc_enhanced_verified : mul_assoc_enhanced_complete.
 Proof. exact I. Qed.
 
+
+    (* ======================== 域运算定义 ======================== *)
+    
+    (* 模逆元查找函数 - 自包含实现 *)
+    Fixpoint find_inv_aux (a n counter : nat) : option nat :=
+      match counter with
+      | O => None
+      | S m =>
+          if Nat.eqb ((a * counter) mod n) 1 then
+            Some counter
+          else
+            find_inv_aux a n m
+      end.
+    
+    Definition find_mod_inv (a n : nat) : option nat :=
+      if Nat.eqb (Nat.gcd a n) 1 then
+        find_inv_aux a n (n - 1)
+      else
+        None.
+    
+    (* 减法定义 *)
+    Lemma sub_def : forall a b, sub a b = add a (neg b).
+    Proof.
+      intros a b.
+      unfold sub.
+      reflexivity.
+    Qed.
+
 (* ======================== 测试有限域实现 ======================== *)
 
 Module TestIndependentFiniteField.
@@ -4947,7 +5017,7 @@ Module TestIndependentFiniteField.
     Definition p := 5.
     Definition is_prime_proof := prime_5_proof.
   End Prime5Params.
-  
+
 End TestIndependentFiniteField.
 
 (* ======================== 完成标记 ======================== *)
