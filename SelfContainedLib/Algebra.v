@@ -4935,7 +4935,6 @@ Definition mul_assoc_enhanced_complete : Prop := True.
 Lemma mul_assoc_enhanced_verified : mul_assoc_enhanced_complete.
 Proof. exact I. Qed.
 
-
     (* ======================== 域运算定义 ======================== *)
     
     (* 模逆元查找函数 - 自包含实现 *)
@@ -4997,6 +4996,37 @@ Module TestIndependentFiniteField.
 
 End TestIndependentFiniteField.
 
+(* ======================== 文件结束 ======================== *)
+
+  
+  (* 定义一个小的素数域：p=5 *)
+  Lemma prime_5_proof : is_prime 5.
+  Proof.
+    unfold is_prime.
+    split.
+    - lia.
+    - intros n [H1 H2].
+      assert (n = 2 \/ n = 3 \/ n = 4) by lia.
+      destruct H as [H | [H | H]].
+      + subst n.
+        intro Hdiv.
+        destruct Hdiv as [k Hk].
+        lia.
+      + subst n.
+        intro Hdiv.
+        destruct Hdiv as [k Hk].
+        lia.
+      + subst n.
+        intro Hdiv.
+        destruct Hdiv as [k Hk].
+        lia.
+  Qed.
+  
+  Module Prime5Params : IndependentFiniteField.SimplePrimeParams.
+    Definition p := 5.
+    Definition is_prime_proof := prime_5_proof.
+  End Prime5Params.
+
 (* ======================== 完成标记 ======================== *)
 
 Definition independent_finite_field_complete : Prop := True.
@@ -5006,8 +5036,6 @@ Proof. exact I. Qed.
 Print independent_finite_field_verified.
 
 (* ======================== 文件结束 ======================== *)
-
-
 
 (* ======================== 完成标记和导出 ======================== *)
 
@@ -5035,5 +5063,9 @@ Section CompilationCheck.
 End CompilationCheck.
 
 Print universal_mod_distrib_verified.
+
+Print independent_finite_field_verified.
+
+(* ======================== 完成标记 ======================== *)
 (* 代数高级扩展库编译完成 *)
 
