@@ -4053,33 +4053,10 @@ Definition mod_distrib_list_l_fast (a : nat) (xs : list nat) (n : nat)
            (Hpos : 0 < n) : nat :=
   fst (mod_distrib_list_l_fast_aux a xs n Hpos 0).
 
-(* ======================== 完成标记和导出 ======================== *)
 
-(* 通用n项分配律完成标记 *)
-Definition universal_mod_distrib_complete : Prop := True.
 
-Lemma universal_mod_distrib_verified : universal_mod_distrib_complete.
-Proof.
-  exact I.
-Qed.
 
-(* 导出所有新定义的引理 *)
-Export List ListNotations.
 
-(* 编译检查 *)
-Section CompilationCheck.
-  
-  (* 检查所有需要的标准库函数都存在 *)
-  Check sum_list.
-  Check map.
-  Check combine.
-  Check List.seq.
-  Check seq.
-  
-End CompilationCheck.
-
-Print universal_mod_distrib_verified.
-(* 代数高级扩展库编译完成 *)
 
 (* ======================== 补充：独立有限域证明模块 ======================== *)
 
@@ -5032,7 +5009,31 @@ Print independent_finite_field_verified.
 
 
 
+(* ======================== 完成标记和导出 ======================== *)
 
+(* 通用n项分配律完成标记 *)
+Definition universal_mod_distrib_complete : Prop := True.
 
+Lemma universal_mod_distrib_verified : universal_mod_distrib_complete.
+Proof.
+  exact I.
+Qed.
 
+(* 导出所有新定义的引理 *)
+Export List ListNotations.
+
+(* 编译检查 *)
+Section CompilationCheck.
+  
+  (* 检查所有需要的标准库函数都存在 *)
+  Check sum_list.
+  Check map.
+  Check combine.
+  Check List.seq.
+  Check seq.
+  
+End CompilationCheck.
+
+Print universal_mod_distrib_verified.
+(* 代数高级扩展库编译完成 *)
 
