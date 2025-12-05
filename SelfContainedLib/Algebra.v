@@ -966,12 +966,6 @@ Qed.
   
 End RingProperties.
 
-
-
-(* ======================== 使用Coq标准库的环策略 ======================== *)
-(* 导入Coq的标准ring库 *)
-From Coq Require Import Ring.
-
 (* ======================== 环验证工具 ======================== *)
 Module RingVerificationTools (R : Ring).
   Module Props := RingProperties R.
@@ -1054,17 +1048,6 @@ Module Type Field.
   Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
   Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
 End Field.
-
-
-
-
-
-
-
-
-
-
-
 
 (* ======================== 测试模块 ======================== *)
 
