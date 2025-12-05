@@ -2346,47 +2346,13 @@ End TestIndependentFiniteField.
   Lemma independent_finite_field_verified : independent_finite_field_complete.
   Proof. exact I. Qed.
 
-  Print independent_finite_field_verified.
-
 (* ======================== 文件结束 ======================== *)
-
-  (* 我们将在这之后添加 `End IndependentFiniteField.`，所以修改为： *)
-
-  (* ... 同上 ... *)
 
   Print independent_finite_field_verified.
 
-End IndependentFiniteField. 
+End IndependentFiniteField.  (* 模块正确关闭 *)
 
 (* ======================== 文件结束 ======================== *)
-  
-  (* 定义一个小的素数域：p=5 *)
-  Lemma prime_5_proof : is_prime 5.
-  Proof.
-    unfold is_prime.
-    split.
-    - lia.
-    - intros n [H1 H2].
-      assert (n = 2 \/ n = 3 \/ n = 4) by lia.
-      destruct H as [H | [H | H]].
-      + subst n.
-        intro Hdiv.
-        destruct Hdiv as [k Hk].
-        lia.
-      + subst n.
-        intro Hdiv.
-        destruct Hdiv as [k Hk].
-        lia.
-      + subst n.
-        intro Hdiv.
-        destruct Hdiv as [k Hk].
-        lia.
-  Qed.
-  
-  Module Prime5Params : IndependentFiniteField.SimplePrimeParams.
-    Definition p := 5.
-    Definition is_prime_proof := prime_5_proof.
-  End Prime5Params.
 
 (* ======================== 完成标记 ======================== *)
 
@@ -2460,12 +2426,6 @@ Module FixedNatAlgebra_Corrected.
   Proof. intros a; apply Nat.mul_1_r. Qed.
 
 End FixedNatAlgebra_Corrected.
-
-
-
-
-
-
 
 (* ======================== 模运算引理 ======================== *)
 
