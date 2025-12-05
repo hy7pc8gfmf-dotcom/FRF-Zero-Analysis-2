@@ -785,7 +785,287 @@ Qed.
     unfold sub.
     reflexivity.
   Qed.
+
+
+
+
+
+
+(* ======================== 环接口扩展 ======================== *)
+Module Type Ring.
+  Include BasicAlgebra.
   
+  (* 扩展：减法运算 *)
+  Parameter sub : T -> T -> T.
+  
+  (* 扩展：负元运算 *)
+  Parameter neg : T -> T.
+  
+  (* 环公理 - 修复版本 *)
+  Axiom sub_def : forall a b, sub a b = add a (neg b).           (* 减法定义 *)
+  Axiom add_inv : forall a, add a (neg a) = zero.               (* 加法逆元 *)
+  Axiom neg_zero : neg zero = zero.                             (* 零的负元 *)
+  
+  (* 修复：移除重复的分配律，利用BasicAlgebra中的交换律推导 *)
+  (* 注意：由于包含BasicAlgebra已有交换律，只需单侧分配律即可 *)
+  Axiom distrib_l : forall a b c, mul a (add b c) = add (mul a b) (mul a c). (* 左分配律 *)
+  
+  (* 添加：乘法零性质 *)
+  Axiom mul_zero_l : forall a, mul zero a = zero.               (* 左零乘 *)
+  Axiom mul_zero_r : forall a, mul a zero = zero.               (* 右零乘 *)
+  
+  (* 添加：负元乘法性质 *)
+  Axiom neg_mul_l : forall a b, mul (neg a) b = neg (mul a b).  (* 左负乘 *)
+  Axiom neg_mul_r : forall a b, mul a (neg b) = neg (mul a b).  (* 右负乘 *)
+  
+  (* 添加：负元加法性质 *)
+  Axiom neg_add : forall a b, neg (add a b) = add (neg a) (neg b). (* 负元和 *)
+  
+End Ring.
+
+(* ======================== 环性质推导模块 ======================== *)
+Module RingProperties (R : Ring).
+  
+(* 首先证明 distrib_r，因为它是其他证明的基础 *)
+Lemma distrib_r : forall a b c, R.mul (R.add a b) c = R.add (R.mul a c) (R.mul b c).
+Proof.
+  intros a b c.
+  rewrite R.mul_comm.                    (* (a+b)*c → c*(a+b) *)
+  rewrite R.distrib_l.                   (* c*(a+b) → c*a + c*b *)
+  rewrite (R.mul_comm c a).              (* c*a → a*c *)
+  rewrite (R.mul_comm c b).              (* c*b → b*c *)
+  reflexivity.
+Qed.
+
+(* 然后定义 neg 相关引理 *)
+Lemma neg_unique : forall a b, R.add a b = R.zero -> b = R.neg a.
+Proof.
+  intros a b H.
+  rewrite <- (R.add_ident b).
+  rewrite <- (R.add_inv a).
+  rewrite <- R.add_assoc.
+  rewrite (R.add_comm b a).
+  rewrite H.
+  rewrite R.add_comm.
+  rewrite R.add_ident.
+  reflexivity.
+Qed.
+
+Lemma neg_zero_alt : R.neg R.zero = R.zero.
+Proof.
+  symmetry.
+  apply neg_unique.
+  apply R.add_ident.  (* 因为 R.add R.zero R.zero = R.zero 就是 R.add_ident R.zero *)
+Qed.
+
+Lemma neg_involutive : forall a, R.neg (R.neg a) = a.
+Proof.
+  intros a.
+  symmetry.
+  apply neg_unique.
+  rewrite R.add_comm.
+  apply R.add_inv.
+Qed.
+
+  (* 其他证明可以在 distrib_r 之后定义 *)
+  Lemma sub_add : forall a b, R.sub a b = R.add a (R.neg b).
+  Proof. apply R.sub_def. Qed.
+  
+  Lemma sub_zero : forall a, R.sub a R.zero = a.
+  Proof.
+    intros a.
+    rewrite R.sub_def.
+    rewrite R.neg_zero.
+    rewrite R.add_ident.
+    reflexivity.
+  Qed.
+  
+  Lemma zero_sub : forall a, R.sub R.zero a = R.neg a.
+  Proof.
+    intros a.
+    rewrite R.sub_def.
+    rewrite R.add_comm.
+    apply R.add_ident.
+  Qed.
+  
+Lemma add_neg_cancel_r : forall a b, R.add (R.add a b) (R.neg b) = a.
+Proof.
+  intros a b.
+  rewrite (R.add_assoc a b (R.neg b)).
+  rewrite R.add_inv.
+  rewrite R.add_ident.
+  reflexivity.
+Qed.
+
+Lemma neg_add_inv : forall a, R.add (R.neg a) a = R.zero.
+Proof.
+  intros a.
+  rewrite R.add_comm.
+  apply R.add_inv.
+Qed.
+
+Lemma add_zero_l : forall a, R.add R.zero a = a.
+Proof.
+  intros a.
+  rewrite R.add_comm.
+  apply R.add_ident.
+Qed.
+
+(* 交换律和单位元 *)
+Lemma add_neg_cancel_l : forall a b, R.add (R.neg a) (R.add a b) = b.
+Proof.
+  intros a b.
+  rewrite <- R.add_assoc.
+  rewrite (R.add_comm (R.neg a) a).
+  rewrite R.add_inv.
+  rewrite R.add_comm.      (* 交换顺序：zero + b → b + zero *)
+  rewrite R.add_ident.     (* 现在可以应用单位元 *)
+  reflexivity.
+Qed.
+
+(* 乘法负元性质推导 *)
+(* 这些引理提供了负号与乘法交换的多种使用方式：
+   - 从左向右重写: rewrite neg_mul
+   - 从右向左重写: rewrite <- neg_mul  
+   - 直接应用: apply neg_mul
+*)
+Lemma neg_mul : forall a b, R.neg (R.mul a b) = R.mul (R.neg a) b.
+Proof. 
+  intros a b.
+  symmetry.
+  apply R.neg_mul_l.
+Qed.
+
+Lemma mul_neg : forall a b, R.neg (R.mul a b) = R.mul a (R.neg b).
+Proof.
+  intros a b.
+  symmetry.
+  apply R.neg_mul_r.
+Qed.
+
+  (* 零乘性质 *)
+  Lemma zero_mul : forall a, R.mul R.zero a = R.zero.
+  Proof. apply R.mul_zero_l. Qed.
+  
+  Lemma mul_zero : forall a, R.mul a R.zero = R.zero.
+  Proof. apply R.mul_zero_r. Qed.
+  
+  (* 负元相等性 *)
+  Lemma neg_eq_zero_iff : forall a, R.neg a = R.zero <-> a = R.zero.
+  Proof.
+    intros a.
+    split.
+    - intros H.
+      rewrite <- (neg_involutive a).
+      rewrite H.
+      apply neg_zero_alt.
+    - intros H.
+      rewrite H.
+      apply R.neg_zero.
+  Qed.
+  
+End RingProperties.
+
+
+
+(* ======================== 使用Coq标准库的环策略 ======================== *)
+(* 导入Coq的标准ring库 *)
+From Coq Require Import Ring.
+
+(* ======================== 环验证工具 ======================== *)
+Module RingVerificationTools (R : Ring).
+  Module Props := RingProperties R.
+  
+  Record RingAxiomsVerified : Type := {
+    add_comm_proof : forall a b, R.add a b = R.add b a;
+    add_assoc_proof : forall a b c, R.add (R.add a b) c = R.add a (R.add b c);
+    add_ident_proof : forall a, R.add a R.zero = a;
+    mul_assoc_proof : forall a b c, R.mul (R.mul a b) c = R.mul a (R.mul b c);
+    mul_ident_proof : forall a, R.mul a R.one = a;
+    distrib_proof : forall a b c, R.mul a (R.add b c) = R.add (R.mul a b) (R.mul a c);
+    sub_def_proof : forall a b, R.sub a b = R.add a (R.neg b);
+    add_inv_proof : forall a, R.add a (R.neg a) = R.zero;
+    neg_zero_proof : R.neg R.zero = R.zero;
+    distrib_l_proof : forall a b c, R.mul a (R.add b c) = R.add (R.mul a b) (R.mul a c);
+    mul_zero_l_proof : forall a, R.mul R.zero a = R.zero;
+    mul_zero_r_proof : forall a, R.mul a R.zero = R.zero;
+    neg_mul_l_proof : forall a b, R.mul (R.neg a) b = R.neg (R.mul a b);
+    neg_mul_r_proof : forall a b, R.mul a (R.neg b) = R.neg (R.mul a b);
+    neg_add_proof : forall a b, R.neg (R.add a b) = R.add (R.neg a) (R.neg b)
+  }.
+  
+  Definition verify_ring_axioms : RingAxiomsVerified :=
+    {|
+      add_comm_proof := R.add_comm;
+      add_assoc_proof := R.add_assoc;
+      add_ident_proof := R.add_ident;
+      mul_assoc_proof := R.mul_assoc;
+      mul_ident_proof := R.mul_ident;
+      distrib_proof := R.distrib_l;
+      sub_def_proof := R.sub_def;
+      add_inv_proof := R.add_inv;
+      neg_zero_proof := R.neg_zero;
+      distrib_l_proof := R.distrib_l;
+      mul_zero_l_proof := R.mul_zero_l;
+      mul_zero_r_proof := R.mul_zero_r;
+      neg_mul_l_proof := R.neg_mul_l;
+      neg_mul_r_proof := R.neg_mul_r;
+      neg_add_proof := R.neg_add
+    |}.
+    
+End RingVerificationTools.
+
+
+
+(* ======================== 域接口定义 ======================== *)
+Module Type Field.
+  (* 直接复制Ring的所有声明 *)
+  Parameter T : Type.
+  Parameter zero : T.
+  Parameter one : T.
+  Parameter add : T -> T -> T.
+  Parameter mul : T -> T -> T.
+  Parameter sub : T -> T -> T.
+  Parameter neg : T -> T.
+  
+  (* Ring公理 *)
+  Axiom add_comm : forall a b, add a b = add b a.
+  Axiom mul_comm : forall a b, mul a b = mul b a.
+  Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
+  Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
+  Axiom add_ident : forall a, add a zero = a.
+  Axiom mul_ident : forall a, mul a one = a.
+  Axiom sub_def : forall a b, sub a b = add a (neg b).
+  Axiom add_inv : forall a, add a (neg a) = zero.
+  Axiom neg_zero : neg zero = zero.
+  Axiom distrib_l : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
+  Axiom mul_zero_l : forall a, mul zero a = zero.
+  Axiom mul_zero_r : forall a, mul a zero = zero.
+  Axiom neg_mul_l : forall a b, mul (neg a) b = neg (mul a b).
+  Axiom neg_mul_r : forall a b, mul a (neg b) = neg (mul a b).
+  Axiom neg_add : forall a b, neg (add a b) = add (neg a) (neg b).
+  
+  (* 域扩展 *)
+  Parameter div : T -> T -> option T.
+  Parameter inv : T -> option T.
+  
+  (* 域公理 *)
+  Axiom mul_inv : forall a, a <> zero -> exists b, mul a b = one.
+  Axiom field_div_def : forall a b, b <> zero -> div a b = Some (mul a (match inv b with Some x => x | None => one end)).
+  Axiom no_zero_divisors : forall a b, mul a b = zero -> a = zero \/ b = zero.
+End Field.
+
+
+
+
+
+
+
+
+
+
+
+
 (* ======================== 测试模块 ======================== *)
 
 Module TestFiniteField.
@@ -2325,8 +2605,6 @@ End TestIndependentFiniteField.
 
 End IndependentFiniteField.  (* 模块正确关闭 *)
 
-(* ======================== 文件结束 ======================== *)
-
 (* ======================== 完成标记 ======================== *)
 
 Definition independent_finite_field_complete : Prop := True.
@@ -2365,7 +2643,6 @@ End CompilationCheck.
 Print universal_mod_distrib_verified.
 
 Print independent_finite_field_verified.
-
 (* ======================== 完成标记 ======================== *)
 (* 代数高级扩展库编译完成 *)
 
