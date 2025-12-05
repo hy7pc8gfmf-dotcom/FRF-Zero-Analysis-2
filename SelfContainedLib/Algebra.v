@@ -1360,16 +1360,6 @@ Qed.
 Print finite_field_basic_axioms_proof_complete.
 
 (* ======================== 9. 通用n项模分配律扩展 ======================== *)
-
-From Coq Require Import List.
-Import ListNotations.
-
-(* 保持与现有库一致的编译警告设置 *)
-Set Warnings "-deprecated".
-Set Warnings "-warn-library-file-stdlib-vector".
-
-Local Open Scope nat_scope.
-
 (* ======================== 基础定义和辅助函数 ======================== *)
 
 (* 辅助函数：列表求和 *)
