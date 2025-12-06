@@ -19,6 +19,9 @@ Require Import Coq.Logic.FunctionalExtensionality.
 Require Import Coq.Setoids.Setoid.
 From Coq Require Import Utf8.
 
+(* 显式声明作用域以避免警告 *)
+Declare Scope category_scope.
+
 (* ========================
    模块声明：明确接口范围
    ======================== *)
@@ -55,7 +58,7 @@ Record PreCategory := {
   comp : forall {x y z : Obj},         (* 公理C-004：复合操作 *)
          Hom y z -> Hom x y -> Hom x z;
   
-  (* 范畴公理（修复参数顺序） *)
+  (* 范畴公理 *)
   comp_assoc : forall {w x y z : Obj}  (* 公理C-005：结合律 *)
                (f : Hom w x) (g : Hom x y) (h : Hom y z),
                comp h (comp g f) = comp (comp h g) f;
