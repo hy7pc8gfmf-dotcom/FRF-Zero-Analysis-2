@@ -444,15 +444,38 @@ Notation "F ∘∘ G" := (ComposeFunctor F G)
    核心定理层（系统关键）
    ======================== *)
 
-(* 定理1：两个零对象是同构的 *)
+(* 定理1：两个零对象是同构的 - 简单直接版本 *)
 Theorem zero_objects_isomorphic : 
   forall (C : PreCategory) (Z Z' : Obj C),
-  IsZeroObject Z -> IsZeroObject Z' ->  (* 注意：这里去掉了C参数 *)
+  IsZeroObject Z -> IsZeroObject Z' ->
   exists (f : Hom Z Z') (g : Hom Z' Z),
     comp g f = id Z /\ comp f g = id Z'.
 Proof.
-  (* 暂时跳过证明，先解决类型问题 *)
-Admitted.
+  intros C Z Z' [Z_initial Z_terminal] [Z'_initial Z'_terminal].
+  
+  (* 获取 f: Z → Z' (来自 Z 的初始性) *)
+  destruct (Z_initial Z') as [f [Hf_true Hf_unique]].
+  
+  (* 获取 g: Z' → Z (来自 Z' 的初始性) *)
+  destruct (Z'_initial Z) as [g [Hg_true Hg_unique]].
+  
+  exists f, g.
+  split.
+  
+  (* 证明 comp g f = id Z *)
+  - destruct (Z_initial Z) as [h [Hh_true Hh_unique]].
+    (* 由于 h = comp g f 且 h = id Z，所以 comp g f = id Z *)
+    transitivity h.
+    + symmetry. apply Hh_unique. exact I.
+    + apply Hh_unique. exact I.
+    
+  (* 证明 comp f g = id Z' *)
+  - destruct (Z'_terminal Z') as [k [Hk_true Hk_unique]].
+    (* 由于 k = comp f g 且 k = id Z'，所以 comp f g = id Z' *)
+    transitivity k.
+    + symmetry. apply Hk_unique. exact I.
+    + apply Hk_unique. exact I.
+Qed.
 
 (* 定理2：范畴公理标签可判定性 *)
 Theorem category_axiom_tag_decidable : 
