@@ -2488,7 +2488,7 @@ Notation "x ≈[ S1 -> S2 ] y" :=
   (CrossSystemSimilarity (S1:=S1) (S2:=S2) x y) (at level 70).
 
 (* ======================== *)
-(* FRF 2.0 编译报告模块 - 重构版 *)
+(* FRF 2.0 编译报告模块 *)
 (* ======================== *)
 
 Module FRF_Compilation_Report.
@@ -2676,7 +2676,7 @@ Definition status_to_string (s : CompileStatus) : string :=
   | CS_Error msg => "[✗] " ++ msg
   end.
 
-(** 生成简单报告 - 修复版 *)
+(** 生成简单报告 *)
 Definition simple_report : string :=
   let success_count := count_success compile_checks in
   let warning_count := count_warning compile_checks in
@@ -2733,8 +2733,6 @@ Definition compile_verified_summary : string :=
   | hd :: _ => hd
   | _ => "unknown"
   end ++ ".".
-
-End FRF_Compilation_Report.
 
 (* ======================== *)
 (* 编译报告显示模块 *)
@@ -2837,4 +2835,58 @@ Eval compute in FRF_Display_Report.FULL_COMPILATION_REPORT.
 (** 验证编译完成 *)
 Theorem frf_meta_theory_compiled : True.
 Proof. exact I. Qed.
+
+(** 编译状态类型 *)
+Inductive CompilationStatus : Type :=
+  | CompilationSuccess : string -> CompilationStatus
+  | CompilationWarning : string -> CompilationStatus
+  | CompilationError : string -> CompilationStatus.
+
+(** 编译检查记录 *)
+Record CompilationCheck : Type := {
+  check_name : string;
+  check_status : CompilationStatus;
+  check_time : option nat;  (* 可选：检查耗时 *)
+  check_dependencies : list string;
+}.
+
+(** 辅助函数：创建成功状态 *)
+Definition comp_success (msg : string) : CompilationStatus :=
+  CompilationSuccess msg.
+
+(** 辅助函数：创建警告状态 *)
+Definition comp_warning (msg : string) : CompilationStatus :=
+  CompilationWarning msg.
+
+(** 辅助函数：创建错误状态 *)
+Definition comp_error (msg : string) : CompilationStatus :=
+  CompilationError msg.
+
+(** 整数转字符串的辅助函数 *)
+Fixpoint nat_to_string (n : nat) : string :=
+  match n with
+  | O => "0"
+  | S n' => "S" ++ nat_to_string n'
+  end.
+
+(** 字符串连接辅助函数 *)
+Fixpoint concat_strings (strs : list string) (sep : string) : string :=
+  match strs with
+  | nil => ""
+  | hd :: nil => hd
+  | hd :: tl => hd ++ sep ++ concat_strings tl sep
+  end.
+
+(** 验证关键类型定义 *)
+Theorem verify_core_types : True.
+Proof.
+  (* 验证类型定义存在 *)
+  assert (SystemCategory_is_defined : SystemCategory) by exact MathCategory.
+  assert (PropertyCategory_is_defined : PropertyCategory) by exact LogicCat.
+  assert (RoleHierarchy_is_defined : RoleHierarchy) by exact BaseRole.
+  assert (RelationType_is_defined : RelationType) by exact AxiomLevel.
+  exact I.
+Qed.
+
+End FRF_Compilation_Report.
 End FRF_MetaTheory.
