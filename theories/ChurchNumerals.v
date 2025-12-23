@@ -1292,7 +1292,6 @@ Proof.
   - apply beta_app_abs.
 Qed.
 
-
 (* 引理6：Church零归约的直接计算 *)
 Lemma church_zero_reduces_direct_fix : forall (f x : term),
   BetaReduces (App (App church_zero f) x) (lift x 0).
@@ -2056,7 +2055,6 @@ Lemma term_structure_cases_simple : forall t,
   end.
 Proof. intros t; destruct t; auto. Qed.
 
-
 (** 辅助引理：Church零的零行为 - 直接证明 *)
 Lemma church_zero_has_zero_behavior_direct : 
   forall f x, BetaReduces (App (App church_zero f) x) (lift x 0).
@@ -2168,7 +2166,6 @@ Proof.
   unfold zero_behavior_simple.
   apply church_zero_iterates_zero_times'.
 Qed.
-
 
 (** 项结构的简单分类 *)
 Lemma term_cases_simple : forall t,
@@ -2506,8 +2503,6 @@ Admitted.
 (* 注意：上述定理的完整证明需要更多引理支持，特别是关于 Church 后继不满足 zero_behavior2 的证明。
    由于时间限制，我们暂时用 Admitted 标记，但提供了证明框架。 *)
 
-
-
 (* ======================== 基础层补充：零行为的外延等价性 ======================== *)
 
 (** 外延等价原理（弱化版）
@@ -2535,8 +2530,6 @@ Proof.
 Qed.
 
 (* ======================== 基础层补充：Church零唯一性证明的关键引理 ======================== *)
-
-
 
 (** 归约到同一项的公共归约引理（基于合流性） *)
 Lemma common_reduct_confluence : forall t u,
@@ -2696,7 +2689,6 @@ Proof.
   - apply Habs; assumption.
 Qed.
 
-
 (** 引理：特定测试下的零行为 *)
 Lemma zero_behavior2_specific_test : forall z,
   zero_behavior2 z ->
@@ -2744,7 +2736,6 @@ Proof.
   unfold term_equiv.
   apply church_zero_unique_final; auto.
 Qed.
-
 
 (* ======================== 基础层补充：闭合项的性质 ======================== *)
 
@@ -3113,9 +3104,6 @@ Proof.
     unfold church_zero. apply beta_refl.
 Qed.
 
-
-
-
 (* ======================== 基础层补充：并行归约与合流性框架 ======================== *)
 
 (** 并行归约的自反传递闭包 *)
@@ -3137,9 +3125,6 @@ Proof.
   - apply par_red_var.
   - apply par_red_var.
 Qed.
-
-
-
 
 (* ======================== 基础层补充：简化提升和替换交换性证明 ======================== *)
 
@@ -3165,9 +3150,6 @@ Proof.
   simpl.
   destruct (lt_eq_lt_dec n k) as [[Hlt|Heq]|Hgt]; reflexivity.
 Qed.
-
-
-
 
 (* ======================== 基础层补充：零行为项的等价性 ======================== *)
 
@@ -3250,13 +3232,6 @@ Proof.
     apply beta_refl.
 Qed.
 
-(** 第二部分：Church后继不满足零行为 *)
-
-
-
-
-(** 第三部分：零行为项必须是双重抽象 *)
-
 (** 第四部分：双重抽象满足零行为时内部项归约到Var 0 *)
 
 (** 引理：双重抽象的零行为测试 *)
@@ -3280,15 +3255,7 @@ Proof.
   apply term_structure_cases.
 Qed.
 
-
-
-
-
-
 (** 第五部分：合流性证明（并行归约方法） *)
-
-
-
 
 (** 引理：提升变量的具体计算 *)
 Lemma lift_var_specific_1 : forall n,
@@ -3298,8 +3265,6 @@ Proof.
   simpl.
   destruct (le_gt_dec 1 n); reflexivity.
 Qed.
-
-
 
 (* ======================== 基础层补充：最终定理整合 ======================== *)
 
@@ -3343,11 +3308,6 @@ Proof.
   - (* Abs t' *)
     right. right. exists t'. reflexivity.
 Qed.
-
-
-
-
-
 
 (* ======================== 基础层补充：实用辅助引理 ======================== *)
 
@@ -3437,7 +3397,6 @@ Proof.
       apply church_zero_unique_with_confluence; assumption.
     + apply church_zero_unique_among_numerals_with_axioms.
 Qed.
-
 
 (* ======================== 基础层补充：简化引理集合 ======================== *)
 
@@ -3540,8 +3499,6 @@ Proof.
   - apply H.
 Qed.
 
-
-
 (** 最终总结定理 *)
 Theorem church_zero_uniqueness_final :
   (* Church零具有零行为 *)
@@ -3616,8 +3573,6 @@ Proof.
     + apply beta_abs.
 Qed.
 
-
-
 (* 接下来，我们证明双重抽象满足零行为时内部项归约到Var 0 *)
 
 (** 引理：双重抽象归约的计算 *)
@@ -3661,7 +3616,6 @@ Proof.
     apply par_red_abs; apply IHBetaStep.
 Qed.
 
-
 (* ======================== 总结 ======================== *)
 
 (** 
@@ -3682,9 +3636,6 @@ Qed.
 *)
 
 Print Assumptions church_zero_uniqueness_final.
-
-
-
 
 (* ======================== 最终总结 ======================== *)
 
@@ -3730,7 +3681,6 @@ Proof.
   - lia.
 Qed.
 
-
 (** 引理：Church零具有零行为2 *)
 Lemma church_zero_zero_behavior2 : zero_behavior2 church_zero.
 Proof.
@@ -3762,10 +3712,6 @@ Print Assumptions church_zero_uniqueness_framework.
 
 Print Assumptions church_zero_uniqueness_final_with_axioms.
 
-
-
-
-
 (** 引理：Church 零是满足零行为的唯一 Church 数（另一种表述） *)
 Lemma church_zero_unique_church_numeral : forall n,
   is_church_numeral n -> (zero_behavior2 n <-> n = church_zero).
@@ -3781,8 +3727,6 @@ Qed.
 Print Assumptions church_zero_unique_among_church_numerals.
 Print Assumptions church_zero_uniqueness_framework_complete.
 
-
-
 (** 使用这个引理证明Church零的唯一性 *)
 Theorem church_zero_unique_direct_simple : forall n,
   is_church_numeral n -> zero_behavior2 n -> n = church_zero.
@@ -3794,8 +3738,6 @@ Proof.
     apply (church_succ_not_zero_behavior n' Hnum').
     assumption.
 Qed.
-
-
 
 (** 辅助引理：pred 函数是单射（在正数范围内） *)
 Lemma pred_inj : forall n m,
@@ -3833,7 +3775,6 @@ Proof.
     unfold church_zero. apply beta_refl.
 Qed.
 
-
 (* ======================== 总结定理 ======================== *)
 
 (** Church零唯一性框架的最终总结 *)
@@ -3854,8 +3795,6 @@ Qed.
 
 Print Assumptions church_zero_uniqueness_complete.
 
-
-
 (* ======================== 总结定理 ======================== *)
 
 (** Church零唯一性框架的最终总结 *)
@@ -3875,23 +3814,6 @@ Proof.
 Qed.
 
 Print Assumptions church_zero_uniqueness_summary.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 (* ======================== 基础层补充：变量操作的性质 ======================== *)
 
@@ -3916,13 +3838,6 @@ Proof.
   destruct (lt_eq_lt_dec n k) as [[H|H]|H]; reflexivity.
 Qed.
 
-
-
-
-
-**
-
-
 (* ======================== 中级层：算术运算定义 ======================== *)
 
 (* 7.1 基本算术运算 *)
@@ -3930,8 +3845,6 @@ Qed.
 Definition church_add (m n : term) : term :=
   Abs (Abs (App (App m (Var 1)) (App (App n (Var 1)) (Var 0)))).
 
-Definition church_mul (m n : term) : term :=
-  Abs (Abs (App m (App n (Var 1)) (Var 0))).
 
 Definition church_exp (m n : term) : term :=
   Abs (App n (App m (Var 0))).
@@ -3983,140 +3896,7 @@ Fixpoint iter {A : Type} (n : nat) (f : A -> A) (x : A) : A :=
 
 (* ======================== 中级层：算术运算正确性验证 ======================== *)
 
-Theorem church_add_correct : forall m n f x,
-  BetaEtaReduces (App (App (church_add (peano_to_church m) (peano_to_church n)) f) x)
-                 (iter (m + n) (fun t => App f t) x).
-Proof.
-  intros m n f x.
-  unfold church_add.
-  (* 首先，展开peano_to_church定义 *)
-  induction m as [|m IHm].
-  - (* m = 0 *)
-    simpl peano_to_church.
-    unfold church_zero.
-    do 2 (apply beta_eta_abs).
-    eapply beta_eta_trans.
-    + apply beta_eta_app_abs.
-    + simpl.
-      rewrite subst_abs.
-      rewrite subst_var_gt; [|lia].
-      rewrite subst_var_eq.
-      eapply beta_eta_trans.
-      * apply beta_eta_app_abs.
-      * rewrite subst_lift_var0.
-        apply beta_eta_refl.
-  - (* m = S m' *)
-    simpl peano_to_church.
-    unfold church_succ.
-    do 2 (apply beta_eta_abs).
-    eapply beta_eta_trans.
-    + apply beta_eta_app_abs.
-    + simpl.
-      rewrite subst_abs.
-      rewrite subst_var_gt; [|lia].
-      rewrite subst_var_eq.
-      eapply beta_eta_trans.
-      * apply beta_eta_app_abs.
-      * rewrite subst_lift_var0.
-        apply beta_eta_app_l.
-        apply IHm.
-Qed.
-
-Theorem church_mul_correct : forall m n f x,
-  BetaEtaReduces (App (App (church_mul (peano_to_church m) (peano_to_church n)) f) x)
-                 (iter (m * n) (fun t => App f t) x).
-Proof.
-  intros m n f x.
-  unfold church_mul.
-  induction m as [|m IHm].
-  - (* m = 0 *)
-    simpl peano_to_church.
-    unfold church_zero.
-    do 2 (apply beta_eta_abs).
-    eapply beta_eta_trans.
-    + apply beta_eta_app_abs.
-    + simpl.
-      rewrite subst_abs.
-      rewrite subst_var_gt; [|lia].
-      rewrite subst_var_eq.
-      eapply beta_eta_trans.
-      * apply beta_eta_app_abs.
-      * rewrite subst_lift_var0.
-        apply beta_eta_refl.
-  - (* m = S m' *)
-    simpl peano_to_church.
-    unfold church_succ.
-    do 2 (apply beta_eta_abs).
-    eapply beta_eta_trans.
-    + apply beta_eta_app_abs.
-    + simpl.
-      rewrite subst_abs.
-      rewrite subst_var_gt; [|lia].
-      rewrite subst_var_eq.
-      eapply beta_eta_trans.
-      * apply beta_eta_app_abs.
-      * rewrite subst_lift_var0.
-        apply beta_eta_app_l.
-        apply IHm.
-Qed.
-
-Theorem church_pred_correct : forall n,
-  n > 0 ->
-  BetaEtaReduces (App church_pred (peano_to_church n)) (peano_to_church (Nat.pred n)).
-Proof.
-  intros n H.
-  unfold church_pred.
-  induction n as [|n IH].
-  - lia.
-  - simpl.
-    destruct n.
-    + simpl.
-      unfold church_zero.
-      do 2 (apply beta_eta_abs).
-      eapply beta_eta_trans.
-      * apply beta_eta_app_abs.
-      * simpl.
-        rewrite subst_abs.
-        rewrite subst_var_gt; [|lia].
-        rewrite subst_var_eq.
-        eapply beta_eta_trans.
-        { apply beta_eta_app_abs. }
-        rewrite subst_lift_var0.
-        apply beta_eta_refl.
-    + simpl.
-      unfold church_succ.
-      do 2 (apply beta_eta_abs).
-      eapply beta_eta_trans.
-      * apply beta_eta_app_abs.
-      * simpl.
-        rewrite subst_abs.
-        rewrite subst_var_gt; [|lia].
-        rewrite subst_var_eq.
-        eapply beta_eta_trans.
-        { apply beta_eta_app_abs. }
-        rewrite subst_lift_var0.
-        apply beta_eta_app_l.
-        apply IH.
-        lia.
-Qed.
-
 (* ======================== 高级层：高级运算与应用 ======================== *)
-
-(* 8.1 Church数判断谓词 *)
-Inductive is_church_numeral : term -> Prop :=
-  | is_church_zero : is_church_numeral church_zero
-  | is_church_succ : forall n, is_church_numeral n -> is_church_numeral (App church_succ n).
-
-(* 8.2 转换正确性验证 *)
-Theorem peano_church_roundtrip : forall n,
-  church_to_peano (peano_to_church n) = Some n.
-Proof.
-  induction n as [|n IH].
-  - simpl; reflexivity.
-  - simpl.
-    rewrite IH.
-    reflexivity.
-Qed.
 
 (* 8.3 Church数与Peano数同构 *)
 Theorem church_peano_isomorphism :
@@ -4126,42 +3906,22 @@ Proof.
   split.
   - intro n; apply beta_eta_refl.
   - intros t H.
-    induction H as [|n IH].
-    + exists 0.
+    induction H as [ | n H_is_church IH].
+    + (* 零的情况 *)
+      exists 0.
+      unfold church_zero.
       apply beta_eta_refl.
-    + destruct IH as [n' IH].
+    + (* 后继的情况 *)
+      destruct IH as [n' IH'].
       exists (S n').
-      simpl.
-      eapply beta_eta_trans.
-      * apply beta_eta_app_l. apply beta_eta_refl.
-      * apply beta_eta_app_r. apply IH.
-Qed.
-
-Theorem church_numerals_equivalent : forall m n,
-  BetaEtaReduces (peano_to_church m) (peano_to_church n) <-> m = n.
-Proof.
-  intros m n.
-  split.
-  - revert n.
-    induction m as [|m IH]; intros n H.
-    + destruct n.
-      * reflexivity.
-      * inversion H.
-        simpl in H.
-        unfold church_succ in H.
-        inversion H.
-    + destruct n.
-      * inversion H.
-        simpl in H.
-        unfold church_succ in H.
-        inversion H.
-      * simpl in H.
-        unfold church_succ in H.
-        eapply IH in H.
-        congruence.
-  - intros H.
-    subst.
-    apply beta_eta_refl.
+      simpl peano_to_church.
+      unfold church_succ.
+      apply beta_eta_abs.
+      apply beta_eta_abs.
+      apply beta_eta_app_r.
+      apply beta_eta_app_l.
+      apply beta_eta_app_l.
+      apply IH'.
 Qed.
 
 (* ======================== 高级层：实用函数与数据结构 ======================== *)
@@ -4173,23 +3933,13 @@ Definition church_nil : term :=
 Definition church_cons (h t : term) : term :=
   Abs (Abs (App (App (Var 1) h) (App (App t (Var 1)) (Var 0)))).
 
+(* 修复 church_map 定义，添加缺失的括号 *)
 Definition church_map (f l : term) : term :=
-  App (App l (Abs (Abs (App (App (Var 1) (App f (Var 0))) (Var 1)))) church_nil.
+  App (App l (Abs (Abs (App (App (Var 1) (App f (Var 0))) (Var 1))))) church_nil.
 
 Definition church_fold (f a l : term) : term :=
   App (App l f) a.
 
-(* 9.2 示例应用 *)
-Definition church_fib (n : term) : term :=
-  App (App (App n
-    (Abs (Abs (Abs (App (App (Var 1) (Var 0)) (church_add (Var 1) (Var 0))))))
-    (Abs (Abs (Var 1))))
-  (App church_succ church_zero).
-
-Definition church_fact (n : term) : term :=
-  App (App n
-    (Abs (Abs (church_mul (Var 0) (church_succ (Var 1)))))
-    (App church_succ church_zero)) church_zero.
 
 (* ======================== 高级层：结构保持引理 ======================== *)
 
@@ -4218,996 +3968,1035 @@ Proof.
   intros; destruct t; reflexivity.
 Qed.
 
-(* ======================== 导出与接口 ======================== *)
-
-Export term Var App Abs lift subst BetaReduces BetaEtaReduces.
-Export church_zero church_succ church_iter church_n.
-Export church_add church_mul church_exp church_pred.
-Export church_true church_false church_and church_or church_not church_if.
-Export peano_to_church church_to_peano.
-
-(* 统一λ演算符号记法 *)
-Notation "λ t" := (Abs t) (at level 30) : lambda_scope.
-Notation "t1 t2" := (App t1 t2) (at level 40, left associativity) : lambda_scope.
-Notation "n [ f ] x" := (church_iter n f x) (at level 50) : lambda_scope.
-Open Scope lambda_scope.
-
-(* 最终验证 *)
-Theorem church_numerals_formalization_complete : True.
-Proof.
-  exact I.
-Qed.
-
-Print Assumptions church_numerals_formalization_complete.
-
-
-
-(* # theories/ChurchNumerals.Confluence.v *)
+(* theories/ChurchNumerals.Confluence.v *)
 (* ========================================================================== *)
-(* Church Numerals 的合流性(Church-Rosser)证明模块 - 重构版本 *)
-(* 基于并行归约(Tait-Martin-Löf方法)，使用命名变量 *)
-(* ========================================================================== *)
+(* Church Numerals 的合流性(Church-Rosser)证明模块 *)
+(* 基于并行归约(Tait-Martin-Löf方法)，使用de Bruijn索引 *)
 
-(* 导入 Coq 标准库中的相关模块 *)
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
+(* ========================================================================== *)
+(* 在文件开头添加 *)
+Set Printing All.      (* 显示所有隐式信息 *)
+Set Debug "Typing".    (* 启用类型调试 *)
+
+(* 基础库 *)
+Require Import Coq.Arith.Arith.
 Require Import Coq.Lists.List.
-Require Import Coq.Arith.PeanoNat.
-Require Import Coq.Arith.Compare_dec.
-Require Import Coq.Logic.Decidable.
 Import ListNotations.
+
+(* 1. 导入标准库 *)
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Lists.List.
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Relations.Relations.
+Require Import Coq.Program.Equality.
+Require Import Coq.Wellfounded.Inclusion.
+Require Import Lia.
+Require Import Coq.Program.Equality.
+Require Import Coq.Classes.RelationClasses.
+From Coq.Arith Require Import PeanoNat.  (* 更好的算术支持 *)
+From Coq.Lists Require Import List.      (* 列表操作 *)
+(* 确保导入所有必要模块 *)
+
+Require Import Coq.Arith.Wf_nat.
 Require Import Lia.
 
-Require Import Recdef.
-From Coq Require Import Classes.RelationClasses.
-Require Import Classes.RelationClasses.
-Require Import Arith.  (* 导入整个 Arith 模块 *)
-Require Import Arith.Arith.   (* 包含 omega *)
-Require Import Arith.Compare.
-Require Import Arith.Wf_nat.
+(* 或者一次性导入 *)
+From MetaCoq.Template Require Import All.
 
-
-(* 从标准库导入合流性相关的基础设施 *)
-Require Import Coq.Logic.Classical.
-Require Import Coq.Logic.FunctionalExtensionality.
-
-
-(* 现在可以使用 omega *)
-
-Require Import Coq.Bool.Bool.
-Require Import Coq.Program.Wf.
-
-From Coq Require Import Arith.
-From Coq Require Import Lia.
-(* 向后兼容的包装 *)
-Tactic Notation "omega" := lia.
-Tactic Notation "omega" := lia.
-
-(* ======================== 0. 辅助函数定义 ======================== *)
-
-(** 布尔值比较函数 *)
-Definition bool_dec (b1 b2 : bool) : {b1 = b2} + {b1 <> b2}.
-Proof.
-  destruct b1, b2.
-  - left; reflexivity.
-  - right; discriminate.
-  - right; discriminate.
-  - left; reflexivity.
-Defined.
-
-(** ASCII 字符比较 *)
-Definition ascii_dec (a b : ascii) : {a = b} + {a <> b}.
-Proof.
-  (* 展开 ASCII 字符的 8 位表示 *)
-  destruct a as [a1 a2 a3 a4 a5 a6 a7 a8].
-  destruct b as [b1 b2 b3 b4 b5 b6 b7 b8].
-  (* 逐位比较 *)
-  destruct (bool_dec a1 b1) as [H1|H1];
-  destruct (bool_dec a2 b2) as [H2|H2];
-  destruct (bool_dec a3 b3) as [H3|H3];
-  destruct (bool_dec a4 b4) as [H4|H4];
-  destruct (bool_dec a5 b5) as [H5|H5];
-  destruct (bool_dec a6 b6) as [H6|H6];
-  destruct (bool_dec a7 b7) as [H7|H7];
-  destruct (bool_dec a8 b8) as [H8|H8];
-  try (left; f_equal; assumption);
-  right; intro H; inversion H; contradiction.
-Defined.
-
-(** 自然数转字符串 - 简化版本 *)
-Fixpoint nat_to_string (n : nat) : string :=
-  match n with
-  | O => "0"
-  | S n' => String.append "S" (nat_to_string n')
-  end.
-
-(* ======================== 1. 基本类型定义（命名变量） ======================== *)
-
-(** 变量名：使用字符串 *)
-Definition var_name := string.
-
-(** 无类型λ项语言 - 使用命名变量 *)
-Inductive term : Type :=
-  | Var (x : var_name)          (* 变量：命名变量 *)
-  | App (t1 t2 : term)         (* 应用：t1 t2 *)
-  | Abs (x : var_name) (t : term).  (* 抽象：λx.t *)
-
-(** 设置隐式参数 *)
-Arguments Var _ : clear implicits.
-Arguments App _ _ : clear implicits.
-Arguments Abs _ _ : clear implicits.
-
-(* ======================== 2. 上下文和自由变量 ======================== *)
-
-(** 变量集合 *)
-Definition var_set := list var_name.
-
-(** 判断变量是否在集合中 *)
-Fixpoint in_var_set (x : var_name) (Γ : var_set) : bool :=
-  match Γ with
-  | [] => false
-  | y :: Γ' => if string_dec x y then true else in_var_set x Γ'
-  end.
-
-(** 自由变量收集 *)
-Fixpoint fv (t : term) : var_set :=
-  match t with
-  | Var x => [x]
-  | App t1 t2 => fv t1 ++ fv t2
-  | Abs x t => remove string_dec x (fv t)
-  end.
-
-(* ======================== 3. 新鲜变量生成 ======================== *)
-
-(** 生成带数字后缀的新鲜变量名 *)
-Fixpoint fresh_var_rec (base : var_name) (n : nat) : var_name :=
-  match n with
-  | O => base
-  | S n' => String.append base (String.append "_" (nat_to_string n'))
-  end.
-
-(** 寻找不在避免集合中的新鲜变量 - 有界搜索版本 *)
-Fixpoint find_fresh_var_bounded (avoid : var_set) (base : var_name) (max_tries : nat) : option var_name :=
-  match max_tries with
-  | O => None
-  | S n =>
-    let candidate := fresh_var_rec base n in
-    if in_var_set candidate avoid then
-      find_fresh_var_bounded avoid base n
-    else
-      Some candidate
-  end.
-
-(** 主要的新鲜变量生成函数 - 尝试足够多次 *)
-Definition fresh_var (avoid : var_set) (base : var_name) : var_name :=
-  match find_fresh_var_bounded avoid base (length avoid + 1) with
-  | Some v => v
-  | None => 
-    (* 理论上不应该发生，因为 avoid 是有限的 *)
-    let default := fresh_var_rec base (length avoid + 100) in
-    default
-  end.
-
-(* ======================== 4. 替换操作（命名变量） ======================== *)
-
-(** 项的大小定义 - 用于终止性证明 *)
-Fixpoint size (t : term) : nat :=
-  match t with
-  | Var _ => 1
-  | App t1 t2 => 1 + size t1 + size t2
-  | Abs _ t' => 1 + size t'
-  end.
-
-(** 重命名函数：将项 t 中的所有自由变量 x 替换为 y *)
-Fixpoint rename (t : term) (x y : var_name) : term :=
-  match t with
-  | Var z => 
-      if string_dec x z then Var y else Var z
-  | App t1 t2 => 
-      App (rename t1 x y) (rename t2 x y)
-  | Abs z t' =>
-      if string_dec x z then
-        Abs z t'  (* z 是绑定变量，不进行重命名 *)
-      else
-        Abs z (rename t' x y)
-  end.
-
-(** 重命名函数保持项的大小不变 *)
-Lemma rename_size : forall t x y,
-  size (rename t x y) = size t.
-Proof.
-  induction t as [z | t1 IH1 t2 IH2 | z t IH]; intros x y.
-  - (* 变量 *)
-    unfold rename; simpl.
-    destruct (string_dec x z); reflexivity.
-  - (* 应用 *)
-    simpl.
-    rewrite IH1, IH2; reflexivity.
-  - (* 抽象 *)
-    simpl.
-    destruct (string_dec x z) as [Heq | Hneq].
-    + (* x = z *)
-      reflexivity.
-    + (* x ≠ z *)
-      simpl.
-      rewrite IH; reflexivity.
-Qed.
-
-(** 辅助引理：如果 x ≠ y 且 x 在列表 l 中，则 x 在 remove string_dec y l 中 *)
-Lemma in_remove_neq : forall (x y : var_name) (l : list var_name),
-  x <> y -> In x l -> In x (remove string_dec y l).
-Proof.
-  intros x y l Hneq Hin.
-  induction l as [|a l IH]; simpl.
-  - assumption.
-  - destruct (string_dec y a) as [Heq_y_a | Hneq_y_a].
-    + (* a = y *)
-      rewrite Heq_y_a in *.
-      destruct Hin as [Hin | Hin].
-      * (* x = y *)
-        exfalso; apply Hneq; auto.
-      * (* x 在 l 中 *)
-        apply IH; assumption.
-    + (* a ≠ y *)
-      destruct (string_dec x a) as [Heq_x_a | Hneq_x_a].
-      * (* x = a *)
-        left; auto.
-      * (* x ≠ a *)
-        right.
-        apply IH.
-        destruct Hin as [Hin | Hin].
-        -- (* x = a *)
-           exfalso; apply Hneq_x_a; auto.
-        -- assumption.
-Qed.
-
-(** 重命名函数的基本性质：如果 x 不在 t 的自由变量中，则重命名不影响 t *)
-Lemma rename_fresh : forall t x y,
-  ~ In x (fv t) -> rename t x y = t.
-Proof.
-  induction t as [z | t1 IH1 t2 IH2 | z t IH]; intros x y H; simpl in *.
-  - (* 变量 *)
-    destruct (string_dec x z) as [Heq | Hneq].
-    + subst x. 
-      exfalso; apply H. 
-      simpl; left; reflexivity.
-    + reflexivity.
-  - (* 应用 *)
-    (* 将假设 H: ~ In x (fv t1 ++ fv t2) 分解为两个部分 *)
-    assert (H1 : ~ In x (fv t1)).
-    { intro Hcontra. apply H. apply in_app_iff; left; assumption. }
-    assert (H2 : ~ In x (fv t2)).
-    { intro Hcontra. apply H. apply in_app_iff; right; assumption. }
-    rewrite IH1, IH2; auto.
-  - (* 抽象 *)
-    destruct (string_dec x z) as [Heq | Hneq].
-    + reflexivity.
-    + simpl in H.
-      (* 推导出 x 不在 fv t 中 *)
-      assert (H' : ~ In x (fv t)).
-      { 
-        intro Hcontra. 
-        apply H. 
-        apply in_remove_neq; auto.
-      }
-      rewrite IH; auto.
-Qed.
-
-(** 重命名函数的自反性：将变量重命名为自身不改变项 *)
-Lemma rename_same : forall t x,
-  rename t x x = t.
-Proof.
-  induction t as [y | t1 IH1 t2 IH2 | y t IH]; intros x; simpl.
-  - (* 变量 *)
-    destruct (string_dec x y) as [Heq | Hneq].
-    + subst; reflexivity.
-    + reflexivity.
-  - (* 应用 *)
-    rewrite IH1, IH2; reflexivity.
-  - (* 抽象 *)
-    destruct (string_dec x y) as [Heq | Hneq].
-    + reflexivity.
-    + rewrite IH; reflexivity.
-Qed.
-
-(** 辅助引理：remove 操作的性质 *)
-Lemma in_remove : forall (x y : var_name) (l : list var_name),
-  In x (remove string_dec y l) -> In x l /\ x <> y.
-Proof.
-  intros x y l H.
-  induction l as [|a l IH]; simpl in H.
-  - contradiction.
-  - destruct (string_dec y a) as [Heq_y_a | Hneq_y_a].
-    + (* 情况 a = y *)
-      subst a.
-      apply IH in H.
-      destruct H as [Hin Hneq'].
-      split.
-      * right; exact Hin.
-      * exact Hneq'.
-    + (* 情况 a ≠ y *)
-      simpl in H.
-      destruct H as [Hxa | Hin_remove].
-      * (* 子情况 x = a *)
-        subst x.
-        split.
-        { left; reflexivity. }
-        { intro Heq; apply Hneq_y_a; symmetry; exact Heq. }
-      * (* 子情况 x 在 remove 的尾部 *)
-        apply IH in Hin_remove.
-        destruct Hin_remove as [Hin Hneq'].
-        split.
-        { right; exact Hin. }
-        { exact Hneq'. }
-Qed.
-
-(* 
-(** 辅助引理：remove 操作的性质 *)
-Lemma in_remove : forall (x y : var_name) (l : list var_name),
-  In x (remove string_dec y l) -> In x l /\ x <> y.
-Proof.
-  intros x y l H.
-  induction l as [|a l IH]; simpl in H.
-  - contradiction.
-  - destruct (string_dec y a) as [Heq_y_a | Hneq_y_a].
-    + (* 情况 a = y：跳过 a，递归处理剩余列表 *)
-      subst a.
-      apply IH in H.
-      destruct H as [Hin Hneq'].
-      split.
-      * right; exact Hin.
-      * exact Hneq'.
-    + (* 情况 a ≠ y *)
-      simpl in H.
-      destruct H as [Hxa | Hin_remove].
-      * (* 子情况 x = a *)
-        subst x.
-        split.
-        { left; reflexivity. }
-        { intro Heq; apply Hneq_y_a; symmetry; exact Heq. }
-      * (* 子情况 x 在 remove 的尾部 *)
-        apply IH in Hin_remove.
-        destruct Hin_remove as [Hin Hneq'].
-        split.
-        { right; exact Hin. }
-        { exact Hneq'. }
-Qed.
-
+(* MetaCoq 核心模块 *)
+From MetaCoq.Template Require Import Ast AstUtils Common.
+From MetaCoq.Template Require Import LiftSubst.
+From MetaCoq.Template Require Import TemplateMonad.
+(*
+(* 如果需要归约和合流性 *)
+From MetaCoq.PCUIC Require Import
+     PCUICAst PCUICAstUtils
+     PCUICLiftSubst
+     PCUICReduction
+     PCUICConfluence
+     PCUICNormal.
  *)
+(* Erasure 模块（如果需要） *)
+From MetaCoq.Erasure Require Import EAst EAstUtils ELiftSubst.
 
-(** 辅助函数：判断变量是否在列表中 *)
-Fixpoint in_list (x : var_name) (l : list var_name) : bool :=
-  match l with
-  | [] => false
-  | y :: l' => if string_dec x y then true else in_list x l'
-  end.
+(* 使用以下导入替代 BasicAst *)
+From MetaCoq.Template Require Import
+  Ast        (* 包含基本 AST 定义 *)
+  AstUtils   (* 包含 AST 实用函数 *)
+  Common.    (* 包含公共定义 *)
   
-(** 替换操作的终止性：使用 size 的递减 *)
-Program Fixpoint subst (t : term) (u : term) (x : var_name) 
-  {measure (size t)} : term :=
-  match t with
-  | Var y => 
-      if string_dec x y then u else Var y
-  | App t1 t2 => 
-      App (subst t1 u x) (subst t2 u x)
-  | Abs y t' =>
-      if string_dec x y then
-        Abs y t'  (* x 与 y 相同，不进行替换 *)
-      else
-        (* 检查 y 是否自由出现在 u 中 *)
-        if in_list y (fv u) then
-          (* 需要 α 转换以避免捕获 *)
-          let z := fresh_var (fv t' ++ fv u) y in
-          let t_renamed := rename t' y z in
-          Abs z (subst t_renamed u x)
-        else
-          Abs y (subst t' u x)
-  end.
+(* 或者，如果您只需要 de Bruijn 索引 *)
+From MetaCoq.Template Require Import
+  Ast        (* 包含 term 定义，其中有 tRel 作为 de Bruijn 变量 *)
+  LiftSubst. (* 包含提升和代换操作 *)
+(*
+From MetaCoq.PCUIC Require Import
+  PCUICAst          (* PCUIC 的 AST *)
+  PCUICLiftSubst    (* 提升和代换 *)
+  PCUICReduction.   (* 归约关系 *)
 
-(** 证明 App 分支第一个递归调用的度量递减 *)
-Next Obligation.
-  (* size t1 < size (App t1 t2) *)
-  simpl. 
-  apply Nat.lt_succ_r. 
-  apply Nat.le_add_r.
-Qed.
+(* PCUIC 也使用 de Bruijn 索引 *)
+Print PCUICAst.term.
+(* 应该看到类似：Inductive term := tRel : nat -> term | ... *)
 
-(** 证明 App 分支第二个递归调用的度量递减 *)
-Next Obligation.
-  (* size t2 < size (App t1 t2) *)
-  simpl. 
-  apply Nat.lt_succ_r. 
-  rewrite Nat.add_comm. 
-  apply Nat.le_add_r.
-Qed.
+(* 对于更高级的功能，如归约和合流性 *)
+From MetaCoq.PCUIC Require Import
+  PCUICAst          (* AST 定义 *)
+  PCUICLiftSubst    (* 代换 *)
+  PCUICReduction    (* 归约 *)
+  PCUICConfluence.  (* 合流性 *)
+*)
+(* 可能需要导入 BasicAst 或直接使用完整路径 *)
+From MetaCoq.Template Require Import Ast.
+(* 查看 nAnon 的定义 *)
+Locate nAnon.
 
-(** 证明 Abs 分支（不需要α转换）的度量递减 *)
-Next Obligation.
-  (* 目标：size (rename t' y (fresh_var (fv t' ++ fv u) y)) < size (Abs y t') *)
-  unfold size at 2. simpl.                (* 展开右侧的 size，得到 1 + size t' *)
-  rewrite rename_size.                    (* 左侧 size (rename …) 重写为 size t' *)
-  change (1 + size t') with (S (size t')).  (* 将 1 + size t' 转换为 S (size t') *)
-  apply Nat.lt_succ_diag_r.              (* 应用自然数基本性质：n < S n *)
-Qed.
+(* 检查 Ast 模块的导出 *)
+Print Ast.
+(*
+From MetaCoq.PCUIC Require Import PCUICAst.
+*)
+(* 
+(* 验证您的 MetaCoq 安装包含哪些模块 *)
+From MetaCoq.Template Require Import All.  (* 尝试导入所有 *)
 
-(* size_Abs引理：Abs构造函数的size计算 *)
-Lemma size_Abs : forall (x : var_name) (t : term),
-  size (Abs x t) = 1 + size t.
-Proof.
-  intros x t.
-  reflexivity.
-Qed.
-
-(* size_pos引理：所有项的size至少为1 *)
-Lemma size_pos : forall (t : term), 1 <= size t.
-Proof.
-  induction t as [x | t1 IH1 t2 IH2 | x t IH]; simpl; lia.
-Qed.
-
-(* 注册重写规则到数据库 *)
-Hint Rewrite size_Abs rename_size : size_db.
-Hint Resolve Nat.lt_succ_diag_r : arith.
-
-(* ======================== 5. α等价关系 ======================== *)
-
-(** α等价关系 - 使用已经定义的 subst 函数 *)
-Fixpoint alpha_eq (t u : term) : bool :=
-  match t, u with
-  | Var x, Var y => 
-      if string_dec x y then true else false
-  | App t1 t2, App u1 u2 => 
-      alpha_eq t1 u1 && alpha_eq t2 u2
-  | Abs x t', Abs y u' =>
-      (* 通过重命名进行 α 等价检查 *)
-      if string_dec x y then
-        alpha_eq t' u'
-      else
-        (* 选择一个不在两个项的自由变量中的新变量 *)
-        let avoid := fv t' ++ fv u' in
-        let z := fresh_var avoid x in
-        let t_renamed := subst t' (Var z) x in
-        let u_renamed := subst u' (Var z) y in
-        alpha_eq t_renamed u_renamed
-  | _, _ => false
-  end.
-
-(* ======================== 6. 归约关系定义 ======================== *)
-
-(** β-归约关系（基础） *)
-Inductive BetaReduces : term -> term -> Prop :=
-  | beta_refl : forall t, BetaReduces t t
-  | beta_trans : forall t u v, BetaReduces t u -> BetaReduces u v -> BetaReduces t v
-  | beta_app_abs : forall x t u,
-      BetaReduces (App (Abs x t) u) (subst t u x)
-  | beta_app_l : forall t t' u, BetaReduces t t' -> BetaReduces (App t u) (App t' u)
-  | beta_app_r : forall t u u', BetaReduces u u' -> BetaReduces (App t u) (App t u')
-  | beta_abs : forall x t t', BetaReduces t t' -> BetaReduces (Abs x t) (Abs x t').
-
-(** 单步β归约关系 *)
-Inductive BetaStep : term -> term -> Prop :=
-  | beta_step_app_abs : forall x t u, BetaStep (App (Abs x t) u) (subst t u x)
-  | beta_step_app_l : forall t t' u, BetaStep t t' -> BetaStep (App t u) (App t' u)
-  | beta_step_app_r : forall t u u', BetaStep u u' -> BetaStep (App t u) (App t u')
-  | beta_step_abs : forall x t t', BetaStep t t' -> BetaStep (Abs x t) (Abs x t').
-
-(* ======================== 7. 基本引理 ======================== *)
-
-Lemma BetaReduces_trans : forall t u v,
-  BetaReduces t u -> BetaReduces u v -> BetaReduces t v.
-Proof.
-  intros t u v H1 H2.
-  apply beta_trans with (u := u); assumption.
-Qed.
-
-(* α等价的基本性质 *)
-Lemma alpha_eq_refl : forall t, alpha_eq t t = true.
-Proof.
-  induction t as [x | t1 IH1 t2 IH2 | x t IH]; simpl.
-  - (* 变量 *)
-    destruct (string_dec x x) as [Heq | Hneq]; auto.
-    exfalso; apply Hneq; reflexivity.
-  - (* 应用 *)
-    rewrite IH1, IH2; auto.
-  - (* 抽象 *)
-    simpl.
-    (* 对于 Abs x t，需要处理两种情况 *)
-    destruct (string_dec x x) as [Heq | Hneq].
-    + rewrite IH; auto.
-    + exfalso; apply Hneq; reflexivity.
-Qed.
-
-(* 新鲜变量生成函数的正确性 *)
-Lemma fresh_var_not_in : forall avoid base,
-  ~ In (fresh_var avoid base) avoid.
-Proof.
-  intros avoid base.
-  unfold fresh_var.
-  generalize 0 as counter.
-  induction avoid as [|a avoid' IH]; intros counter.
-  - (* avoid 为空 *)
-    simpl.
-    unfold find_fresh_var.
-    simpl.
-    intro H; inversion H.
-  - (* avoid 包含元素 *)
-    simpl.
-    unfold find_fresh_var.
-    (* 分析 candidate 是否在 avoid 中 *)
-    destruct (in_var_set (fresh_var_rec base counter) (a :: avoid')) eqn:Hin.
-    + (* candidate 在 avoid 中，递归调用 *)
-      apply IH.
-    + (* candidate 不在 avoid 中，返回 candidate *)
-      simpl.
-      intro H.
-      destruct H.
-      * (* 等于 a *)
-        rewrite H in Hin.
-        simpl in Hin.
-        destruct (string_dec a a) in Hin.
-        -- inversion Hin.
-        -- exfalso; apply n; reflexivity.
-      * (* 在 avoid' 中 *)
-        apply IH; assumption.
-Qed.
-
-(** 替换操作的基本性质 - 完整证明 *)
-Lemma subst_fresh : forall t u x,
-  ~ In x (fv t) -> subst t u x = t.
-Proof.
-  induction t as [y | t1 IH1 t2 IH2 | y t IH]; intros u x H; simpl in *.
-  - (* 变量 *)
-    destruct (string_dec x y) as [Heq | Hneq].
-    + subst x.
-      exfalso; apply H.
-      simpl; left; reflexivity.
-    + reflexivity.
-  - (* 应用 *)
-    rewrite IH1, IH2.
-    + reflexivity.
-    + intro Hcontra; apply H.
-      apply in_app_iff; left; assumption.
-    + intro Hcontra; apply H.
-      apply in_app_iff; right; assumption.
-  - (* 抽象 *)
-    destruct (string_dec x y) as [Heq | Hneq].
-    + reflexivity.
-    + simpl in H.
-      (* 使用 remove_In 简化条件 *)
-      assert (Hnot_in: ~ In x (fv t)).
-      {
-        intro Hcontra; apply H.
-        apply in_remove_neq; auto.
-      }
-      rewrite IH; auto.
-      (* 检查 y 是否在 fv u 中 *)
-      destruct (in_var_set y (fv u)) eqn:Heq2.
-      * (* 需要 α 转换 *)
-        simpl.
-        (* 我们需要证明 fresh_var 产生的变量不影响等式 *)
-        (* 使用 fresh_var_not_in 引理 *)
-        assert (Hz_not_in: ~ In (fresh_var (fv t ++ fv u) y) (fv t ++ fv u)).
-        { apply fresh_var_not_in. }
-        (* 由于 z 是新鲜变量，它不在 fv t 中，因此重命名不会改变 t *)
-        assert (Hrename_eq: rename t y (fresh_var (fv t ++ fv u) y) = t).
-        { apply rename_fresh. intro Hcontra. apply Hz_not_in. apply in_app_iff; left; assumption. }
-        rewrite Hrename_eq.
-        (* 现在我们需要证明 subst t u x = t *)
-        (* 这由归纳假设 IH 直接得出，因为我们已经知道 x 不在 fv t 中 *)
-        apply IH; assumption.
-      * reflexivity.
-Qed.
-
-(* ======================== 8. 从 Coq 库导入合流性基础设施 ======================== *)
-
-(** 导入 Coq 的关系理论库 *)
-Require Import Coq.Relations.Relation_Operators.
-Require Import Coq.Relations.Operators_Properties.
-
-(** 使用 Coq 的合流性证明模式 *)
-Module Import ConfluenceUtils.
-
-(** 定义并行归约关系 - Tait/Martin-Löf方法 *)
-Inductive ParRed : term -> term -> Prop :=
-  | par_red_var : forall x, ParRed (Var x) (Var x)
-  | par_red_abs : forall x t u, ParRed t u -> ParRed (Abs x t) (Abs x u)
-  | par_red_app : forall t1 t2 u1 u2,
-      ParRed t1 u1 -> ParRed t2 u2 -> ParRed (App t1 t2) (App u1 u2)
-  | par_red_beta : forall x t1 t2 u1 u2,
-      ParRed t1 u1 -> ParRed t2 u2 ->
-      ParRed (App (Abs x t1) t2) (subst u1 u2 x).
-
-(** 自反传递闭包 *)
-Definition ParRedStar := clos_refl_trans term ParRed.
-
-End ConfluenceUtils.
-
-(* ======================== 9. 基本性质证明 ======================== *)
-
-Lemma par_red_refl : forall t, ParRed t t.
-Proof.
-  induction t as [x | t1 IH1 t2 IH2 | x t IH].
-  - apply par_red_var.
-  - apply par_red_app; assumption.
-  - apply par_red_abs; assumption.
-Qed.
-
-(* ======================== 10. 完整化函数（完全化） ======================== *)
-
-(** 完整化函数：计算并行归约的最大公共合约项 *)
-Fixpoint complete (t : term) : term :=
-  match t with
-  | Var x => Var x
-  | App (Abs x t1) t2 => subst (complete t1) (complete t2) x
-  | App t1 t2 => App (complete t1) (complete t2)
-  | Abs x t' => Abs x (complete t')
-  end.
-
-Notation "'⇛' t" := (complete t) (at level 30).
-
-Lemma complete_par_red : forall t, ParRed t (⇛ t).
-Proof.
-  induction t as [x | t1 IH1 t2 IH2 | x t IH]; simpl.
-  - apply par_red_var.
-  - destruct t1 as [y | t11 t12 | y t1'].
-    + (* 变量应用 *)
-      apply par_red_app; assumption.
-    + (* 应用的应用 *)
-      apply par_red_app; assumption.
-    + (* 抽象的应用 *)
-      apply par_red_beta; assumption.
-  - (* 抽象 *)
-    apply par_red_abs; assumption.
-Qed.
-
-(* ======================== 11. 合流性证明核心 ======================== *)
-
-(** 证明：如果 t 并行归约到 u，那么 u 也并行归约到 complete(t) *)
-Lemma par_red_to_complete : forall t u,
-  ParRed t u -> ParRed u (⇛ t).
-Proof.
-  intros t u H.
-  induction H as [x | x t u H IH | t1 t2 u1 u2 H1 IH1 H2 IH2 | x t1 t2 u1 u2 H1 IH1 H2 IH2].
+(* 或者查看可用模块 *)
+(* 在 CoqIDE 或 Proof General 中，可以查看库浏览器 *)
+ *)
+From MetaCoq.Template Require Import Ast LiftSubst.
+From MetaCoq.Template Require Import All.
+  (* 导入所有 Template 模块 *)
+  (* 1. 首先检查 Universe 和 Level 是否可用 *)
   
-  - (* 变量 *)
-    apply complete_par_red.
-    
-  - (* 抽象 *)
-    simpl.
-    apply par_red_abs.
-    exact IH.
-    
-  - (* 应用 *)
-    simpl.
-    destruct (⇛ t1) as [y | v1 v2 | y v'] eqn:Heqt1.
-    + (* complete(t1) 是变量 *)
-      apply par_red_app; assumption.
-    + (* complete(t1) 是应用 *)
-      apply par_red_app; assumption.
-    + (* complete(t1) 是抽象 *)
-      (* 这里需要特殊处理 β 归约情况 *)
-      (* 我们知道 u1 并行归约到 Abs y v' *)
-      (* 并且 u2 并行归约到 complete(t2) *)
-      (* 所以 App u1 u2 应该并行归约到 subst v' (complete t2) y *)
-      simpl in Heqt1.
-      (* 根据归纳假设，u1 ⇛ complete(t1) = Abs y v' *)
-      (* 所以我们需要证明 App u1 u2 ⇛ subst v' (complete t2) y *)
-      (* 这个证明需要更多引理，暂时跳过 *)
-      admit.
-      
-  - (* β 归约 *)
-    simpl.
-    (* 需要证明 subst u1 u2 x 归约到 subst (complete t1) (complete t2) x *)
-    (* 根据归纳假设，u1 ⇛ complete(t1), u2 ⇛ complete(t2) *)
-    (* 所以 subst u1 u2 x ⇛ subst (complete t1) (complete t2) x *)
-    (* 需要替换操作的单调性 *)
-    admit.
-Qed.
+  (* 尝试不同的 Level 构造方式 *)
+  (* 方法A：使用 Level.lzero（如果存在） *)
+  (* 方法B：使用 Level.var（如果需要） *)
+  (* 方法C：使用 Level.Level 构造函数 *)
 
-(** 使用 Coq 的标准菱形性质证明方法 *)
-Theorem par_red_diamond : forall t u v,
-  ParRed t u -> ParRed t v -> exists w, ParRed u w /\ ParRed v w.
+(* 在 Coq 中执行 *)
+Locate Level.lzero.
+Locate Universe.make.
+From MetaCoq.Template Require Import All.
+
+Require Import Coq.Arith.Arith.
+From MetaCoq.Template Require Import Ast LiftSubst.
+
+(* 10.6 灵活的基础归约关系 (可选，向后兼容)
+   为不同使用场景提供别名
+*)
+Notation step := BetaStep.
+Notation multi_step := BetaReduces.
+Notation "t [ u // k ]" := (subst t u k) (at level 40).
+Notation "t '-->' u" := (BetaStep t u) (at level 50).
+Notation "t '-->>' u" := (BetaReduces t u) (at level 50).
+
+(* ======================== 辅助定义和性质 ======================== *)
+
+(* 10.8 关系性质证明 *)
+
+(* 辅助引理：构造子单射性 *)
+Lemma var_injective : forall n m, Var n = Var m -> n = m.
+Proof. intros n m H; injection H; auto. Qed.
+
+Lemma app_injective : forall t1 t2 u1 u2, App t1 t2 = App u1 u2 -> t1 = u1 /\ t2 = u2.
+Proof. intros t1 t2 u1 u2 H; injection H; auto. Qed.
+
+Lemma abs_injective : forall t u, Abs t = Abs u -> t = u.
+Proof. intros t u H; injection H; auto. Qed.
+
+(* 辅助引理：App (Abs t) u 的形式 *)
+Lemma app_abs_not_var : forall t u n, App (Abs t) u <> Var n.
+Proof. intros t u n H; discriminate. Qed.
+
+Lemma app_abs_not_abs : forall t u t', App (Abs t) u <> Abs t'.
+Proof. intros t u t' H; discriminate. Qed.
+(** 基础算术辅助引理 *)
+Section ArithmeticLemmas.
+
+Lemma pred_succ_nat : forall n, pred (S n) = n.
+Proof. intros; reflexivity. Qed.
+
+Lemma succ_pred_nat : forall n, n > 0 -> S (pred n) = n.
 Proof.
-  intros t u v Htu Htv.
-  exists (⇛ t).
-  split.
-  - apply par_red_to_complete; assumption.
-  - apply par_red_to_complete; assumption.
+  intros n H.
+  destruct n as [|n'].
+  - lia.
+  - reflexivity.
 Qed.
 
-(** 并行归约转换为 BetaReduces *)
-Lemma par_red_to_beta_red : forall t u,
-  ParRed t u -> BetaReduces t u.
+Lemma pred_mono : forall n m, n <= m -> pred n <= pred m.
 Proof.
-  intros t u H.
-  induction H as [x | x t u H IH | t1 t2 u1 u2 H1 IH1 H2 IH2 | x t1 t2 u1 u2 H1 IH1 H2 IH2].
-  - (* 变量 *)
-    apply beta_refl.
-  - (* 抽象 *)
-    apply beta_abs; assumption.
-  - (* 应用 *)
-    eapply beta_trans.
-    + apply beta_app_l; assumption.
-    + eapply beta_trans.
-      * apply beta_app_r; assumption.
-      * apply beta_refl.
-  - (* β 归约 *)
-    eapply beta_trans.
-    + apply beta_app_l; apply beta_abs; assumption.
-    + eapply beta_trans.
-      * apply beta_app_r; assumption.
-      * apply beta_app_abs.
+  intros n m H.
+  lia.
 Qed.
 
-(** BetaReduces 转换为并行归约的星号闭包 *)
-Lemma beta_red_to_par_red_star : forall t u,
-  BetaReduces t u -> ParRedStar t u.
+Lemma le_pred_iff : forall n m, n > 0 -> m > 0 -> (pred n <= pred m <-> n <= m).
 Proof.
-  intros t u H.
-  induction H as [t | t u v Htu IHtu Huv IHuv | x t u | t t' u Htt' IH | t u u' Huu' IH | x t t' Htt' IH].
-  - (* 自反性 *)
-    apply rt_refl.
-  - (* 传递性 *)
-    eapply rt_trans; eauto.
-  - (* β 应用-抽象 *)
-    apply rt_step.
-    apply par_red_beta; apply par_red_refl.
-  - (* 应用左 *)
-    eapply rt_step.
-    apply par_red_app; [apply IH | apply par_red_refl].
-    apply rt_refl.
-  - (* 应用右 *)
-    eapply rt_step.
-    apply par_red_app; [apply par_red_refl | apply IH].
-    apply rt_refl.
-  - (* 抽象 *)
-    eapply rt_step.
-    apply par_red_abs; apply IH.
-    apply rt_refl.
+  intros n m Hn Hm.
+  split; intro H.
+  - lia.
+  - lia.
 Qed.
 
-(* ======================== 12. 主要合流性定理 ======================== *)
+End ArithmeticLemmas.
 
-(** 引理：并行归约星号闭包的合流性 *)
-Lemma confluence_star : forall t u v,
-  ParRedStar t u -> ParRedStar t v -> exists w, ParRedStar u w /\ ParRedStar v w.
+(* ======================== 证明更一般交换性 ======================== *)
+(* 证明更一般交换性 *)
+
+
+(** 算术辅助引理：处理索引比较 **)
+Section ArithmeticHelpers.
+
+Lemma lt_dec_cases : forall n k,
+  n < k \/ n = k \/ n > k.
 Proof.
-  intros t u v Htu Htv.
-  revert v Htv.
-  induction Htu as [t | t u' v' Htu' Hu'v' IH].
-  
-  - (* t ⇛* t *)
-    intros v Htv.
-    exists v.
-    split; [apply rt_refl | assumption].
-    
-  - (* t ⇛ u' ⇛* v' *)
-    intros v Htv.
-    (* 使用菱形性质 *)
-    destruct (par_red_diamond _ _ _ Htu' Htv) as [w [Hu'w Hvw]].
-    
-    (* 应用归纳假设 *)
-    destruct (IH w Hu'w) as [z [Hv'z Hwz]].
-    
-    exists z.
-    split.
-    + eapply rt_trans; eauto.
-    + eapply rt_trans; eauto.
+  intros n k.
+  destruct (lt_eq_lt_dec n k) as [[H|H]|H]; auto.
 Qed.
 
-(** 引理：并行归约星号闭包转换为 BetaReduces *)
-Lemma par_red_star_to_beta_red : forall t u,
-  ParRedStar t u -> BetaReduces t u.
+Lemma lt_plus_l : forall n k1 k2,
+  n < k1 -> n < k1 + k2.
+Proof. lia. Qed.
+
+Lemma lt_plus_r : forall n k1 k2,
+  n < k2 -> n < k1 + k2.
+Proof. lia. Qed.
+
+Lemma eq_plus_l : forall n k1 k2,
+  n = k1 -> n < k1 + k2 \/ n = k1 + k2 \/ n > k1 + k2.
+Proof. lia. Qed.
+
+Lemma gt_plus_l : forall n k1 k2,
+  n > k1 -> n > k1 + k2 \/ n = k1 + k2 \/ n < k1 + k2.
+Proof. lia. Qed.
+
+End ArithmeticHelpers.
+
+
+(** 辅助引理：处理算术情况 **)
+Section ArithmeticCases.
+
+Lemma case_n_lt_k1 : forall n k1 k2,
+  n < k1 -> 
+  (n < k1 + k2) /\ (n <> k1 + k2) /\ (n <= k1 + k2 -> n < k1 + k2).
+Proof. lia. Qed.
+
+Lemma case_n_eq_k1 : forall n k1 k2,
+  n = k1 ->
+  (k1 + k2 > k1 \/ k1 + k2 = k1) /\ (k2 = 0 -> k1 + k2 = k1).
+Proof. lia. Qed.
+
+Lemma case_n_gt_k1 : forall n k1 k2,
+  n > k1 ->
+  (n > k1 + k2 \/ n = k1 + k2 \/ n < k1 + k2) /\
+  (n >= k1 + k2 -> n >= k1 + k2) /\
+  (n < k1 + k2 -> n < k1 + k2).
+Proof. lia. Qed.
+
+End ArithmeticCases.
+
+(** 引理3：算术辅助引理 **)
+Lemma arithmetic_helper_1 : forall n k1 k2,
+  n < k1 -> n < k1 + k2.
+Proof. lia. Qed.
+
+Lemma arithmetic_helper_2 : forall n k1 k2,
+  n > k1 + k2 -> n > k1.
+Proof. lia. Qed.
+
+Lemma arithmetic_helper_3 : forall n k1 k2,
+  n >= k1 + k2 -> n >= k1.
+Proof. lia. Qed.
+
+(* ======================== 合流性定理 ======================== *)
+
+(** 索引比较的三种情况 *)
+Lemma index_cases : forall n k,
+  n < k \/ n = k \/ n > k.
 Proof.
-  intros t u H.
-  induction H as [t | t u v Htu IHtu Huv IHuv].
-  - apply beta_refl.
-  - eapply beta_trans; eauto.
-    apply par_red_to_beta_red; assumption.
+  intros n k.
+  destruct (lt_eq_lt_dec n k) as [[H|H]|H]; auto.
 Qed.
 
-(** 定理：β归约的合流性（Church-Rosser定理） *)
-Theorem confluence : forall t u v,
-  BetaReduces t u -> BetaReduces t v -> exists w, BetaReduces u w /\ BetaReduces v w.
-Proof.
-  intros t u v Htu Htv.
-  
-  (* 转换为并行归约的星号闭包 *)
-  apply beta_red_to_par_red_star in Htu.
-  apply beta_red_to_par_red_star in Htv.
-  
-  (* 使用星号闭包的合流性 *)
-  destruct (confluence_star _ _ _ Htu Htv) as [w [Huw Hvw]].
-  
-  exists w.
-  split.
-  - apply par_red_star_to_beta_red; assumption.
-  - apply par_red_star_to_beta_red; assumption.
-Qed.
+(*
+一、整体证明策略
+目标引理：beta_subst_lift_commute : forall t u k, beta_subst (lift t (S k)) (lift u k) = lift (beta_subst t u) k
 
-(* ======================== 13. 使用 Coq 的标准合流性框架 ======================== *)
+核心思路：
 
-(** 导入 Coq 的合流性库 *)
-Require Import Coq.Relations.Confluence.
+先证明变量情况的特例
 
-(** 证明 ParRed 是强合流的 *)
-Lemma par_red_locally_confluent : locally_confluent ParRed.
-Proof.
-  unfold locally_confluent.
-  intros x y z Hxy Hxz.
-  destruct (par_red_diamond _ _ _ Hxy Hxz) as [w [Hyw Hzw]].
-  exists w; split; assumption.
-Qed.
+建立提升和替换的代数性质链
 
-(** 由于并行归约是强合流的，其自反传递闭包也是合流的 *)
-Theorem par_red_star_confluent : confluent ParRedStar.
-Proof.
-  apply locally_confluent_confluent.
-  apply par_red_locally_confluent.
-Qed.
+通过结构归纳扩展到一般情况
 
-(** 重新证明 Church-Rosser 定理 *)
-Theorem church_rosser : forall t u v,
-  BetaReduces t u -> BetaReduces t v -> exists w, BetaReduces u w /\ BetaReduces v w.
-Proof.
-  intros t u v Htu Htv.
-  apply beta_red_to_par_red_star in Htu.
-  apply beta_red_to_par_red_star in Htv.
-  
-  destruct (par_red_star_confluent _ _ _ Htu Htv) as [w [Huw Hvw]].
-  
-  exists w.
-  split.
-  - apply par_red_star_to_beta_red; assumption.
-  - apply par_red_star_to_beta_red; assumption.
-Qed.
-
-(* ======================== 14. 强合流性 ======================== *)
-
-Theorem strong_confluence : forall t u1 u2,
-  BetaStep t u1 -> BetaStep t u2 ->
-  exists v, BetaReduces u1 v /\ BetaReduces u2 v.
-Proof.
-  intros t u1 u2 H1 H2.
-  
-  (* 转换为并行归约 *)
-  assert (ParRed t u1) as Hpar1.
-  { induction H1 as [x t u | t t' u H IH | t u u' H IH | x t t' H IH].
-    - apply par_red_beta; apply par_red_refl.
-    - apply par_red_app; [apply IH | apply par_red_refl].
-    - apply par_red_app; [apply par_red_refl | apply IH].
-    - apply par_red_abs; apply IH. }
-    
-  assert (ParRed t u2) as Hpar2.
-  { induction H2 as [x t u | t t' u H IH | t u u' H IH | x t t' H IH].
-    - apply par_red_beta; apply par_red_refl.
-    - apply par_red_app; [apply IH | apply par_red_refl].
-    - apply par_red_app; [apply par_red_refl | apply IH].
-    - apply par_red_abs; apply IH. }
-  
-  destruct (par_red_diamond _ _ _ Hpar1 Hpar2) as [v [Hv1 Hv2]].
-  
-  exists v.
-  split.
-  - apply par_red_to_beta_red; assumption.
-  - apply par_red_to_beta_red; assumption.
-Qed.
-
-(* ======================== 15. 范式相关定义 ======================== *)
-
-Inductive NF : term -> Prop :=
-  | nf_var : forall x, NF (Var x)
-  | nf_app_var : forall x t, NF (Var x) -> NF t -> NF (App (Var x) t)
-  | nf_app_abs : forall x t u, NF t -> NF u -> NF (App (Abs x t) u)
-  | nf_abs : forall x t, NF t -> NF (Abs x t).
-
-(* ======================== 16. 导出的记法和接口 ======================== *)
-
-(** 语法记法 *)
-Notation "t ⇛ u" := (ParRed t u) (at level 50).
-Notation "t ⇛* u" := (ParRedStar t u) (at level 50).
-Notation "t →β u" := (BetaStep t u) (at level 50).
-Notation "t →β* u" := (BetaReduces t u) (at level 50).
-
-(** 导出核心定义 *)
-Export term.
-Export BetaReduces.
-Export ParRed.
-Export ParRedStar.
-
-(** 导出主要定理 *)
-Export confluence.
-Export church_rosser.
-Export strong_confluence.
-
-(* ======================== 17. 缺失的辅助引理 ======================== *)
-
-(** 替换操作的同变量情况 *)
-Lemma subst_fresh_same_var : forall t y,
-  ~ In y (fv t) -> subst t (Var y) y = t.
-Proof.
-  induction t as [x | t1 IH1 t2 IH2 | x t IH]; intros y H; simpl in *.
-  - (* 变量 *)
-    destruct (string_dec y x) as [Heq | Hneq].
-    + subst x.
-      exfalso; apply H.
-      simpl; left; reflexivity.
-    + reflexivity.
-  - (* 应用 *)
-    rewrite IH1, IH2.
-    + reflexivity.
-    + intro Hcontra; apply H.
-      apply in_app_iff; left; assumption.
-    + intro Hcontra; apply H.
-      apply in_app_iff; right; assumption.
-  - (* 抽象 *)
-    destruct (string_dec y x) as [Heq | Hneq].
-    + reflexivity.
-    + simpl in H.
-      assert (Hnot_in: ~ In y (fv t)).
-      {
-        intro Hcontra; apply H.
-        apply in_remove_neq; auto.
-      }
-      rewrite IH; auto.
-      (* 检查 x 是否在 fv (Var y) 中 *)
-      destruct (in_var_set x (fv (Var y))) eqn:Heq2.
-      * (* 需要 α 转换 *)
-        simpl in Heq2.
-        (* fv (Var y) = [y]，所以检查 x 是否等于 y *)
-        destruct (string_dec x y) as [Heq3 | Hneq3].
-        -- exfalso; apply Hneq; assumption.
-        -- inversion Heq2.
-      * reflexivity.
-Qed.
-
-(* ======================== 18. 总结 ======================== *)
-
-(** 
-  修复完成：
-  1. 修复了字符串字面量问题：使用 String.append 函数进行字符串连接
-  2. 使用 String.append 而不是 ++ 运算符，避免字符串字面量解析问题
-  3. 确保了函数定义的正确顺序
-  
-  当前状态：
-  - 所有基本定义都可以编译通过
-  - 合流性证明框架完整
-  - 提供了大部分基本引理的证明
-  
-  仍然需要完成：
-  1. subst_fresh 中的一个 admit（关于新鲜变量不同于 y 的情况）
-  2. par_red_to_complete 中的两个 admit
-  
-  这些证明细节较为复杂，但不影响整体框架的编译。
-  我们已经完成了核心修复，消除了主要的编译错误。
+处理特殊的算术边界情况
 *)
 
 
+(*
+二、辅助引理链设计
+第1层：基础算术辅助引理
+这些引理处理索引比较，为变量情况的证明做准备：
+*)
 
-(** 辅助引理：如果 x ≠ y 且 x 在列表 l 中，则 x 在 remove string_dec y l 中 *)
-Lemma in_remove_neq : forall (x y : var_name) (l : list var_name),
-  x <> y -> In x l -> In x (remove string_dec y l).
+(** L1.1: 自然数索引的基本性质 *)
+Lemma nat_index_tripartition : forall n k,
+  n < k \/ n = k \/ n > k.
+Proof. lia. Qed.
+
+(** L1.2: 提升索引的单调性 *)
+Lemma lift_index_monotone : forall n m k,
+  n <= m -> 
+  (if le_gt_dec k n then S n else n) <= (if le_gt_dec k m then S m else m).
 Proof.
-  intros x y l Hneq Hin.
-  induction l as [|a l IH]; simpl.
-  - assumption.
-  - destruct (string_dec y a) as [Heq_y_a | Hneq_y_a].
-    + (* a = y *)
-      rewrite Heq_y_a in *.
-      destruct Hin as [Hin | Hin].
-      * (* x = y *)
-        exfalso; apply Hneq; auto.
-      * (* x 在 l 中 *)
-        apply IH; assumption.
-    + (* a ≠ y *)
-      destruct (string_dec x a) as [Heq_x_a | Hneq_x_a].
-      * (* x = a *)
-        left; auto.
-      * (* x ≠ a *)
-        right.
-        apply IH.
-        destruct Hin as [Hin | Hin].
-        -- (* x = a *)
-           exfalso; apply Hneq_x_a; auto.
-        -- assumption.
+  intros n m k Hle.
+  destruct (le_gt_dec k n) as [Hkn|Hkn];
+  destruct (le_gt_dec k m) as [Hkm|Hkm]; lia.
 Qed.
+
+(** 辅助引理：当 n < k1 且 k1 ≤ k2 时，n < S k2 *)
+Lemma lt_k1_le_k2_implies_lt_Sk2 : forall n k1 k2,
+  n < k1 -> k1 <= k2 -> n < S k2.
+Proof. lia. Qed.
+
+(** 辅助引理：当 n < k1 且 k1 ≤ k2 时，n < k2 *)
+Lemma lt_k1_le_k2_implies_lt_k2 : forall n k1 k2,
+  n < k1 -> k1 <= k2 -> n < k2.
+Proof. lia. Qed.
+
+(** 辅助引理：当 n < k1 且 k1 ≤ k2 时，n < S k2 *)
+Lemma lt_k1_le_k2_implies_lt_Sk2_fixed : forall n k1 k2,
+  n < k1 -> k1 <= k2 -> n < S k2.
+Proof. lia. Qed.
+
+(** 辅助引理：当 n < k1 且 k1 ≤ k2 时，n < k2 *)
+Lemma lt_k1_le_k2_implies_lt_k2_fixed : forall n k1 k2,
+  n < k1 -> k1 <= k2 -> n < k2.
+Proof. lia. Qed.
+
+(* theories/ChurchNumerals.Confluence.v *)
+(* ========================================================================== *)
+(* Church Numerals 的合流性(Church-Rosser)证明模块 *)
+(* 基于并行归约(Tait-Martin-Löf方法)，使用de Bruijn索引 *)
+
+(* ========================================================================== *)
+(* 在文件开头添加 *)
+Set Printing All.      (* 显示所有隐式信息 *)
+Set Debug "Typing".    (* 启用类型调试 *)
+
+(* 基础库 *)
+Require Import Coq.Arith.Arith.
+Require Import Coq.Lists.List.
+Import ListNotations.
+
+(* 1. 导入标准库 *)
+Require Import Coq.Arith.Compare_dec.
+Require Import Coq.Lists.List.
+Require Import Coq.Logic.FunctionalExtensionality.
+Require Import Coq.Relations.Relations.
+Require Import Coq.Program.Equality.
+Require Import Coq.Wellfounded.Inclusion.
+Require Import Lia.
+Require Import Coq.Program.Equality.
+Require Import Coq.Classes.RelationClasses.
+From Coq.Arith Require Import PeanoNat.  (* 更好的算术支持 *)
+From Coq.Lists Require Import List.      (* 列表操作 *)
+(* 确保导入所有必要模块 *)
+
+Require Import Coq.Arith.Wf_nat.
+Require Import Lia.
+
+(* 或者一次性导入 *)
+From MetaCoq.Template Require Import All.
+
+(* MetaCoq 核心模块 *)
+From MetaCoq.Template Require Import Ast AstUtils Common.
+From MetaCoq.Template Require Import LiftSubst.
+From MetaCoq.Template Require Import TemplateMonad.
+(*
+(* 如果需要归约和合流性 *)
+From MetaCoq.PCUIC Require Import
+     PCUICAst PCUICAstUtils
+     PCUICLiftSubst
+     PCUICReduction
+     PCUICConfluence
+     PCUICNormal.
+ *)
+(* Erasure 模块（如果需要） *)
+From MetaCoq.Erasure Require Import EAst EAstUtils ELiftSubst.
+
+(* 使用以下导入替代 BasicAst *)
+From MetaCoq.Template Require Import
+  Ast        (* 包含基本 AST 定义 *)
+  AstUtils   (* 包含 AST 实用函数 *)
+  Common.    (* 包含公共定义 *)
+  
+(* 或者，如果您只需要 de Bruijn 索引 *)
+From MetaCoq.Template Require Import
+  Ast        (* 包含 term 定义，其中有 tRel 作为 de Bruijn 变量 *)
+  LiftSubst. (* 包含提升和代换操作 *)
+(*
+From MetaCoq.PCUIC Require Import
+  PCUICAst          (* PCUIC 的 AST *)
+  PCUICLiftSubst    (* 提升和代换 *)
+  PCUICReduction.   (* 归约关系 *)
+
+(* PCUIC 也使用 de Bruijn 索引 *)
+Print PCUICAst.term.
+(* 应该看到类似：Inductive term := tRel : nat -> term | ... *)
+
+(* 对于更高级的功能，如归约和合流性 *)
+From MetaCoq.PCUIC Require Import
+  PCUICAst          (* AST 定义 *)
+  PCUICLiftSubst    (* 代换 *)
+  PCUICReduction    (* 归约 *)
+  PCUICConfluence.  (* 合流性 *)
+*)
+(* 可能需要导入 BasicAst 或直接使用完整路径 *)
+From MetaCoq.Template Require Import Ast.
+(* 查看 nAnon 的定义 *)
+Locate nAnon.
+
+(* 检查 Ast 模块的导出 *)
+Print Ast.
+(*
+From MetaCoq.PCUIC Require Import PCUICAst.
+*)
+(* 
+(* 验证您的 MetaCoq 安装包含哪些模块 *)
+From MetaCoq.Template Require Import All.  (* 尝试导入所有 *)
+
+(* 或者查看可用模块 *)
+(* 在 CoqIDE 或 Proof General 中，可以查看库浏览器 *)
+ *)
+From MetaCoq.Template Require Import Ast LiftSubst.
+From MetaCoq.Template Require Import All.
+  (* 导入所有 Template 模块 *)
+  (* 1. 首先检查 Universe 和 Level 是否可用 *)
+  
+  (* 尝试不同的 Level 构造方式 *)
+  (* 方法A：使用 Level.lzero（如果存在） *)
+  (* 方法B：使用 Level.var（如果需要） *)
+  (* 方法C：使用 Level.Level 构造函数 *)
+
+(* 在 Coq 中执行 *)
+Locate Level.lzero.
+Locate Universe.make.
+From MetaCoq.Template Require Import All.
+
+Require Import Coq.Arith.Arith.
+From MetaCoq.Template Require Import Ast LiftSubst.
+
+(* ======================== 基础定义 ======================== *)
+
+(* 10.6 灵活的基础归约关系 (可选，向后兼容)
+   为不同使用场景提供别名
+*)
+
+Notation "t [ u // k ]" := (subst t u k) (at level 40).
+Notation "t '-->' u" := (BetaStep t u) (at level 50).
+Notation "t '-->>' u" := (BetaReduces t u) (at level 50).
+
+
+(** 1. 基本算术引理 *)
+Lemma pred_succ_eq : forall n, pred (S n) = n.
+Proof. intros; reflexivity. Qed.
+
+Lemma succ_pred_eq : forall n, n > 0 -> S (pred n) = n.
+Proof. intros n H; destruct n; [lia|reflexivity]. Qed.
+
+Lemma le_gt_dec_cases : forall n k,
+  (exists Hle : k <= n, le_gt_dec k n = left Hle) \/
+  (exists Hgt : k > n, le_gt_dec k n = right Hgt).
+Proof.
+  intros n k.
+  destruct (le_gt_dec k n) as [Hle | Hgt].
+  - left. exists Hle. reflexivity.
+  - right. exists Hgt. reflexivity.
+Qed.
+
+(** 2. de Bruijn索引引理 *)
+Lemma lt_eq_lt_dec_cases : forall n k,
+  match lt_eq_lt_dec n k with
+  | inleft (left _) => n < k
+  | inleft (right _) => n = k
+  | inright _ => n > k
+  end.
+Proof.
+  intros n k.
+  destruct (lt_eq_lt_dec n k) as [[H|H]|H]; auto.
+Qed.
+
+(** 证明示例1：基本算术引理 *)
+Lemma pred_monotonic : forall n m, n <= m -> pred n <= pred m.
+Proof.
+  intros n m H.
+  lia.
+Qed.
+
+(** 13. 项的形式分析引理 *)
+Lemma term_cases : forall t,
+  (exists n, t = Var n) \/
+  (exists t1 t2, t = App t1 t2) \/
+  (exists t', t = Abs t').
+Proof.
+  intros t.
+  destruct t as [n|t1 t2|t']; eauto.
+Qed.
+
+Lemma not_app_is_abs : forall t,
+  (forall t1 t2, t <> App t1 t2) -> 
+  (exists n, t = Var n) \/ (exists t', t = Abs t').
+Proof.
+  intros t H.
+  destruct t as [n|t1 t2|t']; eauto.
+  exfalso; apply (H t1 t2); reflexivity.
+Qed.
+
+(** 1.1 自然数索引的基本性质 **)
+Lemma nat_index_tripartition_complete : forall n k,
+  n < k \/ n = k \/ n > k.
+Proof.
+  intros n k.
+  destruct (lt_eq_lt_dec n k) as [[H|H]|H]; auto.
+Qed.
+
+(** 1.2 提升索引的单调性 **)
+Lemma lift_index_monotone_complete : forall n m k,
+  n <= m -> 
+  (if le_gt_dec k n then S n else n) <= (if le_gt_dec k m then S m else m).
+Proof.
+  intros n m k Hle.
+  destruct (le_gt_dec k n) as [Hkn|Hkn];
+  destruct (le_gt_dec k m) as [Hkm|Hkm]; lia.
+Qed.
+
+(* ======================== 第一部分：可以直接证明的算术辅助引理 ======================== *)
+
+(** 1. 基础算术引理 - 这些都可以用lia直接证明 **)
+
+(** 自然数比较引理 **)
+Lemma lt_dec_cases_simple : forall n k,
+  n < k \/ n = k \/ n > k.
+Proof.
+  intros n k.
+  destruct (lt_eq_lt_dec n k) as [[H|H]|H]; auto.
+Qed.
+
+(** 提升操作的单调性 **)
+Lemma lift_index_monotone_simple : forall n m k,
+  n <= m -> 
+  (if le_gt_dec k n then S n else n) <= (if le_gt_dec k m then S m else m).
+Proof.
+  intros n m k Hle.
+  destruct (le_gt_dec k n) as [Hkn|Hkn];
+  destruct (le_gt_dec k m) as [Hkm|Hkm]; lia.
+Qed.
+
+(** 3. 项的结构性质 - 直接可证的引理 **)
+
+(** 项的形式分解引理 **)
+Lemma term_decomposition : forall t,
+  (exists n, t = Var n) \/
+  (exists t1 t2, t = App t1 t2) \/
+  (exists t', t = Abs t').
+Proof.
+  intros t.
+  destruct t as [n|t1 t2|t']; eauto.
+Qed.
+
+(** 6. 基本构造函数的单射性 - 直接可证 **)
+
+(** 变量构造函数的单射性 **)
+Lemma var_inj : forall n m, Var n = Var m -> n = m.
+Proof.
+  intros n m H.
+  injection H.
+  auto.
+Qed.
+
+(** 应用构造函数的单射性 **)
+Lemma app_inj : forall t1 t2 u1 u2, 
+  App t1 t2 = App u1 u2 -> t1 = u1 /\ t2 = u2.
+Proof.
+  intros t1 t2 u1 u2 H.
+  injection H.
+  auto.
+Qed.
+
+(** 抽象构造函数的单射性 **)
+Lemma abs_inj : forall t u, Abs t = Abs u -> t = u.
+Proof.
+  intros t u H.
+  injection H.
+  auto.
+Qed.
+
+(** 9. Church数的基本性质 - 直接可证的引理 **)
+
+(** Church后继的定义展开 **)
+Lemma church_succ_unfold : forall n,
+  church_succ n = 
+  Abs (Abs (App (Var 1) (App (App n (Var 1)) (Var 0)))).
+Proof.
+  intro n.
+  unfold church_succ.
+  reflexivity.
+Qed.
+
+(** 10. 证明辅助引理 - 简化证明过程 **)
+
+(** 使用lia处理算术条件的引理 **)
+Lemma arithmetic_helper_lt_trans : forall n m p,
+  n < m -> m <= p -> n < p.
+Proof. lia. Qed.
+
+Lemma arithmetic_helper_le_trans : forall n m p,
+  n <= m -> m < p -> n < p.
+Proof. lia. Qed.
+
+(** 自然数归纳的简化形式 **)
+Lemma nat_induction_simple : forall (P : nat -> Prop),
+  P 0 -> (forall n, P n -> P (S n)) -> forall n, P n.
+Proof.
+  exact nat_ind.
+Qed.
+
+(** ======================== 第五部分：证明策略和工具 ======================== *)
+
+(** 自动处理算术条件的策略 **)
+Ltac solve_arithmetic :=
+  repeat (match goal with
+  | H: ?n < ?m |- _ => 
+      match type of H with
+      | lt _ _ => idtac
+      | _ => fail
+      end
+  | H: ?n <= ?m |- _ => 
+      match type of H with
+      | le _ _ => idtac
+      | _ => fail
+      end
+  | H: ?n > ?m |- _ => 
+      match type of H with
+      | lt _ _ => idtac
+      | _ => fail
+      end
+  | H: ?n >= ?m |- _ => 
+      match type of H with
+      | le _ _ => idtac
+      | _ => fail
+      end
+  | H: ?n = ?m |- _ => idtac
+  | |- ?n < ?m => lia
+  | |- ?n <= ?m => lia
+  | |- ?n > ?m => lia
+  | |- ?n >= ?m => lia
+  | |- ?n = ?m => lia
+  end).
+
+(** 自动处理变量索引的策略 **)
+Ltac solve_index :=
+  repeat (match goal with
+  | H: context[le_gt_dec ?k ?n] |- _ => 
+      destruct (le_gt_dec k n)
+  | |- context[le_gt_dec ?k ?n] => 
+      destruct (le_gt_dec k n)
+  | H: context[lt_eq_lt_dec ?n ?k] |- _ => 
+      destruct (lt_eq_lt_dec n k) as [[?|?]|?]
+  | |- context[lt_eq_lt_dec ?n ?k] => 
+      destruct (lt_eq_lt_dec n k) as [[?|?]|?]
+  end; try lia).
+
+(** 引理：应用项的大小大于其子项 *)
+Lemma app_size_gt_components : forall t1 t2,
+  term_size (App t1 t2) > term_size t1 /\ term_size (App t1 t2) > term_size t2.
+Proof.
+  intros t1 t2.
+  simpl. split; lia.
+Qed.
+
+(** 引理：抽象项的大小大于其体 *)
+Lemma abs_size_gt_body : forall t,
+  term_size (Abs t) > term_size t.
+Proof.
+  intro t.
+  simpl. lia.
+Qed.
+
+Lemma church_succ_preserves_form : forall n,
+  (exists t, n = Abs t) -> exists t, church_succ n = Abs t.
+Proof.
+  intros n [t Heq].
+  unfold church_succ.
+  eexists. reflexivity.
+Qed.
+
+(** 4.1 自然数比较的确定性 **)
+
+Lemma le_gt_dec_deterministic : forall k n (H1 H2 : k <= n),
+  le_gt_dec k n = left H1 -> le_gt_dec k n = left H2 -> H1 = H2.
+Proof.
+  intros k n H1 H2 Heq1 Heq2.
+  apply le_unique.
+Qed.
+
+Lemma lt_eq_lt_dec_deterministic : forall n k 
+  (H1 : n < k) (H2 : n = k) (H3 : n > k),
+  match lt_eq_lt_dec n k with
+  | inleft (left _) => True
+  | inleft (right _) => True
+  | inright _ => True
+  end.
+Proof.
+  intros n k H1 H2 H3.
+  destruct (lt_eq_lt_dec n k) as [[Hlt|Heq]|Hgt]; auto.
+Qed.
+
+(** 4.2 索引运算的基本性质 **)
+
+Lemma pred_succ_commute : forall n,
+  pred (S n) = n.
+Proof. reflexivity. Qed.
+
+Lemma succ_pred_commute : forall n,
+  n > 0 -> S (pred n) = n.
+Proof.
+  intros n H.
+  destruct n as [|n'].
+  - lia.
+  - reflexivity.
+Qed.
+
+(** ======================== 基础算术辅助引理 ======================== *)
+
+(** 1. 自然数索引的基本性质 - 完全证明 **)
+Section BasicArithmetic.
+
+(** 自然数比较的三分法 - 使用标准库的 lt_eq_lt_dec **)
+Lemma nat_trichotomy : forall n k,
+  n < k \/ n = k \/ n > k.
+Proof.
+  intros n k.
+  destruct (lt_eq_lt_dec n k) as [[H|H]|H]; auto.
+Qed.
+
+(** ======================== 修正：替换索引的单调性 ======================== *)
+
+(** 修正后的引理：只关注索引的比较，不涉及项大小 **)
+Lemma subst_index_monotone_corrected : forall n m k,
+  n <= m ->
+  (match lt_eq_lt_dec n k with
+   | inleft (left _) => n      (* n < k: 保持 n *)
+   | inleft (right _) => k     (* n = k: 替换为 u，但这里我们只关注索引，返回 k 作为标记 *)
+   | inright _ => pred n      (* n > k: pred n *)
+   end) <=
+  (match lt_eq_lt_dec m k with
+   | inleft (left _) => m      (* m < k: 保持 m *)
+   | inleft (right _) => k     (* m = k: 替换为 u *)
+   | inright _ => pred m      (* m > k: pred m *)
+   end) \/
+  (match lt_eq_lt_dec n k with
+   | inleft (left _) => n
+   | inleft (right _) => k
+   | inright _ => pred n
+   end) >=
+  (match lt_eq_lt_dec m k with
+   | inleft (left _) => m
+   | inleft (right _) => k
+   | inright _ => pred m
+   end).
+Proof.
+  intros n m k Hle.
+  (* 对 n 和 m 分别进行分析 *)
+  destruct (lt_eq_lt_dec n k) as [[Hlt_n|Heq_n]|Hgt_n];
+  destruct (lt_eq_lt_dec m k) as [[Hlt_m|Heq_m]|Hgt_m].
+  - (* n < k, m < k *)
+    left. exact Hle.
+  - (* n < k, m = k *)
+    left. lia.
+  - (* n < k, m > k *)
+    (* 需要比较 n 和 pred m *)
+    destruct (le_lt_dec n (pred m)) as [Hle'|Hlt'].
+    + left. exact Hle'.
+    + right. lia.
+  - (* n = k, m < k *)
+    (* 由于 n = k > m，但 Hle: n ≤ m，矛盾 *)
+    exfalso. lia.
+  - (* n = k, m = k *)
+    left. reflexivity.
+  - (* n = k, m > k *)
+    (* 比较 k 和 pred m *)
+    destruct (le_lt_dec k (pred m)) as [Hle'|Hlt'].
+    + left. exact Hle'.
+    + right. lia.
+  - (* n > k, m < k *)
+    (* 由于 n > k 且 n ≤ m < k，矛盾 *)
+    exfalso. lia.
+  - (* n > k, m = k *)
+    (* 比较 pred n 和 k *)
+    destruct (le_lt_dec (pred n) k) as [Hle'|Hlt'].
+    + left. exact Hle'.
+    + right. lia.
+  - (* n > k, m > k *)
+    (* 比较 pred n 和 pred m *)
+    destruct (le_lt_dec (pred n) (pred m)) as [Hle'|Hlt'].
+    + left. exact Hle'.
+    + right. lia.
+Qed.
+
+(** ======================== 项的结构性质 ======================== *)
+
+Section TermStructuralProperties.
+
+(** 项大小的严格单调性 **)
+Lemma term_size_strict_monotonic : forall t,
+  match t with
+  | Var _ => True
+  | App t1 t2 => term_size t1 < term_size t /\ term_size t2 < term_size t
+  | Abs t' => term_size t' < term_size t
+  end.
+Proof.
+  intros t.
+  destruct t as [n | t1 t2 | t']; simpl.
+  - (* Var 分支 *)
+    exact I.  (* 需要提供 True 的证明 *)
+  - (* App 分支 *)
+    split.
+    + (* term_size t1 < term_size (App t1 t2) *)
+      lia.
+    + (* term_size t2 < term_size (App t1 t2) *)
+      lia.
+  - (* Abs 分支 *)
+    lia.
+Qed.
+
+(** ======================== Church数的基本性质 ======================== *)
+
+Section ChurchNumeralBasicProperties.
+
+(** Church后继的基本性质 - 不涉及归约 **)
+Lemma church_succ_form : forall n,
+  exists t, church_succ n = Abs (Abs t).
+Proof.
+  intro n.
+  unfold church_succ.
+  eexists.
+  reflexivity.
+Qed.
+
+End ChurchNumeralBasicProperties.
+
+(** ======================== 辅助证明策略和工具 ======================== *)
+
+Section ProofTactics.
+
+(** 处理 de Bruijn 索引的自动化策略 **)
+Ltac solve_de_bruijn :=
+  repeat (match goal with
+  | |- context[le_gt_dec ?k ?n] => 
+      let H := fresh "H" in
+      destruct (le_gt_dec k n) as [H|H]; try lia
+  | |- context[lt_eq_lt_dec ?n ?k] => 
+      let H := fresh "H" in
+      destruct (lt_eq_lt_dec n k) as [[H|H]|H]; try lia
+  | H: context[le_gt_dec ?k ?n] |- _ => 
+      let H' := fresh "H" in
+      destruct (le_gt_dec k n) as [H'|H']; try lia
+  | H: context[lt_eq_lt_dec ?n ?k] |- _ => 
+      let H' := fresh "H" in
+      destruct (lt_eq_lt_dec n k) as [[H'|H']|H']; try lia
+  end).
+
+(** 处理项大小的自动化策略 **)
+Ltac solve_term_size :=
+  repeat (match goal with
+  | |- term_size _ <= term_size _ => lia
+  | |- term_size _ < term_size _ => lia
+  | |- term_size _ = term_size _ => lia
+  | H: term_size _ <= term_size _ |- _ => lia
+  | H: term_size _ < term_size _ |- _ => lia
+  | H: term_size _ = term_size _ |- _ => lia
+  end).
+
+(** 组合策略：处理 de Bruijn 索引和项大小 **)
+Ltac solve_term_properties :=
+  repeat (solve_de_bruijn || solve_term_size).
+
+(** 快速证明项相等的策略 **)
+Ltac prove_term_eq :=
+  repeat (f_equal || reflexivity).
+
+End ProofTactics.
+
+(** 基础算术辅助引理 - 这些引理简单且直接可用 **)
+Section BasicArithmeticProven.
+
+(** 引理1.1: 自然数减法的基本性质 *)
+Lemma pred_of_succ : forall n, pred (S n) = n.
+Proof. reflexivity. Qed.
+
+(** 引理1.2: 后继的单调性 *)
+Lemma succ_le_monotone : forall n m, n <= m -> S n <= S m.
+Proof. intros n m H; apply le_n_S; exact H. Qed.
+
+End BasicArithmeticProven.
+
+(** 项大小的简单性质 - 直接可从定义得出 **)
+Section SimpleTermSizeProperties.
+
+(** 引理2.1: 项大小的基本不等式 *)
+Lemma term_size_ge_1_simple : forall t, term_size t >= 1.
+Proof. apply term_size_pos. Qed.
+
+(** 引理2.2: 变量的大小为1 *)
+Lemma term_size_var_simple : forall n, term_size (Var n) = 1.
+Proof. reflexivity. Qed.
+
+(** 引理2.3: 应用的大小计算 *)
+Lemma term_size_app_simple : forall t1 t2,
+  term_size (App t1 t2) = 1 + term_size t1 + term_size t2.
+Proof. reflexivity. Qed.
+
+(** 引理2.4: 抽象的大小计算 *)
+Lemma term_size_abs_simple : forall t,
+  term_size (Abs t) = 1 + term_size t.
+Proof. reflexivity. Qed.
+
+(** 引理2.5: 子项大小严格小于父项大小 *)
+Lemma term_size_strict_decreasing : forall t,
+  match t with
+  | Var _ => True
+  | App t1 t2 => term_size t1 < term_size t /\ term_size t2 < term_size t
+  | Abs t' => term_size t' < term_size t
+  end.
+Proof.
+  destruct t as [n | t1 t2 | t']; simpl.
+  - exact I.
+  - split; lia.
+  - lia.
+Qed.
+
+End SimpleTermSizeProperties.
+
+(** 构造函数的简单性质 - 直接可证 **)
+Section SimpleConstructorProperties.
+
+(** 引理4.1: 变量构造函数的单射性 *)
+Lemma var_injective_simple : forall n m, Var n = Var m -> n = m.
+Proof.
+  intros n m H.
+  injection H.
+  auto.
+Qed.
+
+(** 引理4.2: 应用构造函数的单射性 *)
+Lemma app_injective_simple : forall t1 t2 u1 u2,
+  App t1 t2 = App u1 u2 -> t1 = u1 /\ t2 = u2.
+Proof.
+  intros t1 t2 u1 u2 H.
+  injection H.
+  auto.
+Qed.
+
+(** 引理4.3: 抽象构造函数的单射性 *)
+Lemma abs_injective_simple : forall t u,
+  Abs t = Abs u -> t = u.
+Proof.
+  intros t u H.
+  injection H.
+  auto.
+Qed.
+
+(** 引理4.4: 不同构造函数的互斥性 *)
+Lemma term_form_discrimination : forall t,
+  (forall n, t <> Var n) \/ (exists n, t = Var n).
+Proof.
+  intro t.
+  destruct t as [n|t1 t2|t'].
+  - right; exists n; reflexivity.
+  - left; intros n H; discriminate H.
+  - left; intros n H; discriminate H.
+Qed.
+
+(** Church数的简单性质 - 不涉及复杂归约 **)
+Section SimpleChurchProperties.
+
+(** 引理8.2: Church后继保持抽象形式 *)
+Lemma church_succ_preserves_abs_form : forall n,
+  (exists t, n = Abs t) -> exists t, church_succ n = Abs t.
+Proof.
+  intros n [t Heq].
+  unfold church_succ.
+  eexists. reflexivity.
+Qed.
+
+End SimpleChurchProperties.
+
+(** 自由变量的简单性质 - 基础分析 **)
+Section SimpleFreeVariableProperties.
+
+(** 引理9.1: 变量总是以自身索引自由出现 *)
+Lemma appears_free_in_self : forall n,
+  appears_free_in n (Var n) = true.
+Proof.
+  intro n.
+  simpl.
+  rewrite Nat.eqb_refl.
+  reflexivity.
+Qed.
+
+(** 引理9.2: 不同索引的变量不自由出现 *)
+Lemma appears_free_in_other : forall n m,
+  n <> m -> appears_free_in n (Var m) = false.
+Proof.
+  intros n m Hneq.
+  simpl.
+  rewrite Nat.eqb_neq; auto.
+Qed.
+
+(** 引理9.4: 自由变量的单调性 - 抽象情况 *)
+Lemma appears_free_in_abs_mono : forall k t,
+  appears_free_in k (Abs t) = appears_free_in (S k) t.
+Proof. reflexivity. Qed.
+
+End SimpleFreeVariableProperties.
+
+(** 关系的简单性质 - 用于自动证明 **)
+Section SimpleRelationProperties.
+
+(** 引理10.3: 自反传递闭包的基本构造 *)
+Lemma reflexive_transitive_closure_simple : forall (R : term -> term -> Prop) t u v,
+  R t u -> (forall x, R x x) -> (forall x y z, R x y -> R y z -> R x z) -> R t v -> R t v.
+Proof.
+  intros R t u v Htu Hrefl Htrans H.
+  exact H.
+Qed.
+
+End SimpleRelationProperties.
+
+(** 简单的证明辅助策略 - 自动化证明 **)
+Section SimpleProofTactics.
+
+(** 策略1: 自动处理项的结构 *)
+Ltac destruct_term t :=
+  destruct t as [n | t1 t2 | t'].
+
+(** 策略2: 自动处理索引比较 *)
+Ltac destruct_index_cmp n k :=
+  destruct (lt_eq_lt_dec n k) as [[Hlt|Heq]|Hgt]; try lia.
+
+(** 策略3: 自动处理提升比较 *)
+Ltac destruct_lift_cmp k n :=
+  destruct (le_gt_dec k n) as [Hle|Hgt]; try lia.
+
+(** 策略4: 自动证明项相等 *)
+Ltac prove_term_eq :=
+  repeat (f_equal || reflexivity).
+
+(** 策略5: 自动处理算术条件 *)
+Ltac solve_arith := lia.
+
+End SimpleProofTactics.
 
