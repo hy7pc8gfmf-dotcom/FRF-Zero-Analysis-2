@@ -4006,10 +4006,6 @@ From MetaCoq.Template Require Import All.
 
 *)
 
-(* MetaCoq 核心模块 *)
-From MetaCoq.Template Require Import Ast AstUtils Common.
-From MetaCoq.Template Require Import LiftSubst.
-From MetaCoq.Template Require Import TemplateMonad.
 (*
 (* 如果需要归约和合流性 *)
 From MetaCoq.PCUIC Require Import
