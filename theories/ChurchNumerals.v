@@ -4201,8 +4201,6 @@ Proof. lia. Qed.
 
 (* ========================================================================== *)
 (* 在文件开头添加 *)
-Set Printing All.      (* 显示所有隐式信息 *)
-Set Debug "Typing".    (* 启用类型调试 *)
 
 (* 基础库 *)
 Require Import Coq.Arith.Arith.
