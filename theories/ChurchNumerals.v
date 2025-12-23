@@ -4000,8 +4000,11 @@ From Coq.Lists Require Import List.      (* 列表操作 *)
 Require Import Coq.Arith.Wf_nat.
 Require Import Lia.
 
+(* 
 (* 或者一次性导入 *)
 From MetaCoq.Template Require Import All.
+
+*)
 
 (* MetaCoq 核心模块 *)
 From MetaCoq.Template Require Import Ast AstUtils Common.
