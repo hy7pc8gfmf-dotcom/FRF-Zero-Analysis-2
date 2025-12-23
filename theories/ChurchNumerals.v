@@ -4608,6 +4608,8 @@ Proof.
     lia.
 Qed.
 
+End TermStructuralProperties.
+
 (** ======================== Church数的基本性质 ======================== *)
 
 Section ChurchNumeralBasicProperties.
