@@ -4015,8 +4015,6 @@ From MetaCoq.PCUIC Require Import
      PCUICConfluence
      PCUICNormal.
  *)
-(* Erasure 模块（如果需要） *)
-From MetaCoq.Erasure Require Import EAst EAstUtils ELiftSubst.
 
 (* 使用以下导入替代 BasicAst *)
 From MetaCoq.Template Require Import
