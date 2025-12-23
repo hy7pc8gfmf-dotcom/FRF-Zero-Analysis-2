@@ -4756,6 +4756,8 @@ Proof.
   - left; intros n H; discriminate H.
 Qed.
 
+End SimpleConstructorProperties.
+
 (** Church数的简单性质 - 不涉及复杂归约 **)
 Section SimpleChurchProperties.
 
