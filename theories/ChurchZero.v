@@ -807,7 +807,6 @@ Proof.
   reflexivity.
 Qed.
 
-
 (* 测试nat优化实例 - 直接使用类型类引理 *)
 Example test_nat_optimized_final :
   @optimized_zero nat nat_optimized (fun n => S n) 0 = 0.
@@ -822,7 +821,6 @@ Example test_bool_optimized_fixed :
 Proof.
   reflexivity.
 Qed.
-
 
 (* 测试option优化实例 *)
 Example test_option_optimized :
@@ -881,7 +879,6 @@ Proof.
   intros A f x.
   reflexivity.
 Qed.
-
 
 (* 引理3: Church零的函数外延性 - 基本版本 *)
 Lemma church_zero_basic_ext : forall (A : Type) (f1 f2 : A -> A) (x1 x2 : A),
@@ -957,10 +954,10 @@ Proof.
 Qed.
 
 (* ======================== 模块导出（无符号冲突，支撑下游集成） ======================== *)
-  Export ChurchNum church_zero ChurchZeroIdentity.
-  Export church_zero_beta iter_notation_consistent church_zero_fun_ext.
-  Export church_zero_iterates_zero_times church_zero_identity_unique church_zero_nat_correspondence.
-  Export church_zero_concept_identity_correct church_zero_iterates_zero_times_with_notation.
+Export ChurchNum church_zero ChurchZeroIdentity.
+Export church_zero_beta iter_notation_consistent church_zero_fun_ext_proper.
+Export church_zero_iterates_zero_times church_zero_identity_unique church_zero_nat_correspondence.
+Export church_zero_concept_identity_correct church_zero_iterates_zero_times_with_notation.
 
 Close Scope church_zero_scope.
 
