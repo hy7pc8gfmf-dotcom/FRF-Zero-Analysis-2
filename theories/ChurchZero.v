@@ -951,10 +951,5 @@ Proof.
 Qed.
 
 (* ======================== 模块导出（无符号冲突，支撑下游集成） ======================== *)
-Export ChurchNum church_zero ChurchZeroIdentity.
-Export church_zero_beta iter_notation_consistent church_zero_fun_ext_proper.
-Export church_zero_iterates_zero_times church_zero_identity_unique church_zero_nat_correspondence.
-Export church_zero_concept_identity_correct church_zero_iterates_zero_times_with_notation.
-
 Close Scope church_zero_scope.
 
