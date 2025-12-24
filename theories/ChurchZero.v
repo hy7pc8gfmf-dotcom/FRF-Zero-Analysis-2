@@ -11,10 +11,7 @@ Require Import Coq.Classes.EquivDec.
 Require Import Coq.Structures.Equalities.
 Require Import Coq.Arith.Arith.    (* 用于 Nat.eqb *)
 Require Import Coq.ZArith.ZArith.
-
-
 Require Import Coq.Arith.EqNat.
-
 Require Import Coq.Bool.Bool.      (* 用于 && 和 || *)
 
 Set Universe Polymorphism.
