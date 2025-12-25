@@ -86,23 +86,14 @@ jobs:
             zlib1g-dev
           echo "✅ 系统依赖安装完成"
 
-      - name: 🔄 初始配置OPAM（修复版）
+      - name: 🔄 配置OPAM环境
         run: |
-          # 参考可执行版本的初始化方式
           opam init --disable-sandboxing -y --compiler=4.14.0
-          
-          # 设置环境
           eval $(opam env)
-          
-          # 添加Coq仓库
           opam repo add coq-released https://coq.inria.fr/opam/released
           opam update -y
-          
-          # 设置环境变量
-          echo "OPAMROOT=~/.opam" >> $GITHUB_ENV
-          echo "OPAMSWITCH=4.14.0" >> $GITHUB_ENV
-          
-          echo "✅ OPAM配置完成，当前switch: $(opam switch show)"
+          echo "OPAM_HOME=$OPAM_HOME" >> $GITHUB_ENV
+          echo "OPAM_SWITCH_PREFIX=$OPAM_SWITCH_PREFIX" >> $GITHUB_ENV
 
       - name: 📊 配置验证环境
         run: |
@@ -137,7 +128,6 @@ jobs:
           echo "系统环境检查:"
           echo "OPAM版本: $(opam --version)"
           echo "OCaml版本: $(ocamlc --version 2>/dev/null || echo '未安装')"
-          echo "当前switch: $(opam switch show)"
           
           # 设置默认版本
           echo "version=8.18.0" >> $GITHUB_OUTPUT
@@ -151,7 +141,6 @@ jobs:
           echo "可用内存: ${{ steps.check-memory.outputs.available_mb }}MB"
           echo "分配内存: ${{ env.COQ_MEMORY }}MB"
           echo "并行任务: ${{ env.PARALLEL_JOBS }}"
-          echo "当前switch: $(opam switch show)"
           echo "计划安装Coq版本: 8.18.0"
 
   install-dependencies:
@@ -164,45 +153,29 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: 🔄 恢复OPAM缓存
+      - name: 📥 恢复OPAM缓存
         uses: actions/cache@v3
         id: opam-cache
         with:
           path: |
             ~/.opam
             ~/.cache/opam
-          key: ${{ runner.os }}-opam-4.14.0-coq-8.18.0-${{ hashFiles('**/*.opam', '**/.opam', '**/coq-project') }}
+          key: ${{ runner.os }}-opam-8.18.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            ${{ runner.os }}-opam-4.14.0-coq-8.18.0-
-            ${{ runner.os }}-opam-4.14.0-
+            ${{ runner.os }}-opam-8.18.0-
             ${{ runner.os }}-opam-
 
-      - name: 🔄 设置OPAM环境（优化版）
+      - name: 🔄 设置OPAM环境
         run: |
-          # 如果OPAM目录不存在，重新初始化
-          if [ ! -d "${HOME}/.opam" ]; then
-            echo "OPAM目录不存在，重新初始化..."
-            opam init --disable-sandboxing -y --compiler=4.14.0
-          fi
-          
-          # 确保使用正确的switch
-          opam switch 4.14.0
+          opam init --disable-sandboxing -y --compiler=4.14.0
           eval $(opam env)
-          
-          # 添加Coq仓库
-          opam repo add coq-released https://coq.inria.fr/opam/released --all-switches
+          opam repo add coq-released https://coq.inria.fr/opam/released
           opam update -y
-          
-          echo "✅ OPAM环境设置完成"
-          echo "当前switch: $(opam switch show)"
-          echo "OCaml版本: $(ocamlc --version)"
 
-      - name: 📊 安装Coq核心（匹配修复版本）
+      - name: 📊 安装Coq核心
         run: |
           eval $(opam env)
           echo "安装Coq 8.18.0..."
-          
-          # 安装Coq
           opam install -y coq.8.18.0
           
           echo "验证Coq安装..."
@@ -212,14 +185,17 @@ jobs:
             exit 1
           fi
 
-      - name: 🧮 安装mathcomp（匹配版本）
+      - name: 🧮 安装mathcomp
         run: |
           eval $(opam env)
           echo "安装mathcomp系列..."
           
-          # 安装完整的mathcomp，指定兼容版本
-          opam install -y coq-mathcomp-ssreflect coq-mathcomp-fingroup coq-mathcomp-algebra
-          opam install -y coq-mathcomp-solvable coq-mathcomp-field
+          # 安装完整的mathcomp
+          opam install -y coq-mathcomp-ssreflect
+          opam install -y coq-mathcomp-fingroup
+          opam install -y coq-mathcomp-algebra
+          opam install -y coq-mathcomp-solvable
+          opam install -y coq-mathcomp-field
           
           echo "验证mathcomp安装..."
           opam list --installed | grep "coq-mathcomp" || (echo "❌ mathcomp安装失败" && exit 1)
@@ -255,11 +231,6 @@ jobs:
           echo ""
           echo "OPAM配置:"
           opam config report
-          echo ""
-          echo "环境检查:"
-          echo "OPAMROOT: $OPAMROOT"
-          echo "OPAMSWITCH: $OPAMSWITCH"
-          echo "当前switch: $(opam switch show)"
 
   compile-phase-1:
     name: 🏗️ 阶段1:基础库编译
@@ -268,19 +239,16 @@ jobs:
     timeout-minutes: 45
     env:
       COQFLAGS: "-Q SelfContainedLib SelfContainedLib"
-      COQ_MEMORY: ${{ needs.setup-environment.outputs.memory_available }}
-      PARALLEL_JOBS: ${{ needs.setup-environment.outputs.core_count }}
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: 🔄 设置Coq环境
+      - name: 🔄 设置环境
         run: |
           eval $(opam env)
-          echo "Coq环境已设置"
-          coqc --version
+          echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
 
       - name: 📊 编译前检查
         run: |
@@ -290,8 +258,7 @@ jobs:
           find SelfContainedLib -name "*.v" 2>/dev/null | head -20 || echo "无文件"
           echo ""
           echo "编译参数: $COQFLAGS"
-          echo "内存限制: $COQ_MEMORY MB"
-          echo "并行任务: $PARALLEL_JOBS"
+          echo "内存限制: ${{ env.COQ_MEMORY }}MB"
 
       - name: 🔧 顺序编译基础库
         run: |
@@ -326,7 +293,7 @@ jobs:
             local extra_flags=""
             
             if [ "$base" = "Geometry" ] && [ $line_count -gt 1000 ]; then
-              extra_flags="-m 8192 -async-proofs on"
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
               echo "  大文件检测，使用增强参数"
             fi
             
@@ -406,23 +373,25 @@ jobs:
     timeout-minutes: 60
     env:
       COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories"
-      COQ_MEMORY: ${{ needs.setup-environment.outputs.memory_available }}
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: 🔄 设置Coq环境
-        run: |
-          eval $(opam env)
-          echo "Coq环境已设置"
-
       - name: 📥 恢复阶段1结果
         uses: actions/download-artifact@v3
         with:
           name: phase-1-compiled
           path: .
+
+      - name: 🔄 设置环境
+        run: |
+          eval $(opam env)
+          echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+          
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories
 
       - name: 📊 检查元理论文件
         run: |
@@ -484,7 +453,7 @@ jobs:
             
             if [ "$base" = "FRF_MetaTheory" ] || [ "$base" = "ChurchNumerals" ]; then
               if [ $line_count -gt 2000 ]; then
-                extra_flags="-m 8192 -async-proofs on -async-proofs-tac-j 4"
+                extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
                 echo "  大文件，使用增强参数"
               fi
             fi
@@ -586,16 +555,19 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: 🔄 设置Coq环境
-        run: |
-          eval $(opam env)
-          echo "Coq环境已设置"
-
       - name: 📥 恢复阶段2结果
         uses: actions/download-artifact@v3
         with:
           name: phase-2-compiled
           path: .
+
+      - name: 🔄 设置环境
+        run: |
+          eval $(opam env)
+          echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+          
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories
 
       - name: 📊 检查场景文件
         run: |
@@ -663,7 +635,7 @@ jobs:
             case $base in
               CaseE_*)
                 if [ $line_count -gt 3000 ]; then
-                  extra_flags="-m 8192 -async-proofs on -async-proofs-tac-j 4"
+                  extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
                   echo "  超大文件，使用增强参数"
                 fi
                 ;;
@@ -769,16 +741,19 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: 🔄 设置Coq环境
-        run: |
-          eval $(opam env)
-          echo "Coq环境已设置"
-
       - name: 📥 恢复阶段3结果
         uses: actions/download-artifact@v3
         with:
           name: phase-3-compiled
           path: .
+
+      - name: 🔄 设置环境
+        run: |
+          eval $(opam env)
+          echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+          
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories Quantum CS_Null
 
       - name: 📁 检查扩展模块
         run: |
@@ -846,7 +821,7 @@ jobs:
             local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
             
             if [ $line_count -gt 2000 ]; then
-              extra_flags="-m 8192 -async-proofs on"
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
               echo "    大文件，使用增强参数"
             fi
             
@@ -925,10 +900,10 @@ jobs:
             local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
             
             if [ "$base" = "FRF_CS_Null_Common" ] && [ $line_count -gt 5000 ]; then
-              extra_flags="-m 16384 -async-proofs on -async-proofs-tac-j 8"
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 8"
               echo "    极大文件，使用最强参数"
             elif [ $line_count -gt 3000 ]; then
-              extra_flags="-m 8192 -async-proofs on"
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
               echo "    大文件，使用增强参数"
             fi
             
@@ -1080,16 +1055,19 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: 🔄 设置Coq环境
-        run: |
-          eval $(opam env)
-          echo "Coq环境已设置"
-
       - name: 📥 恢复阶段4结果
         uses: actions/download-artifact@v3
         with:
           name: phase-4-compiled
           path: .
+
+      - name: 🔄 设置环境
+        run: |
+          eval $(opam env)
+          echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+          
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories Quantum CS_Null
 
       - name: 🔧 编译集成模块
         run: |
@@ -1139,7 +1117,7 @@ jobs:
           # 设置编译参数（大文件处理）
           local extra_flags=""
           if [ $line_count -gt 4000 ]; then
-            extra_flags="-m 8192 -async-proofs on -async-proofs-tac-j 6"
+            extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 6"
             echo "  大文件检测: $line_count 行，使用增强参数"
           fi
           
@@ -1185,12 +1163,207 @@ jobs:
             echo "  ❌ FRF_Comparative.vo 缺失"
           fi
 
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-5-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            Quantum/*.vo
+            Quantum/*.glob
+            CS_Null/*.vo
+            CS_Null/*.glob
+            build-logs/
+          retention-days: 7
+
+  compile-phase-6:
+    name: 🧪 阶段6:测试套件编译
+    needs: compile-phase-5
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    env:
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -Q Test Test"
+    steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 📥 恢复阶段5结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-5-compiled
+          path: .
+
+      - name: 🔄 设置环境
+        run: |
+          eval $(opam env)
+          echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+          
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories Quantum CS_Null Test
+
+      - name: 🧪 检查测试套件
+        run: |
+          echo "=== 测试套件检查 ==="
+          echo "测试目录:"
+          ls -la Test/ 2>/dev/null || echo "Test目录不存在"
+          
+          echo ""
+          echo "测试文件:"
+          find Test -name "*.v" 2>/dev/null | head -20 || echo "无测试文件"
+          
+          echo ""
+          echo "测试统计:"
+          test_count=$(find Test -name "*.v" 2>/dev/null | wc -l)
+          echo "  总测试文件数: $test_count"
+
+      - name: 🔧 编译测试
+        run: |
+          eval $(opam env)
+          
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
+          echo "🧪 编译测试套件..."
+          
+          # 检查测试文件是否存在
+          test_files_count=0
+          for file in Test/*.v 2>/dev/null; do
+            test_files_count=1
+            break
+          done
+          
+          if [ $test_files_count -eq 0 ]; then
+            echo "⚠️ 未找到测试文件"
+            exit 0
+          fi
+          
+          # 编译函数
+          compile_test() {
+            local file=$1
+            local base=$(basename "$file" .v)
+            local log_file="build-logs/test_${base}.log"
+            
+            echo "  测试: $base.v..."
+            
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
+            fi
+            
+            # 设置编译参数
+            local extra_flags=""
+            local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            
+            case $base in
+              Test_FRF_MetaTheory|Test_BlockchainSystem)
+                if [ $line_count -gt 2000 ]; then
+                  extra_flags="-async-proofs on"
+                  echo "    大测试文件，使用异步证明"
+                fi
+                ;;
+              Test_QuantumVacuum|SelfContainedVerification)
+                if [ $line_count -gt 1000 ]; then
+                  extra_flags=""
+                fi
+                ;;
+            esac
+            
+            # 执行编译
+            if timeout 10m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
+              echo "    ✅ $base.v 编译成功"
+              return 0
+            else
+              echo "    ❌ $base.v 编译失败"
+              return 1
+            fi
+          }
+          
+          # 编译所有测试文件
+          failed=0
+          success=0
+          total=0
+          
+          for file in Test/*.v 2>/dev/null; do
+            total=$((total + 1))
+            if compile_test "$file"; then
+              success=$((success + 1))
+            else
+              failed=1
+            fi
+            
+            # 小文件之间短暂休息
+            sleep 1
+          done
+          
+          echo ""
+          echo "测试编译统计: $success/$total 个测试编译成功"
+          
+          if [ $failed -eq 1 ]; then
+            echo "❌ 测试套件编译有失败"
+            exit 1
+          fi
+          
+          echo "✅ 测试套件编译完成"
+
+      - name: 📊 测试编译统计
+        run: |
+          echo "=== 测试套件编译统计 ==="
+          
+          total=0
+          success=0
+          
+          for file in Test/*.vo 2>/dev/null; do
+            if [ -f "$file" ]; then
+              base=$(basename "$file" .vo)
+              size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+              echo "  ✅ $base (${size} bytes)"
+              success=$((success + 1))
+            fi
+            total=$((total + 1))
+          done
+          
+          if [ $total -eq 0 ]; then
+            echo "  无测试文件"
+          else
+            echo ""
+            echo "统计: $success/$total 个测试编译成功"
+            
+            # 检查是否有未编译的测试文件
+            for file in Test/*.v 2>/dev/null; do
+              base=$(basename "$file" .v)
+              if [ ! -f "Test/${base}.vo" ]; then
+                echo "  ❌ $base.v (未编译)"
+              fi
+            done
+          fi
+
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-6-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            Quantum/*.vo
+            Quantum/*.glob
+            CS_Null/*.vo
+            CS_Null/*.glob
+            Test/*.vo
+            Test/*.glob
+            build-logs/
+          retention-days: 7
+
       - name: 📊 生成验证报告
         run: |
           echo "生成全量验证报告..."
-          
-          # 创建报告目录
-          mkdir -p verification-report
           
           # 统计编译结果
           TOTAL_FILES=0
@@ -1208,12 +1381,15 @@ jobs:
                 
                 if [ -f "$vo_file" ]; then
                   COMPILED_FILES=$((COMPILED_FILES + 1))
+                  
+                  # 检查是否是大文件
                   lines=$(wc -l < "$file" 2>/dev/null || echo 0)
                   if [ "$lines" -gt 3000 ]; then
                     HUGE_FILES=$((HUGE_FILES + 1))
                     HUGE_COMPILED=$((HUGE_COMPILED + 1))
                   fi
                 else
+                  # 检查是否是大文件
                   lines=$(wc -l < "$file" 2>/dev/null || echo 0)
                   if [ "$lines" -gt 3000 ]; then
                     HUGE_FILES=$((HUGE_FILES + 1))
@@ -1229,59 +1405,5 @@ jobs:
             SUCCESS_RATE=$((COMPILED_FILES * 100 / TOTAL_FILES))
           fi
           
-          # 使用简单的echo语句生成报告
-          echo "# FRF 2.0 全量形式化验证报告" > verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "## 概述" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **验证时间**: $(date)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **GitHub Actions运行ID**: ${{ github.run_id }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **触发事件**: ${{ github.event_name }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **分支**: ${{ github.ref }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **OPAM Switch**: $(opam switch show)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **Coq版本**: $(coqc --version | head -1)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "## 编译统计" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **总文件数**: ${TOTAL_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **成功编译**: ${COMPILED_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **编译成功率**: ${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **大文件数(>3000行)**: ${HUGE_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **大文件编译成功**: ${HUGE_COMPILED} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "## 阶段编译状态" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "1. ✅ 阶段1: 基础库编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "2. ✅ 阶段2: 元理论层编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "3. ✅ 阶段3: 数学场景层编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "4. ✅ 阶段4: 扩展模块编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "5. ✅ 阶段5: 集成模块编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "6. ✅ 阶段6: 测试套件编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          
-          echo "✅ 验证报告生成完成"
-
-    - name: 📤 上传验证报告
-      uses: actions/upload-artifact@v3
-      with:
-        name: full-verification-report
-        path: verification-report/
-        retention-days: 14
-
-  verification-summary:
-    name: 📋 验证总结
-    needs: [compile-phase-6]
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 🎉 验证成功报告
-        run: |
-          echo "========================================="
-          echo "       🎉 FRF 2.0 全量验证完成！       "
-          echo "========================================="
-          echo ""
-          echo "✅ 所有编译阶段均成功完成"
-          echo "✅ 修复的OPAM环境配置正常工作"
-          echo "✅ 所有核心模块编译通过"
-          echo ""
-          echo "📊 验证结果已保存为 artifacts"
-          echo "📄 详细报告可在 artifacts 中查看"
-          echo ""
-          echo "🚀 验证流程结束状态: SUCCESS"
-          echo "========================================="
+          # 生成Markdown报告
+          cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
