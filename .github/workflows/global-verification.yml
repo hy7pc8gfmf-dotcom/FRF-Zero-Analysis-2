@@ -98,13 +98,14 @@ jobs:
         echo "CORE_COUNT=${{ steps.check-cpu.outputs.core_count }}" >> $GITHUB_ENV
         
         # 根据内存设置编译参数
-        if [ ${{ steps.check-memory.outputs.available_mb }} -gt 16000 ]; then
+        AVAIL_MEM=${{ steps.check-memory.outputs.available_mb }}
+        if [ $AVAIL_MEM -gt 16000 ]; then
           echo "COQ_MEMORY=16384" >> $GITHUB_ENV
           echo "BIGFILE_MEMORY=16384" >> $GITHUB_ENV
-        elif [ ${{ steps.check-memory.outputs.available_mb }} -gt 8000 ]; then
+        elif [ $AVAIL_MEM -gt 8000 ]; then
           echo "COQ_MEMORY=8192" >> $GITHUB_ENV
           echo "BIGFILE_MEMORY=8192" >> $GITHUB_ENV
-        elif [ ${{ steps.check-memory.outputs.available_mb }} -gt 4000 ]; then
+        elif [ $AVAIL_MEM -gt 4000 ]; then
           echo "COQ_MEMORY=4096" >> $GITHUB_ENV
           echo "BIGFILE_MEMORY=4096" >> $GITHUB_ENV
         else
@@ -112,7 +113,10 @@ jobs:
           echo "BIGFILE_MEMORY=2048" >> $GITHUB_ENV
         fi
         
-        echo "PARALLEL_JOBS=$((${{ steps.check-cpu.outputs.core_count }} / 2))" >> $GITHUB_ENV
+        # 计算并行任务数
+        CORE_COUNT=${{ steps.check-cpu.outputs.core_count }}
+        PARALLEL_JOBS=$((CORE_COUNT / 2))
+        echo "PARALLEL_JOBS=$PARALLEL_JOBS" >> $GITHUB_ENV
 
     - name: 🔍 检查Coq版本
       id: check-coq
@@ -217,7 +221,7 @@ jobs:
         opam list --tree --installed | head -50
 
   compile-phase-1:
-    name: 阶段1: 基础库编译
+    name: 🏗️ 阶段1: 基础库编译
     needs: [setup-environment, install-dependencies]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
