@@ -427,7 +427,7 @@ jobs:
           mkdir -p verification-report
           
           # 生成Markdown报告 - 使用不同的heredoc标记避免YAML解析问题
-          cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF_REPORT'
+          cat > verification-report/FRF2_VERIFICATION_REPORT.md << "EOF_REPORT"
 # FRF 2.0 形式化验证报告
 
 ## 验证概览
@@ -468,8 +468,8 @@ EOF_REPORT
             fi
           done
           
-          # 添加总结 - 使用另一个heredoc标记
-          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF_SUMMARY'
+          # 添加总结
+          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << "EOF_SUMMARY"
 
 ## 验证总结
 
