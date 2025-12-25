@@ -41,7 +41,7 @@ jobs:
   setup-and-install:
     name: 🔧 环境配置与依赖安装
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     outputs:
       coq_version: ${{ steps.verify-coq.outputs.version }}
       coq_ready: ${{ steps.verify-coq.outputs.ready }}
