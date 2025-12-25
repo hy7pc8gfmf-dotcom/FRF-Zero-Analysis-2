@@ -1078,7 +1078,6 @@ jobs:
 
 ## 验证概览
           EOF
-          
           echo "- **验证时间**: $(date)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **环境**: Ubuntu 22.04" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **总文件数**: $TOTAL_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
