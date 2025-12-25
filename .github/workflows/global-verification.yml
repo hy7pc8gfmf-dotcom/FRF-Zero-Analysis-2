@@ -10,7 +10,7 @@ on:
 jobs:
   full-formal-verification:
     runs-on: ubuntu-22.04
-    timeout-minutes: 240  # 全量编译需要更长时间
+    timeout-minutes: 240
     
     steps:
     - name: 📥 检出代码仓库
@@ -313,22 +313,23 @@ jobs:
         # 创建报告目录
         mkdir -p verification-reports
         
-        # 生成报告
-        cat > verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-# FRF 2.0 全量形式化编译报告
-
-## 编译概述
-- **编译时间**: $(date)
-- **运行环境**: GitHub Actions (Ubuntu 22.04)
-- **Coq版本**: $(coqc --version 2>/dev/null | head -1)
-- **总编译文件数**: 27个核心模块
-- **编译状态**: 全量编译
-
-## 模块编译状态
-
-### 层级1：自包含基础库 (3个文件)
-EOF
+        # 开始生成报告
+        echo "# FRF 2.0 全量形式化编译报告" > verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
+        echo "## 编译概述" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **编译时间**: $(date)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **运行环境**: GitHub Actions (Ubuntu 22.04)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        COQ_VERSION=$(coqc --version 2>/dev/null | head -1 || echo "未知")
+        echo "- **Coq版本**: $COQ_VERSION" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **总编译文件数**: 27个核心模块" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **编译状态**: 全量编译" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        
+        echo "## 模块编译状态" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        
+        echo "### 层级1：自包含基础库 (3个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加层级1状态
         for file in Algebra Category Geometry; do
           if [ -f "SelfContainedLib/$file.vo" ]; then
@@ -337,12 +338,9 @@ EOF
             echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-### 层级2：FRF元理论层 (3个文件)
-EOF
-        
+        echo "### 层级2：FRF元理论层 (3个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加层级2状态
         for file in FRF_MetaTheory ChurchZero ChurchNumerals; do
           if [ -f "theories/$file.vo" ]; then
@@ -351,12 +349,9 @@ EOF
             echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-### 层级3：数学场景层 (5个文件)
-EOF
-        
+        echo "### 层级3：数学场景层 (5个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加层级3状态
         for file in CaseA_SetTheory CaseB_Algebra CaseC_TypeTheory CaseD_CategoryTheory CaseE_QuantumVacuum; do
           if [ -f "theories/$file.vo" ]; then
@@ -365,12 +360,9 @@ EOF
             echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-### 层级4：量子模块 (2个文件)
-EOF
-        
+        echo "### 层级4：量子模块 (2个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加量子模块状态
         for file in QFT_FRF CurvedSpacetimeQFT; do
           if [ -f "Quantum/$file.vo" ]; then
@@ -379,12 +371,9 @@ EOF
             echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-### 层级4：空值系统模块 (8个文件)
-EOF
-        
+        echo "### 层级4：空值系统模块 (8个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加空值系统状态
         for file in FRF_CS_Null_Common FRF_CS_Null CxxNull PythonNull JavaNull MathNull RustNull; do
           if [ -f "CS_Null/$file.vo" ]; then
@@ -393,24 +382,18 @@ EOF
             echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-### 层级5：集成模块 (1个文件)
-EOF
-        
+        echo "### 层级5：集成模块 (1个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加集成模块状态
         if [ -f "theories/FRF_Comparative.vo" ]; then
           echo "- ✅ **FRF_Comparative.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         else
           echo "- ❌ **FRF_Comparative.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         fi
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-### 层级6：测试套件 (5个文件)
-EOF
-        
+        echo "### 层级6：测试套件 (5个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 添加测试套件状态
         for file in Test_Basic Test_FRF_MetaTheory Test_QuantumVacuum Test_BlockchainSystem SelfContainedVerification; do
           if [ -f "Test/$file.vo" ]; then
@@ -419,22 +402,20 @@ EOF
             echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
         # 计算统计
         total_files=27
         compiled_files=$(find . -name "*.vo" -type f | wc -l)
         success_rate=$((compiled_files * 100 / total_files))
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << EOF
-
-## 统计摘要
-- **总模块数**: $total_files
-- **编译成功数**: $compiled_files
-- **编译成功率**: $success_rate%
-
-## 大文件编译状态
-EOF
+        echo "## 统计摘要" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **总模块数**: $total_files" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **编译成功数**: $compiled_files" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **编译成功率**: $success_rate%" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
+        echo "## 大文件编译状态" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         # 大文件状态
         huge_files=("Geometry.v" "FRF_MetaTheory.v" "ChurchNumerals.v" "CaseE_QuantumVacuum.v" "FRF_CS_Null_Common.v" "FRF_Comparative.v")
         for file in "${huge_files[@]}"; do
@@ -455,42 +436,33 @@ EOF
             echo "- ❓ **$file** (大文件) - 文件未找到" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-
-## 结论
-EOF
-        
+        echo "## 结论" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         if [ $compiled_files -eq $total_files ]; then
-          cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << 'EOF'
-🎉 **FRF 2.0 全量形式化编译完全成功！**
-
-所有27个核心模块均编译成功，包括6个大文件也已成功编译。项目架构完整，形式化验证基础就绪。
-
-**下一步建议**：
-1. 运行 `make report` 生成跨系统对比报告
-2. 执行测试验证功能正确性
-3. 进行性能分析和优化
-EOF
+          echo "🎉 **FRF 2.0 全量形式化编译完全成功！**" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "所有27个核心模块均编译成功，包括6个大文件也已成功编译。项目架构完整，形式化验证基础就绪。" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "**下一步建议**：" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "1. 运行 `make report` 生成跨系统对比报告" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "2. 执行测试验证功能正确性" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "3. 进行性能分析和优化" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         else
-          cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << EOF
-⚠️ **FRF 2.0 编译部分成功**
-
-已编译 $compiled_files 个模块（共 $total_files 个），$((total_files - compiled_files)) 个模块编译失败。
-
-**建议**：
-1. 检查编译错误日志
-2. 验证依赖关系
-3. 调整大文件编译参数
-EOF
+          echo "⚠️ **FRF 2.0 编译部分成功**" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "已编译 $compiled_files 个模块（共 $total_files 个），$((total_files - compiled_files)) 个模块编译失败。" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "**建议**：" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "1. 检查编译错误日志" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "2. 验证依赖关系" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "3. 调整大文件编译参数" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         fi
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        cat >> verification-reports/FRF_FULL_COMPILATION_REPORT.md << EOF
-
----
-*报告生成时间: $(date)*
-*GitHub Actions Run ID: ${GITHUB_RUN_ID}*
-EOF
+        echo "---" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "*报告生成时间: $(date)*" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "*GitHub Actions Run ID: $GITHUB_RUN_ID*" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
         echo "✅ 详细报告生成完成"
 
