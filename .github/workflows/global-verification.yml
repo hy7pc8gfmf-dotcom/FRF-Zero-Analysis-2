@@ -58,9 +58,6 @@ jobs:
           python3-pip \
           jq
         
-        # 安装Coq相关工具
-        pip3 install coq-verifier
-        
         echo "✅ 系统依赖安装完成"
 
     - name: 🔄 初始化OPAM环境（完整版）
@@ -70,7 +67,6 @@ jobs:
         opam init --disable-sandboxing -y --compiler=4.14.0
         eval $(opam env)
         opam repo add coq-released https://coq.inria.fr/opam/released
-        opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
         opam update
         
         echo "✅ OPAM环境初始化完成"
@@ -82,7 +78,7 @@ jobs:
       timeout-minutes: 35
       run: |
         eval $(opam env)
-        echo "安装Coq $COQ_VERSION 完整套件..."
+        echo "安装Coq 8.18.0 完整套件..."
         
         # 安装Coq核心
         opam install -y --no-depexts coq.8.18.0
@@ -90,10 +86,7 @@ jobs:
         # 安装常用库
         opam install -y --no-depexts \
           coq-stdlib \
-          coq-mathcomp-ssreflect=1.17.0 \
-          coq-mathcomp-algebra \
-          coq-mathcomp-field \
-          coq-mathcomp-fingroup
+          coq-mathcomp-ssreflect=1.17.0
         
         echo "验证Coq安装..."
         if coqc --version | grep -q "8.18.0"; then
@@ -106,26 +99,6 @@ jobs:
         
         echo "安装库版本:"
         opam list --installed --short | grep -E "coq|mathcomp"
-
-    - name: 🧮 可选：安装Mathlib（如果存在依赖）
-      timeout-minutes: 20
-      continue-on-error: true
-      run: |
-        eval $(opam env)
-        echo "尝试安装Mathlib..."
-        
-        # 检查是否需要Mathlib
-        if find . -name "*.v" -type f -exec grep -l "Require.*mathcomp\|From.*mathcomp" {} \;; then
-          echo "检测到mathcomp依赖，尝试安装..."
-          opam install -y --no-depexts coq-mathcomp-ssreflect=1.17.0
-        fi
-        
-        if find . -name "*.v" -type f -exec grep -l "Require.*Mathlib\|From.*Mathlib" {} \;; then
-          echo "检测到Mathlib依赖，尝试安装..."
-          opam install -y --no-depexts coq-mathlib
-        fi
-        
-        echo "✅ 可选库安装完成"
 
     - name: 📁 智能文件发现与准备
       id: file-discovery
@@ -194,13 +167,13 @@ jobs:
       run: |
         echo "准备Makefile兼容环境..."
         
-        # 创建基础的Makefile（如果需要）
+        # 创建基础的Makefile（如果需要）- 修复语法错误
         if [ ! -f "Makefile" ]; then
-          echo "⚠️  未找到Makefile，创建最小版本..."
-          cat > Makefile << 'EOF'
+          echo "创建最小Makefile版本..."
+          cat > Makefile << 'MAKEFILE_EOF'
 # 最小Makefile用于GitHub Actions
-COQC ?= coqc
-COQDEP ?= coqdep
+COQC := coqc
+COQDEP := coqdep
 
 # 基础路径
 SELF_CONTAINED := SelfContainedLib
@@ -236,10 +209,13 @@ clean:
 	@find . -name "*.v.d" -delete
 
 .PHONY: all clean
-EOF
+MAKEFILE_EOF
+          echo "✅ Makefile创建完成"
+        else
+          echo "✅ 已有Makefile，跳过创建"
         fi
         
-        echo "✅ 构建环境准备完成"
+        echo "构建环境准备完成"
 
     - name: 🔧 第一步：编译一级基础层（自包含库）
       timeout-minutes: 20
@@ -249,20 +225,20 @@ EOF
         echo "内存限制: 10240 MB"
         
         # 编译自包含基础库
-        declare -a BASE_FILES=(
-          "SelfContainedLib/Algebra.v"
-          "SelfContainedLib/Category.v"
-          "SelfContainedLib/Geometry.v"
-        )
+        BASE_FILES="
+          SelfContainedLib/Algebra.v
+          SelfContainedLib/Category.v
+          SelfContainedLib/Geometry.v
+        "
         
         success_count=0
         total_count=0
         
-        for file in "${BASE_FILES[@]}"; do
+        for file in $BASE_FILES; do
           if [ -f "$file" ]; then
             total_count=$((total_count + 1))
             echo ""
-            echo "编译: $(basename $file)"
+            echo "编译: $(basename "$file")"
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
@@ -301,20 +277,20 @@ EOF
         echo "=== 第二步：编译二级元理论层 ==="
         
         # 编译FRF元理论
-        declare -a FRF_FILES=(
-          "theories/FRF_MetaTheory.v"
-          "theories/ChurchZero.v"
-          "theories/ChurchNumerals.v"
-        )
+        FRF_FILES="
+          theories/FRF_MetaTheory.v
+          theories/ChurchZero.v
+          theories/ChurchNumerals.v
+        "
         
         success_count=0
         total_count=0
         
-        for file in "${FRF_FILES[@]}"; do
+        for file in $FRF_FILES; do
           if [ -f "$file" ]; then
             total_count=$((total_count + 1))
             echo ""
-            echo "编译: $(basename $file)"
+            echo "编译: $(basename "$file")"
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
@@ -358,36 +334,27 @@ EOF
         echo "=== 第三步：编译三级数学场景层 ==="
         
         # 编译数学场景
-        declare -a SCENE_FILES=(
-          "theories/CaseA_SetTheory.v"
-          "theories/CaseB_Algebra.v"
-          "theories/CaseC_TypeTheory.v"
-          "theories/CaseD_CategoryTheory.v"
-          "theories/CaseE_QuantumVacuum.v"
-        )
+        SCENE_FILES="
+          theories/CaseA_SetTheory.v
+          theories/CaseB_Algebra.v
+          theories/CaseC_TypeTheory.v
+          theories/CaseD_CategoryTheory.v
+          theories/CaseE_QuantumVacuum.v
+        "
         
         success_count=0
         total_count=0
         
-        for file in "${SCENE_FILES[@]}"; do
+        for file in $SCENE_FILES; do
           if [ -f "$file" ]; then
             total_count=$((total_count + 1))
             echo ""
-            echo "编译: $(basename $file)"
+            echo "编译: $(basename "$file")"
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
-            # 检查是否有实数依赖
-            if grep -q "Require.*Reals\|From.*Reals" "$file" 2>/dev/null; then
-              echo "  检测到实数依赖"
-              REAL_FLAG="-R $(coqc -where)/../user-contrib Coq"
-            else
-              REAL_FLAG=""
-            fi
-            
             if coqc -Q SelfContainedLib SelfContainedLib \
                     -Q theories FRF.Theories \
-                    $REAL_FLAG \
                     -m 10240 \
                     "$file"; then
               echo "  ✅ 成功"
@@ -411,69 +378,68 @@ EOF
         
         # 量子模块
         echo "--- 量子模块 ---"
-        declare -a QUANTUM_FILES=(
-          "Quantum/QFT_FRF.v"
-          "Quantum/CurvedSpacetimeQFT.v"
-        )
+        QUANTUM_FILES="
+          Quantum/QFT_FRF.v
+          Quantum/CurvedSpacetimeQFT.v
+        "
         
         # 空值系统模块
         echo "--- 空值系统模块 ---"
-        declare -a NULL_FILES=(
-          "CS_Null/FRF_CS_Null_Common.v"
-          "CS_Null/FRF_CS_Null.v"
-          "CS_Null/CxxNull.v"
-          "CS_Null/PythonNull.v"
-          "CS_Null/JavaNull.v"
-          "CS_Null/MathNull.v"
-          "CS_Null/RustNull.v"
-        )
-        
-        ALL_EXT_FILES=("${QUANTUM_FILES[@]}" "${NULL_FILES[@]}")
+        NULL_FILES="
+          CS_Null/FRF_CS_Null_Common.v
+          CS_Null/FRF_CS_Null.v
+          CS_Null/CxxNull.v
+          CS_Null/PythonNull.v
+          CS_Null/JavaNull.v
+          CS_Null/MathNull.v
+          CS_Null/RustNull.v
+        "
         
         success_count=0
         total_count=0
         
-        for file in "${ALL_EXT_FILES[@]}"; do
+        # 编译量子模块
+        for file in $QUANTUM_FILES; do
           if [ -f "$file" ]; then
             total_count=$((total_count + 1))
             echo ""
-            echo "编译: $(basename $file)"
+            echo "编译: $(basename "$file")"
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
-            # 确定模块类型和参数
-            if [[ "$file" == Quantum/* ]]; then
-              MODULE_PATH="-Q Quantum Quantum"
-            elif [[ "$file" == CS_Null/* ]]; then
-              MODULE_PATH="-Q CS_Null CS_Null"
+            if coqc -Q SelfContainedLib SelfContainedLib \
+                    -Q theories FRF.Theories \
+                    -Q Quantum Quantum \
+                    -m 10240 \
+                    "$file"; then
+              echo "  ✅ 成功"
+              success_count=$((success_count + 1))
             else
-              MODULE_PATH=""
+              echo "  ❌ 失败"
             fi
+          else
+            echo "⚠️  文件不存在: $file"
+          fi
+        done
+        
+        # 编译空值系统模块
+        for file in $NULL_FILES; do
+          if [ -f "$file" ]; then
+            total_count=$((total_count + 1))
+            echo ""
+            echo "编译: $(basename "$file")"
+            lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+            echo "  行数: $lines"
             
-            if [ $lines -gt 1500 ]; then
-              echo "  较大文件，使用增强编译"
-              if coqc -Q SelfContainedLib SelfContainedLib \
-                      -Q theories FRF.Theories \
-                      $MODULE_PATH \
-                      -m 10240 \
-                      -async-proofs on \
-                      "$file"; then
-                echo "  ✅ 成功"
-                success_count=$((success_count + 1))
-              else
-                echo "  ❌ 失败"
-              fi
+            if coqc -Q SelfContainedLib SelfContainedLib \
+                    -Q theories FRF.Theories \
+                    -Q CS_Null CS_Null \
+                    -m 10240 \
+                    "$file"; then
+              echo "  ✅ 成功"
+              success_count=$((success_count + 1))
             else
-              if coqc -Q SelfContainedLib SelfContainedLib \
-                      -Q theories FRF.Theories \
-                      $MODULE_PATH \
-                      -m 10240 \
-                      "$file"; then
-                echo "  ✅ 成功"
-                success_count=$((success_count + 1))
-              else
-                echo "  ❌ 失败"
-              fi
+              echo "  ❌ 失败"
             fi
           else
             echo "⚠️  文件不存在: $file"
@@ -490,18 +456,18 @@ EOF
         echo "=== 第五步：编译五级集成模块层 ==="
         
         # 集成模块
-        declare -a INTEGRATION_FILES=(
-          "theories/FRF_Comparative.v"
-        )
+        INTEGRATION_FILES="
+          theories/FRF_Comparative.v
+        "
         
         success_count=0
         total_count=0
         
-        for file in "${INTEGRATION_FILES[@]}"; do
+        for file in $INTEGRATION_FILES; do
           if [ -f "$file" ]; then
             total_count=$((total_count + 1))
             echo ""
-            echo "编译: $(basename $file)"
+            echo "编译: $(basename "$file")"
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
@@ -549,22 +515,22 @@ EOF
         echo "=== 第六步：编译六级测试套件层 ==="
         
         # 测试模块
-        declare -a TEST_FILES=(
-          "Test/Test_Basic.v"
-          "Test/Test_FRF_MetaTheory.v"
-          "Test/Test_QuantumVacuum.v"
-          "Test/Test_BlockchainSystem.v"
-          "Test/SelfContainedVerification.v"
-        )
+        TEST_FILES="
+          Test/Test_Basic.v
+          Test/Test_FRF_MetaTheory.v
+          Test/Test_QuantumVacuum.v
+          Test/Test_BlockchainSystem.v
+          Test/SelfContainedVerification.v
+        "
         
         success_count=0
         total_count=0
         
-        for file in "${TEST_FILES[@]}"; do
+        for file in $TEST_FILES; do
           if [ -f "$file" ]; then
             total_count=$((total_count + 1))
             echo ""
-            echo "编译: $(basename $file)"
+            echo "编译: $(basename "$file")"
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
@@ -714,20 +680,22 @@ EOF
         # 检查核心模块
         echo ""
         echo "🔍 核心模块验证:"
-        declare -a CORE_MODULES=(
-          "SelfContainedLib/Algebra.vo"
-          "SelfContainedLib/Category.vo"
-          "SelfContainedLib/Geometry.vo"
-          "theories/FRF_MetaTheory.vo"
-          "theories/ChurchNumerals.vo"
-          "theories/ChurchZero.vo"
-          "CS_Null/FRF_CS_Null_Common.vo"
-          "theories/FRF_Comparative.vo"
-          "Test/Test_Basic.vo"
-        )
+        CORE_MODULES="
+          SelfContainedLib/Algebra.vo
+          SelfContainedLib/Category.vo
+          SelfContainedLib/Geometry.vo
+          theories/FRF_MetaTheory.vo
+          theories/ChurchNumerals.vo
+          theories/ChurchZero.vo
+          CS_Null/FRF_CS_Null_Common.vo
+          theories/FRF_Comparative.vo
+          Test/Test_Basic.vo
+        "
         
         core_success=0
-        for module in "${CORE_MODULES[@]}"; do
+        core_total=0
+        for module in $CORE_MODULES; do
+          core_total=$((core_total + 1))
           if [ -f "$module" ]; then
             echo "  ✅ $module"
             core_success=$((core_success + 1))
@@ -737,16 +705,16 @@ EOF
         done
         
         echo ""
-        echo "核心模块通过率: $core_success/${#CORE_MODULES[@]}"
+        echo "核心模块通过率: $core_success/$core_total"
         
         # 生成验证报告
         mkdir -p verification-reports
         
-        cat > verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
+        cat > verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概述
-EOF
+REPORT_EOF
         
         echo "- **验证时间**: $(date)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
         echo "- **运行环境**: GitHub Actions (Ubuntu 22.04)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
@@ -754,10 +722,10 @@ EOF
         echo "- **内存限制**: 10240 MB" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
         echo "- **并行任务**: 4" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
         
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
+        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
 
 ## 编译统计
-EOF
+REPORT_EOF
         
         echo "- 总.v文件数: $TOTAL_V_FILES" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
         echo "- 成功编译文件数: $TOTAL_VO_FILES" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
@@ -768,23 +736,23 @@ EOF
           echo "- 编译成功率: 0% (没有.v文件)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
         fi
         
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
+        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
 
 ## 核心模块状态
-EOF
+REPORT_EOF
         
-        for module in "${CORE_MODULES[@]}"; do
+        for module in $CORE_MODULES; do
           if [ -f "$module" ]; then
-            echo "- ✅ $(basename $module)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+            echo "- ✅ $(basename "$module")" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
           else
-            echo "- ❌ $(basename $module) (缺失)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+            echo "- ❌ $(basename "$module") (缺失)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
           fi
         done
         
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
+        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
 
 ## 详细文件列表
-EOF
+REPORT_EOF
         
         find . -name "*.vo" -type f | while read vo_file; do
           size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
@@ -799,19 +767,7 @@ EOF
         name: frf-2.0-full-verification-reports
         path: |
           verification-reports/
-          *.vo
-          *.glob
         retention-days: 30
-
-    - name: 🧹 清理临时文件（可选）
-      if: always()
-      run: |
-        echo "清理临时文件..."
-        # 保留.vo文件，只清理其他临时文件
-        find . -name "*.aux" -delete
-        find . -name "*.cache" -delete
-        find . -name "*.v.d" -delete
-        echo "✅ 清理完成"
 
     - name: 🎉 全量验证成功通知
       if: success()
