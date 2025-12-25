@@ -340,7 +340,7 @@ jobs:
           ls -la SelfContainedLib/*.vo SelfContainedLib/*.glob 2>/dev/null || echo "无生成文件"
 
   compile-phase-2:
-    name: 🧠 阶段2: 元理论层编译
+
     needs: compile-phase-1
     runs-on: ubuntu-22.04
     timeout-minutes: 45
