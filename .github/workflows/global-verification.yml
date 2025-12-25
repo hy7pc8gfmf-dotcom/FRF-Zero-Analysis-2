@@ -1361,89 +1361,6 @@ jobs:
             build-logs/
           retention-days: 7
 
-  full-verification-report:
-    name: 📋 全量验证报告生成
-    needs: [compile-phase-1, compile-phase-2, compile-phase-3, compile-phase-4, compile-phase-5, compile-phase-6]
-    if: always()
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 📥 收集编译结果
-        run: |
-          echo "=== 收集各阶段编译结果 ==="
-          
-          # 创建报告目录
-          mkdir -p verification-report
-          mkdir -p compilation-artifacts
-          
-          # 下载各阶段编译结果
-          for phase in 1 2 3 4 5 6; do
-            echo "下载阶段 $phase 结果..."
-            mkdir -p "compilation-artifacts/phase-$phase"
-            
-            # 尝试下载artifact
-            if curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-                   -H "Accept: application/vnd.github.v3+json" \
-                   "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" 2>/dev/null | \
-                   grep -q "phase-$phase-compiled"; then
-              echo "  阶段 $phase 结果可用"
-            else
-              echo "  阶段 $phase 结果不可用"
-            fi
-          done
-
-      - name: 📥 恢复最后阶段结果
-        uses: actions/download-artifact@v3
-        with:
-          name: phase-6-compiled
-          path: compilation-artifacts/final
-        continue-on-error: true
-
-      - name: 📊 生成验证报告
-        run: |
-          echo "生成全量验证报告..."
-          
-          # 统计编译结果
-          TOTAL_FILES=0
-          COMPILED_FILES=0
-          HUGE_FILES=0
-          HUGE_COMPILED=0
-          
-          # 扫描所有.v文件
-          for dir in SelfContainedLib theories Quantum CS_Null Test; do
-            if [ -d "$dir" ]; then
-              for file in $(find "$dir" -name "*.v" 2>/dev/null); do
-                TOTAL_FILES=$((TOTAL_FILES + 1))
-                base=$(basename "$file" .v)
-                vo_file="${file%.v}.vo"
-                
-                if [ -f "$vo_file" ]; then
-                  COMPILED_FILES=$((COMPILED_FILES + 1))
-                  
-                  # 检查是否是大文件
-                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                  if [ "$lines" -gt 3000 ]; then
-                    HUGE_FILES=$((HUGE_FILES + 1))
-                    HUGE_COMPILED=$((HUGE_COMPILED + 1))
-                  fi
-                else
-                  # 检查是否是大文件
-                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                  if [ "$lines" -gt 3000 ]; then
-                    HUGE_FILES=$((HUGE_FILES + 1))
-                  fi
-                fi
-              done
-            fi
-          done
-          
-          # 计算成功率
-          SUCCESS_RATE=0
-          if [ "$TOTAL_FILES" -gt 0 ]; then
-            SUCCESS_RATE=$((COMPILED_FILES * 100 / TOTAL_FILES))
-          fi
-          
-          # 生成Markdown报告
-          cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
       - name: 📊 生成验证报告
         run: |
           echo "生成全量验证报告..."
@@ -1493,6 +1410,8 @@ jobs:
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概览
+EOF
+
           # 写入动态数据
           echo "- **验证时间**: $(date)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **环境**: Ubuntu 22.04" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
