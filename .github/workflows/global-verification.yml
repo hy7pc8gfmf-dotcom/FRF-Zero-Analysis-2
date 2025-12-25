@@ -1407,21 +1407,3 @@ jobs:
           
           # 生成Markdown报告
           cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
-# FRF 2.0 全量形式化验证报告
-## 环境信息
-- **系统**:Ubuntu 22.04
-- **CPU核心**:${{ env.CORE_COUNT }}
-- **内存**: ${{ env.AVAIL_MEM }}MB 可用，${{ env.COQ_MEMORY }}MB 分配
-- **Coq版本**: 8.18.0
-- **mathcomp版本**: 完整安装
-- **验证时间**: $(date '+%Y-%m-%d %H:%M:%S')
-
-## 性能统计
-- **编译阶段**: 6个阶段
-- **总超时时间**: 约240分钟
-- **大文件处理**: $HUGE_COMPILED/$HUGE_FILES 个大文件编译成功
-- **并行编译**: ${{ env.PARALLEL_JOBS }} 个并行任务
-
----
-*报告生成时间: $(date)*
-*验证流水线: ${{ github.run_id }}*
