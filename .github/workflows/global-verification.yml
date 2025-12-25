@@ -1025,7 +1025,6 @@ jobs:
               find "../compile-phase-$phase" -name "*.vo" -o -name "*.glob" 2>/dev/null | head -20 | while read -r file; do
                 cp "$file" "compilation-artifacts/phase-$phase/" 2>/dev/null || true
               done
-            fi
       - name: 📊 生成验证报告
         run: |
           echo "生成全量验证报告..."
