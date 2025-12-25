@@ -1467,41 +1467,7 @@ jobs:
           
           # 开始生成报告
           cat > "$REPORT_FILE" << EOF
-# FRF 2.0 全量形式化验证报告
 
-## 验证概览
-'EOF'
-
-          # 写入动态数据
-          echo "- **验证时间**: $(date)" >> "$REPORT_FILE"
-          echo "- **环境**: Ubuntu 22.04" >> "$REPORT_FILE"
-          echo "- **总文件数**: $TOTAL_FILES" >> "$REPORT_FILE"
-          echo "- **编译成功**: $COMPILED_FILES" >> "$REPORT_FILE"
-          echo "- **编译成功率**: ${SUCCESS_RATE}%" >> "$REPORT_FILE"
-          echo "- **大文件(>3000行)**: $HUGE_FILES" >> "$REPORT_FILE"
-          echo "- **大文件编译成功**: $HUGE_COMPILED" >> "$REPORT_FILE"
-          
-          # 继续生成报告...
-          # [中间部分保持不变，直到1413行]
-          
-          # 在1413行及之后，使用已经获取的环境变量
-          cat >> "$REPORT_FILE" << EOF
-
-## 环境信息
-- **系统**: Ubuntu 22.04
-- **CPU核心**: $CORE_COUNT
-- **内存**: ${AVAIL_MEM}MB 可用，${COQ_MEMORY}MB 分配
-- **Coq版本**: 8.18.0
-- **mathcomp版本**: 完整安装
-- **验证时间**: $(date '+%Y-%m-%d %H:%M:%S')
-
-## 性能统计
-- **编译阶段**: 6个阶段
-- **总超时时间**: 约240分钟
-- **大文件处理**: ${HUGE_COMPILED}/${HUGE_FILES} 个大文件编译成功
-- **并行编译**: ${PARALLEL_JOBS} 个并行任务
-
----
 *报告生成时间: $(date)*
 *验证流水线: ${GITHUB_RUN_ID}*
 EOF
