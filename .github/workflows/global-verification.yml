@@ -431,17 +431,17 @@ jobs:
 # FRF 2.0 形式化验证报告
 
 ## 验证概览
-- **验证时间**: $(date)
-- **触发事件**: ${{ github.event_name }}
-- **触发分支**: ${{ github.ref }}
-- **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
+  **验证时间**: $(date)
+  **触发事件**: ${{ github.event_name }}
+  **触发分支**: ${{ github.ref }}
+  **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
 
 ## 构建环境
-- **系统**: Ubuntu 22.04
-- **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
-- **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
-- **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
-- **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
+  **系统**: Ubuntu 22.04
+  **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
+  **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
+  **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
+  **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
 
 ## 模块编译状态
 END_OF_REPORT
