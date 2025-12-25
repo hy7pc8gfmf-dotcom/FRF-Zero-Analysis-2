@@ -1026,7 +1026,6 @@ jobs:
                 cp "$file" "compilation-artifacts/phase-$phase/" 2>/dev/null || true
               done
             fi
-          done
       - name: 📊 生成验证报告
         run: |
           echo "生成全量验证报告..."
