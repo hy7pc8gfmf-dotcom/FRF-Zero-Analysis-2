@@ -441,7 +441,7 @@ jobs:
           wc -l theories/*.v 2>/dev/null | tail -1 || echo "0"
 
   compile-phase-3:
-    name: 🎯 阶段3: 数学场景层编译
+
     needs: compile-phase-2
     runs-on: ubuntu-22.04
     timeout-minutes: 40
