@@ -232,8 +232,8 @@ jobs:
         coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Category.v &
         PID2=$!
         
-        echo "3. 编译Geometry.v（大文件，特殊参数）..."
-        coqc -Q SelfContainedLib SelfContainedLib -m 8192 -async-proofs on SelfContainedLib/Geometry.v &
+        echo "3. 编译Geometry.v（大文件）..."
+        coqc -Q SelfContainedLib SelfContainedLib SelfContainedLib/Geometry.v &
         PID3=$!
         
         # 等待所有编译完成
