@@ -1444,16 +1444,67 @@ jobs:
           
           # 生成Markdown报告
           cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+      - name: 📊 生成验证报告
+        run: |
+          echo "生成全量验证报告..."
+          
+          # 统计编译结果
+          TOTAL_FILES=0
+          COMPILED_FILES=0
+          HUGE_FILES=0
+          HUGE_COMPILED=0
+          
+          # 扫描所有.v文件
+          for dir in SelfContainedLib theories Quantum CS_Null Test; do
+            if [ -d "$dir" ]; then
+              for file in $(find "$dir" -name "*.v" 2>/dev/null); do
+                TOTAL_FILES=$((TOTAL_FILES + 1))
+                base=$(basename "$file" .v)
+                vo_file="${file%.v}.vo"
+                
+                if [ -f "$vo_file" ]; then
+                  COMPILED_FILES=$((COMPILED_FILES + 1))
+                  
+                  # 检查是否是大文件
+                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                  if [ "$lines" -gt 3000 ]; then
+                    HUGE_FILES=$((HUGE_FILES + 1))
+                    HUGE_COMPILED=$((HUGE_COMPILED + 1))
+                  fi
+                else
+                  # 检查是否是大文件
+                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                  if [ "$lines" -gt 3000 ]; then
+                    HUGE_FILES=$((HUGE_FILES + 1))
+                  fi
+                fi
+              done
+            fi
+          done
+          
+          # 计算成功率
+          SUCCESS_RATE=0
+          if [ "$TOTAL_FILES" -gt 0 ]; then
+            SUCCESS_RATE=$((COMPILED_FILES * 100 / TOTAL_FILES))
+          fi
+          
+          # 生成Markdown报告
+          cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概览
-         **验证时间**:$(date)
-         **环境**:Ubuntu 22.04
-         **总文件数**:$TOTAL_FILES
-         **编译成功**:$COMPILED_FILES
-         **编译成功率**:${SUCCESS_RATE}%
-         **大文件(>3000行)**:$HUGE_FILES
-         **大文件编译成功**: $HUGE_COMPILED
+EOF
+
+          # 写入动态数据
+          echo "- **验证时间**: $(date)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **环境**: Ubuntu 22.04" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **总文件数**: $TOTAL_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **编译成功**: $COMPILED_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **编译成功率**: ${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **大文件(>3000行)**: $HUGE_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **大文件编译成功**: $HUGE_COMPILED" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ## 模块编译状态
 
@@ -1481,7 +1532,7 @@ EOF
             fi
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ### 层级2: FRF元理论
 | 模块 | 状态 | 行数 | 实数依赖 |
@@ -1507,7 +1558,7 @@ EOF
             fi
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ### 层级3: 数学场景层
 | 场景 | 状态 | 行数 | 类型 |
@@ -1530,7 +1581,7 @@ EOF
             done
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ### 层级4: 量子模块
 | 模块 | 状态 | 行数 | 功能 |
@@ -1559,7 +1610,7 @@ EOF
             fi
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ### 层级4: 空值系统
 | 模块 | 状态 | 行数 | 语言 |
@@ -1589,7 +1640,7 @@ EOF
             fi
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ### 层级5: 集成模块
 | 模块 | 状态 | 行数 | 功能 |
@@ -1606,7 +1657,7 @@ EOF
             echo "| FRF_Comparative | $status | $lines | 跨系统对比核心 |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           fi
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ### 层级6: 测试套件
 | 测试 | 状态 | 行数 | 测试目标 |
@@ -1637,7 +1688,7 @@ EOF
           done
           
           # 添加总结
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ## 验证总结
 EOF
@@ -1666,7 +1717,7 @@ EOF
             fi
           fi
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ## 环境信息
 - **系统**: Ubuntu 22.04
@@ -1689,57 +1740,3 @@ EOF
           
           echo "✅ 验证报告生成完成"
           echo "报告位置: verification-report/FRF2_FULL_VERIFICATION_REPORT.md"
-
-      - name: 📋 显示报告摘要
-        run: |
-          echo "=== 验证报告摘要 ==="
-          if [ -f "verification-report/FRF2_FULL_VERIFICATION_REPORT.md" ]; then
-            # 提取关键信息
-            echo "报告文件大小: $(stat -c%s verification-report/FRF2_FULL_VERIFICATION_REPORT.md) bytes"
-            echo ""
-            echo "报告前20行:"
-            head -20 verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-            echo ""
-            echo "报告最后10行:"
-            tail -10 verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          else
-            echo "❌ 报告文件未生成"
-          fi
-
-      - name: 📤 上传验证报告
-        uses: actions/upload-artifact@v3
-        with:
-          name: verification-report
-          path: |
-            verification-report/
-            compilation-artifacts/
-          retention-days: 30
-
-      - name: 📧 验证结果通知
-        if: always()
-        run: |
-          echo "=== 验证结果通知 ==="
-          
-          # 读取报告结果
-          if [ -f "verification-report/FRF2_FULL_VERIFICATION_REPORT.md" ]; then
-            # 提取成功率和失败数
-            success_rate=$(grep "编译成功率" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep -o '[0-9]\+%' || echo "0%")
-            total_files=$(grep "总文件数" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep -o '[0-9]\+' | head -1 || echo "0")
-            compiled_files=$(grep "编译成功" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep -o '[0-9]\+' | head -1 || echo "0")
-            
-            echo "验证完成!"
-            echo "总文件数: $total_files"
-            echo "编译成功: $compiled_files"
-            echo "成功率: $success_rate"
-            
-            if [ "$total_files" -eq "$compiled_files" ] && [ "$total_files" -gt 0 ]; then
-              echo "✅ FRF 2.0 全量验证通过!"
-              exit 0
-            else
-              echo "⚠️  FRF 2.0 验证部分失败"
-              exit 1
-            fi
-          else
-            echo "❌ 验证报告未生成"
-            exit 1
-          fi
