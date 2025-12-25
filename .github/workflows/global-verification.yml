@@ -426,8 +426,8 @@ jobs:
           # 创建报告目录
           mkdir -p verification-report
           
-          # 生成Markdown报告 - 使用不同的heredoc标记避免YAML解析问题
-          cat > verification-report/FRF2_VERIFICATION_REPORT.md << "EOF_REPORT"
+          # 生成Markdown报告
+          cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
 # FRF 2.0 形式化验证报告
 
 ## 验证概览
@@ -444,7 +444,7 @@ jobs:
 - **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
 
 ## 模块编译状态
-EOF_REPORT
+EOF
           
           # 检查各个目录的编译状态
           for dir in SelfContainedLib theories Quantum CS_Null Test; do
@@ -469,7 +469,7 @@ EOF_REPORT
           done
           
           # 添加总结
-          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << "EOF_SUMMARY"
+          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
 
 ## 验证总结
 
@@ -496,7 +496,7 @@ EOF_REPORT
 
 ---
 *报告由FRF 2.0自动验证系统生成*
-EOF_SUMMARY
+EOF
           
           echo "✅ 验证报告生成完成"
           
