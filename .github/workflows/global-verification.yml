@@ -1084,13 +1084,13 @@ jobs:
           echo "- **编译成功**:$COMPILED_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **编译成功率**:${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **大文件(>3000行)**:$HUGE_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **大文件编译成功**: $HUGE_COMPILED" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **大文件编译成功**:$HUGE_COMPILED" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           
           cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 
 ## 模块编译状态
 
-### 层级1: 自包含基础库
+### 层级1:自包含基础库
 | 模块 | 状态 | 行数 | 实数依赖 |
 |------|------|------|----------|
           EOF
