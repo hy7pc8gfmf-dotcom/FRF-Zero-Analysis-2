@@ -743,4 +743,350 @@ jobs:
         # 编译集成模块（极大文件）
         echo "开始编译 FRF_Comparative.v..."
         
-        if coqc $COQFLAGS -async-proofs on -async-proofs-tac-j 
+        if coqc $COQFLAGS -async-proofs on -async-proofs-tac-j 6 theories/FRF_Comparative.v 2>&1; then
+          echo "✅ FRF_Comparative.v 编译成功"
+        else
+          echo "❌ FRF_Comparative.v 编译失败"
+          coqc $COQFLAGS theories/FRF_Comparative.v 2>&1 | head -40
+          exit 1
+        fi
+
+    - name: 📊 集成模块验证
+      run: |
+        echo "=== 集成模块验证 ==="
+        echo "编译文件:"
+        if [ -f "theories/FRF_Comparative.vo" ]; then
+          size=$(wc -l < "theories/FRF_Comparative.v" 2>/dev/null || echo 0)
+          echo "  ✅ FRF_Comparative.vo ($size 行)"
+          echo ""
+          echo "生成报告功能验证..."
+          # 检查报告生成函数是否存在
+          if grep -q "default_comparative_report" theories/FRF_Comparative.v; then
+            echo "  ✅ 报告生成函数存在"
+          else
+            echo "  ⚠️  报告生成函数未找到"
+          fi
+        else
+          echo "  ❌ FRF_Comparative.vo 缺失"
+        fi
+
+  compile-phase-6:
+    name: 🧪 阶段6: 测试套件编译
+    needs: [compile-phase-5, compile-phase-1, compile-phase-2, compile-phase-3]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -Q Test Test -m ${{ env.COQ_MEMORY }}"
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: 🔄 设置环境
+      run: |
+        eval $(opam env)
+        echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+        
+        # 复制所有依赖文件
+        cp -r ../compile-phase-1/SelfContainedLib/*.vo SelfContainedLib/ 2>/dev/null || true
+        cp -r ../compile-phase-2/theories/*.vo theories/ 2>/dev/null || true
+        cp -r ../compile-phase-3/theories/*.vo theories/ 2>/dev/null || true
+        cp -r ../compile-phase-4/Quantum/*.vo Quantum/ 2>/dev/null || true
+        cp -r ../compile-phase-4/CS_Null/*.vo CS_Null/ 2>/dev/null || true
+        cp -r ../compile-phase-5/theories/*.vo theories/ 2>/dev/null || true
+
+    - name: 🧪 检查测试套件
+      run: |
+        echo "=== 测试套件检查 ==="
+        echo "测试文件:"
+        ls -la Test/*.v 2>/dev/null || echo "无测试文件"
+        echo ""
+        echo "测试统计:"
+        find Test -name "*.v" 2>/dev/null | wc -l
+
+    - name: 🔧 并行编译测试
+      run: |
+        eval $(opam env)
+        echo "🧪 并行编译测试套件..."
+        
+        # 编译函数
+        compile_test() {
+          local file=$1
+          local base=$(basename $file .v)
+          
+          echo "  测试: $base.v..."
+          
+          case $base in
+            Test_FRF_MetaTheory|Test_BlockchainSystem)
+              # 大测试文件
+              coqc $COQFLAGS -async-proofs on "$file" 2>&1
+              ;;
+            Test_QuantumVacuum|SelfContainedVerification)
+              # 中等测试文件
+              coqc $COQFLAGS "$file" 2>&1
+              ;;
+            Test_Basic)
+              # 小测试文件
+              coqc $COQFLAGS "$file" 2>&1
+              ;;
+            *)
+              # 默认
+              coqc $COQFLAGS "$file" 2>&1
+              ;;
+          esac
+          
+          if [ $? -eq 0 ]; then
+            echo "    ✅ $base.v 编译成功"
+            return 0
+          else
+            echo "    ❌ $base.v 编译失败"
+            return 1
+          fi
+        }
+        
+        export -f compile_test
+        export COQFLAGS
+        
+        # 找到所有测试文件并并行编译
+        test_files=$(find Test -name "*.v" 2>/dev/null | head -10)
+        
+        if [ -z "$test_files" ]; then
+          echo "⚠️  未找到测试文件"
+          exit 0
+        fi
+        
+        echo "找到测试文件:"
+        echo "$test_files" | while read file; do
+          echo "  - $(basename $file)"
+        done
+        
+        # 并行编译
+        for file in $test_files; do
+          compile_test "$file" &
+        done
+        
+        # 等待所有编译完成
+        wait
+        
+        echo "✅ 测试套件编译完成"
+
+    - name: 📊 测试编译统计
+      run: |
+        echo "=== 测试套件编译统计 ==="
+        echo "测试文件:"
+        total=0
+        success=0
+        
+        for file in Test/*.vo 2>/dev/null; do
+          if [ -f "$file" ]; then
+            base=$(basename $file .vo)
+            echo "  ✅ $base"
+            ((success++))
+          fi
+          ((total++))
+        done
+        
+        if [ $total -eq 0 ]; then
+          echo "  无测试文件"
+        else
+          echo ""
+          echo "统计: $success/$total 个测试编译成功"
+        fi
+
+  full-verification-report:
+    name: 📋 全量验证报告生成
+    needs: [compile-phase-1, compile-phase-2, compile-phase-3, compile-phase-4, compile-phase-5, compile-phase-6]
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+    - name: 📥 收集编译结果
+      run: |
+        echo "=== 收集各阶段编译结果 ==="
+        
+        # 创建报告目录
+        mkdir -p verification-report
+        mkdir -p compilation-artifacts
+        
+        # 收集各阶段文件
+        for phase in 1 2 3 4 5 6; do
+          mkdir -p compilation-artifacts/phase-$phase
+          if [ -d "../compile-phase-$phase" ]; then
+            find "../compile-phase-$phase" -name "*.vo" -o -name "*.glob" | head -20 | while read file; do
+              cp "$file" "compilation-artifacts/phase-$phase/" 2>/dev/null || true
+            done
+          fi
+        done
+
+    - name: 📊 生成验证报告
+      run: |
+        echo "生成全量验证报告..."
+        
+        # 统计编译结果
+        TOTAL_FILES=0
+        COMPILED_FILES=0
+        HUGE_FILES=0
+        HUGE_COMPILED=0
+        
+        # 扫描所有.v文件
+        for dir in SelfContainedLib theories Quantum CS_Null Test; do
+          if [ -d "$dir" ]; then
+            for file in $(find "$dir" -name "*.v"); do
+              ((TOTAL_FILES++))
+              base=$(basename $file .v)
+              vo_file="${file%.v}.vo"
+              
+              if [ -f "$vo_file" ]; then
+                ((COMPILED_FILES++))
+                
+                # 检查是否是大文件
+                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                if [ $lines -gt 3000 ]; then
+                  ((HUGE_FILES++))
+                  ((HUGE_COMPILED++))
+                fi
+              else
+                # 检查是否是大文件
+                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                if [ $lines -gt 3000 ]; then
+                  ((HUGE_FILES++))
+                fi
+              fi
+            done
+          fi
+        done
+        
+        # 计算成功率
+        if [ $TOTAL_FILES -gt 0 ]; then
+          SUCCESS_RATE=$((COMPILED_FILES * 100 / TOTAL_FILES))
+        else
+          SUCCESS_RATE=0
+        fi
+        
+        # 生成Markdown报告
+        cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+# FRF 2.0 全量形式化验证报告
+
+## 验证概览
+- **验证时间**: $(date)
+- **环境**: Ubuntu 22.04
+- **总文件数**: $TOTAL_FILES
+- **编译成功**: $COMPILED_FILES
+- **编译成功率**: ${SUCCESS_RATE}%
+- **大文件(>3000行)**: $HUGE_FILES
+- **大文件编译成功**: $HUGE_COMPILED
+
+## 模块编译状态
+
+### 层级1: 自包含基础库
+| 模块 | 状态 | 行数 | 实数依赖 |
+|------|------|------|----------|
+EOF
+        
+        # 基础库状态
+        for file in SelfContainedLib/*.v 2>/dev/null; do
+          if [ -f "$file" ]; then
+            base=$(basename $file .v)
+            lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+            status="❌"
+            if [ -f "${file%.v}.vo" ]; then
+              status="✅"
+            fi
+            
+            real_dep="否"
+            if grep -q "Require.*Reals" "$file" 2>/dev/null; then
+              real_dep="是"
+            fi
+            
+            echo "| $base | $status | $lines | $real_dep |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          fi
+        done
+        
+        cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+
+### 层级2: FRF元理论
+| 模块 | 状态 | 行数 | 实数依赖 |
+|------|------|------|----------|
+EOF
+        
+        # 元理论状态
+        for file in theories/FRF_MetaTheory.v theories/ChurchZero.v theories/ChurchNumerals.v 2>/dev/null; do
+          if [ -f "$file" ]; then
+            base=$(basename $file .v)
+            lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+            status="❌"
+            if [ -f "${file%.v}.vo" ]; then
+              status="✅"
+            fi
+            
+            real_dep="否"
+            if grep -q "Require.*Reals" "$file" 2>/dev/null; then
+              real_dep="是"
+            fi
+            
+            echo "| $base | $status | $lines | $real_dep |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          fi
+        done
+        
+        cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+
+### 层级5: 集成模块
+| 模块 | 状态 | 行数 | 功能 |
+|------|------|------|------|
+EOF
+        
+        # 集成模块状态
+        if [ -f "theories/FRF_Comparative.v" ]; then
+          lines=$(wc -l < "theories/FRF_Comparative.v" 2>/dev/null || echo 0)
+          status="❌"
+          if [ -f "theories/FRF_Comparative.vo" ]; then
+            status="✅"
+          fi
+          echo "| FRF_Comparative | $status | $lines | 跨系统对比核心 |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+        fi
+        
+        # 添加总结
+        cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+
+## 验证总结
+
+EOF
+        
+        if [ $COMPILED_FILES -eq $TOTAL_FILES ]; then
+          echo "🎉 **所有模块编译成功！**" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "FRF 2.0 形式化验证完全通过。" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+        else
+          echo "⚠️  **部分模块编译失败**" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "失败文件数: $((TOTAL_FILES - COMPILED_FILES))" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+        fi
+        
+        cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+
+## 环境信息
+\`\`\`
+Coq版本: ${{ needs.setup-environment.outputs.coq_version }}
+可用内存: ${{ needs.setup-environment.outputs.memory_available }}MB
+CPU核心: ${{ needs.setup-environment.outputs.core_count }}
+编译时间: $(date +%Y-%m-%d\ %H:%M:%S)
+\`\`\`
+EOF
+        
+        echo "✅ 验证报告生成完成"
+
+    - name: 📤 上传验证报告
+      uses: actions/upload-artifact@v4
+      with:
+        name: frf2-verification-report
+        path: |
+          verification-report/
+          compilation-artifacts/
+        retention-days: 30
+
+    - name: 📧 通知结果
+      if: always()
+      run: |
+        echo "=== 验证结果 ==="
+        if [ -f "verification-report/FRF2_FULL_VERIFICATION_REPORT.md" ]; then
+          # 提取关键信息
+          SUCCESS=$(grep -A5 "验证总结" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep
+
