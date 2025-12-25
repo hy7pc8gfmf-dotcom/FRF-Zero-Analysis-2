@@ -16,7 +16,7 @@ env:
 jobs:
   full-formal-verification:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120  # 全量编译需要更长时间
+    timeout-minutes: 120
     
     steps:
     - name: 📥 检出代码仓库
@@ -82,10 +82,10 @@ jobs:
       timeout-minutes: 35
       run: |
         eval $(opam env)
-        echo "安装Coq ${{ env.COQ_VERSION }} 完整套件..."
+        echo "安装Coq $COQ_VERSION 完整套件..."
         
         # 安装Coq核心
-        opam install -y --no-depexts coq.${{ env.COQ_VERSION }}
+        opam install -y --no-depexts coq.8.18.0
         
         # 安装常用库
         opam install -y --no-depexts \
@@ -96,8 +96,8 @@ jobs:
           coq-mathcomp-fingroup
         
         echo "验证Coq安装..."
-        if coqc --version | grep -q "${{ env.COQ_VERSION }}"; then
-          echo "✅ Coq ${{ env.COQ_VERSION }} 安装成功"
+        if coqc --version | grep -q "8.18.0"; then
+          echo "✅ Coq 8.18.0 安装成功"
         else
           echo "❌ Coq版本不匹配"
           coqc --version
@@ -216,7 +216,7 @@ COQFLAGS := -R $(SELF_CONTAINED) SelfContainedLib \
             -R $(CS_NULL) CS_Null \
             -R $(TEST) Test \
             -w -deprecated \
-            -m ${{ env.MEMORY_LIMIT }}
+            -m 10240
 
 # 自动发现所有.v文件
 ALL_V_FILES := $(shell find . -name "*.v" -type f)
@@ -246,7 +246,7 @@ EOF
       run: |
         eval $(opam env)
         echo "=== 第一步：编译一级基础层 ==="
-        echo "内存限制: ${{ env.MEMORY_LIMIT }} MB"
+        echo "内存限制: 10240 MB"
         
         # 编译自包含基础库
         declare -a BASE_FILES=(
@@ -266,7 +266,7 @@ EOF
             lines=$(wc -l < "$file" 2>/dev/null || echo 0)
             echo "  行数: $lines"
             
-            if coqc -Q SelfContainedLib SelfContainedLib -m ${{ env.MEMORY_LIMIT }} "$file"; then
+            if coqc -Q SelfContainedLib SelfContainedLib -m 10240 "$file"; then
               echo "  ✅ 成功"
               success_count=$((success_count + 1))
             else
@@ -323,9 +323,9 @@ EOF
               echo "  大文件，使用增强参数"
               if coqc -Q SelfContainedLib SelfContainedLib \
                       -Q theories FRF.Theories \
-                      -m ${{ env.MEMORY_LIMIT }} \
+                      -m 10240 \
                       -async-proofs on \
-                      -async-proofs-tac-j ${{ env.PARALLEL_JOBS }} \
+                      -async-proofs-tac-j 4 \
                       "$file"; then
                 echo "  ✅ 成功"
                 success_count=$((success_count + 1))
@@ -335,7 +335,7 @@ EOF
             else
               if coqc -Q SelfContainedLib SelfContainedLib \
                       -Q theories FRF.Theories \
-                      -m ${{ env.MEMORY_LIMIT }} \
+                      -m 10240 \
                       "$file"; then
                 echo "  ✅ 成功"
                 success_count=$((success_count + 1))
@@ -388,7 +388,7 @@ EOF
             if coqc -Q SelfContainedLib SelfContainedLib \
                     -Q theories FRF.Theories \
                     $REAL_FLAG \
-                    -m ${{ env.MEMORY_LIMIT }} \
+                    -m 10240 \
                     "$file"; then
               echo "  ✅ 成功"
               success_count=$((success_count + 1))
@@ -455,7 +455,7 @@ EOF
               if coqc -Q SelfContainedLib SelfContainedLib \
                       -Q theories FRF.Theories \
                       $MODULE_PATH \
-                      -m ${{ env.MEMORY_LIMIT }} \
+                      -m 10240 \
                       -async-proofs on \
                       "$file"; then
                 echo "  ✅ 成功"
@@ -467,7 +467,7 @@ EOF
               if coqc -Q SelfContainedLib SelfContainedLib \
                       -Q theories FRF.Theories \
                       $MODULE_PATH \
-                      -m ${{ env.MEMORY_LIMIT }} \
+                      -m 10240 \
                       "$file"; then
                 echo "  ✅ 成功"
                 success_count=$((success_count + 1))
@@ -512,9 +512,9 @@ EOF
                       -Q theories FRF.Theories \
                       -Q Quantum Quantum \
                       -Q CS_Null CS_Null \
-                      -m ${{ env.MEMORY_LIMIT }} \
+                      -m 10240 \
                       -async-proofs on \
-                      -async-proofs-tac-j $(( ${{ env.PARALLEL_JOBS }} * 2 )) \
+                      -async-proofs-tac-j 8 \
                       "$file"; then
                 echo "  ✅ 成功"
                 success_count=$((success_count + 1))
@@ -526,7 +526,7 @@ EOF
                       -Q theories FRF.Theories \
                       -Q Quantum Quantum \
                       -Q CS_Null CS_Null \
-                      -m ${{ env.MEMORY_LIMIT }} \
+                      -m 10240 \
                       "$file"; then
                 echo "  ✅ 成功"
                 success_count=$((success_count + 1))
@@ -573,7 +573,7 @@ EOF
                     -Q Quantum Quantum \
                     -Q CS_Null CS_Null \
                     -Q Test FRF.Test \
-                    -m ${{ env.MEMORY_LIMIT }} \
+                    -m 10240 \
                     "$file"; then
               echo "  ✅ 成功"
               success_count=$((success_count + 1))
@@ -654,7 +654,7 @@ EOF
           esac
           
           # 尝试编译
-          if coqc $MODULE_PATH -m ${{ env.MEMORY_LIMIT }} "$file" 2>/dev/null; then
+          if coqc $MODULE_PATH -m 10240 "$file" 2>/dev/null; then
             echo "  ✅ 自动编译成功"
             success_count=$((success_count + 1))
           else
@@ -690,7 +690,12 @@ EOF
         echo "📈 编译统计:"
         echo "- 总.v文件数: $TOTAL_V_FILES"
         echo "- 成功编译的.vo文件数: $TOTAL_VO_FILES"
-        echo "- 编译成功率: $((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))%"
+        if [ $TOTAL_V_FILES -gt 0 ]; then
+          SUCCESS_RATE=$((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))
+          echo "- 编译成功率: $SUCCESS_RATE%"
+        else
+          echo "- 编译成功率: 0% (没有.v文件)"
+        fi
         
         # 按目录统计
         echo ""
@@ -737,20 +742,33 @@ EOF
         # 生成验证报告
         mkdir -p verification-reports
         
-        cat > verification-reports/FULL_VERIFICATION_SUMMARY.md << EOF
+        cat > verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概述
-- **验证时间**: $(date)
-- **运行环境**: GitHub Actions (Ubuntu 22.04)
-- **Coq版本**: ${{ env.COQ_VERSION }}
-- **内存限制**: ${{ env.MEMORY_LIMIT }} MB
-- **并行任务**: ${{ env.PARALLEL_JOBS }}
+EOF
+        
+        echo "- **验证时间**: $(date)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        echo "- **运行环境**: GitHub Actions (Ubuntu 22.04)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        echo "- **Coq版本**: 8.18.0" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        echo "- **内存限制**: 10240 MB" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        echo "- **并行任务**: 4" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        
+        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
 
 ## 编译统计
-- 总.v文件数: $TOTAL_V_FILES
-- 成功编译文件数: $TOTAL_VO_FILES
-- 编译成功率: $((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))%
+EOF
+        
+        echo "- 总.v文件数: $TOTAL_V_FILES" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        echo "- 成功编译文件数: $TOTAL_VO_FILES" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        if [ $TOTAL_V_FILES -gt 0 ]; then
+          SUCCESS_RATE=$((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))
+          echo "- 编译成功率: $SUCCESS_RATE%" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        else
+          echo "- 编译成功率: 0% (没有.v文件)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
+        fi
+        
+        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
 
 ## 核心模块状态
 EOF
@@ -763,13 +781,12 @@ EOF
           fi
         done
         
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << EOF
+        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'EOF'
 
 ## 详细文件列表
 EOF
         
         find . -name "*.vo" -type f | while read vo_file; do
-          v_file="${vo_file%.vo}.v"
           size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
           echo "- 📄 $vo_file (${size} bytes)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
         done
