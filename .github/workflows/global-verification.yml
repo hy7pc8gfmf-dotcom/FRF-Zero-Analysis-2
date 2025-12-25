@@ -881,7 +881,7 @@ jobs:
           fi
 
   compile-phase-6:
-    name: 🧪 阶段6: 测试套件编译
+    name: 🧪 阶段6:测试套件编译
     needs: [compile-phase-5, compile-phase-1, compile-phase-2, compile-phase-3]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
