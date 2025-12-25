@@ -1,5 +1,4 @@
-name: FRF 2.0 智能形式化验证
-
+name: FRF 2.0 智能全量形式化验证
 on:
   push:
     branches: [main, master, develop]
@@ -9,8 +8,7 @@ on:
       - 'Quantum/**'
       - 'CS_Null/**'
       - 'Test/**'
-      - 'Makefile'
-      - '.github/workflows/**'
+      - '.github/workflows/global-verification.yml'
   pull_request:
     branches: [main, master]
     paths:
@@ -19,7 +17,6 @@ on:
       - 'Quantum/**'
       - 'CS_Null/**'
       - 'Test/**'
-      - 'Makefile'
   workflow_dispatch:
     inputs:
       verify_mode:
@@ -31,475 +28,181 @@ on:
           - full
           - quick
           - test-only
-          - core-only
+          - report-only
       parallel_jobs:
-        description: '并行任务数 (1-16)'
+        description: '并行任务数'
         required: false
         default: '4'
         type: string
-      memory_limit:
-        description: '内存限制 (MB)'
-        required: false
-        default: 'auto'
-        type: choice
-        options:
-          - auto
-          - 2048
-          - 4096
-          - 8192
-          - 16384
 
 jobs:
   setup-environment:
-    name: 🏗️ 环境配置
+    name: 🔧 环境配置与检查
     runs-on: ubuntu-22.04
     outputs:
-      coq_version: ${{ steps.detect-coq.outputs.version }}
-      core_count: ${{ steps.detect-cpu.outputs.cores }}
-      available_memory: ${{ steps.detect-memory.outputs.available_mb }}
-      parallel_jobs: ${{ steps.calc-jobs.outputs.jobs }}
+      coq_version: ${{ steps.check-coq.outputs.version }}
+      memory_available: ${{ steps.check-memory.outputs.available_mb }}
+      core_count: ${{ steps.check-cpu.outputs.core_count }}
     steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
-        
-      - name: 🖥️ 检测CPU核心
-        id: detect-cpu
-        run: |
-          CORES=$(nproc)
-          echo "cores=$CORES" >> $GITHUB_OUTPUT
-          echo "CPU核心数: $CORES"
-          
-      - name: 💾 检测内存
-        id: detect-memory
-        run: |
-          AVAIL_MEM=$(free -m | awk '/^Mem:/{print $7}')
-          echo "available_mb=$AVAIL_MEM" >> $GITHUB_OUTPUT
-          echo "可用内存: ${AVAIL_MEM}MB"
-          
-      - name: 📦 安装系统依赖
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            opam \
-            bubblewrap \
-            m4 \
-            git \
-            wget \
-            bc \
-            graphviz \
-            python3 \
-            python3-pip \
-            libgmp-dev \
-            pkg-config \
-            libssl-dev
-          echo "✅ 系统依赖安装完成"
-          
-      - name: 🔄 初始化OPAM
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          # 初始化OPAM（禁用沙盒以便在CI中使用）
-          opam init --disable-sandboxing -y --compiler=4.14.0
-          # 设置环境变量
-          eval $(opam env)
-          # 添加Coq仓库
-          opam repo add coq-released https://coq.inria.fr/opam/released
-          opam update
-          echo "✅ OPAM初始化完成"
-          
-      - name: 🐚 配置OPAM环境
-        run: |
-          echo 'eval $(opam env)' >> $HOME/.bashrc
-          echo 'export PATH="$HOME/.opam/bin:$PATH"' >> $HOME/.bashrc
-          
-      - name: 🔍 检测Coq版本
-        id: detect-coq
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env 2>/dev/null || true)
-          if command -v coqc >/dev/null 2>&1; then
-            COQ_VERSION=$(coqc --version 2>/dev/null | head -1 | grep -o 'version [0-9.]\+' | cut -d' ' -f2 || echo "unknown")
-          else
-            COQ_VERSION="not_installed"
-          fi
-          echo "version=$COQ_VERSION" >> $GITHUB_OUTPUT
-          echo "检测到Coq版本: $COQ_VERSION"
-          
-      - name: 🧮 计算并行任务数
-        id: calc-jobs
-        run: |
-          # 使用输入参数或自动计算
-          if [ -n "${{ github.event.inputs.parallel_jobs }}" ] && [ "${{ github.event.inputs.parallel_jobs }}" != "" ]; then
-            JOBS="${{ github.event.inputs.parallel_jobs }}"
-          else
-            # 根据CPU核心数计算，留出系统资源
-            CORES=${{ steps.detect-cpu.outputs.cores }}
-            JOBS=$((CORES > 4 ? CORES - 2 : CORES))
-          fi
-          echo "jobs=$JOBS" >> $GITHUB_OUTPUT
-          echo "并行任务数: $JOBS"
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        submodules: true
 
-  install-coq-dependencies:
-    name: 📚 安装Coq依赖
+    - name: 🖥️ 系统信息检查
+      id: check-cpu
+      run: |
+        echo "核心数: $(nproc)"
+        echo "core_count=$(nproc)" >> $GITHUB_OUTPUT
+        
+    - name: 💾 内存检查
+      id: check-memory
+      run: |
+        AVAIL_MEM=$(free -m | awk '/^Mem:/{print $7}')
+        echo "可用内存: ${AVAIL_MEM}MB"
+        echo "available_mb=${AVAIL_MEM}" >> $GITHUB_OUTPUT
+        
+    - name: 📦 安装系统依赖
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          opam \
+          bubblewrap \
+          g++ \
+          pkg-config \
+          m4 \
+          rsync \
+          git \
+          wget \
+          bc \
+          graphviz \
+          python3 \
+          python3-pip
+        
+        echo "✅ 系统依赖安装完成"
+
+    - name: 🔄 配置OPAM环境
+      run: |
+        opam init --disable-sandboxing -y --compiler=4.14.0
+        eval $(opam env)
+        opam repo add coq-released https://coq.inria.fr/opam/released
+        opam repo add mathlib https://github.com/leanprover-community/mathlib.git
+        opam update -y
+        echo "OPAM_HOME=$OPAM_HOME" >> $GITHUB_ENV
+        echo "OPAM_SWITCH_PREFIX=$OPAM_SWITCH_PREFIX" >> $GITHUB_ENV
+        
+    - name: 📊 配置验证环境
+      run: |
+        echo "AVAIL_MEM=${{ steps.check-memory.outputs.available_mb }}" >> $GITHUB_ENV
+        echo "CORE_COUNT=${{ steps.check-cpu.outputs.core_count }}" >> $GITHUB_ENV
+        
+        # 根据内存设置编译参数
+        if [ ${{ steps.check-memory.outputs.available_mb }} -gt 16000 ]; then
+          echo "COQ_MEMORY=16384" >> $GITHUB_ENV
+          echo "BIGFILE_MEMORY=16384" >> $GITHUB_ENV
+        elif [ ${{ steps.check-memory.outputs.available_mb }} -gt 8000 ]; then
+          echo "COQ_MEMORY=8192" >> $GITHUB_ENV
+          echo "BIGFILE_MEMORY=8192" >> $GITHUB_ENV
+        elif [ ${{ steps.check-memory.outputs.available_mb }} -gt 4000 ]; then
+          echo "COQ_MEMORY=4096" >> $GITHUB_ENV
+          echo "BIGFILE_MEMORY=4096" >> $GITHUB_ENV
+        else
+          echo "COQ_MEMORY=2048" >> $GITHUB_ENV
+          echo "BIGFILE_MEMORY=2048" >> $GITHUB_ENV
+        fi
+        
+        echo "PARALLEL_JOBS=$((${{ steps.check-cpu.outputs.core_count }} / 2))" >> $GITHUB_ENV
+
+    - name: 🔍 检查Coq版本
+      id: check-coq
+      run: |
+        eval $(opam env)
+        if command -v coqc &> /dev/null; then
+          COQ_VERSION=$(coqc --version | head -1 | grep -o 'version [0-9.]\+' | cut -d' ' -f2)
+          echo "当前Coq版本: $COQ_VERSION"
+          echo "version=$COQ_VERSION" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Coq未安装"
+          exit 1
+        fi
+
+    - name: 📋 环境报告
+      run: |
+        echo "=== 环境配置报告 ==="
+        echo "系统: Ubuntu 22.04"
+        echo "CPU核心: ${{ steps.check-cpu.outputs.core_count }}"
+        echo "可用内存: ${{ steps.check-memory.outputs.available_mb }}MB"
+        echo "分配内存: ${{ env.COQ_MEMORY }}MB"
+        echo "并行任务: ${{ env.PARALLEL_JOBS }}"
+        echo "Coq版本: ${{ steps.check-coq.outputs.version }}"
+
+  install-dependencies:
+    name: 📦 依赖安装与缓存
     needs: setup-environment
     runs-on: ubuntu-22.04
     strategy:
       matrix:
         coq-version: ['8.18.0']
+        mathcomp-version: ['1.17.0']
     steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
+    - name: 📥 恢复OPAM缓存
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.opam
+          ~/.cache/opam
+        key: ${{ runner.os }}-opam-${{ matrix.coq-version }}-${{ matrix.mathcomp-version }}-${{ hashFiles('*.opam') }}
+        restore-keys: |
+          ${{ runner.os }}-opam-${{ matrix.coq-version }}-${{ matrix.mathcomp-version }}-
+          ${{ runner.os }}-opam-
+
+    - name: 🔄 设置OPAM环境
+      run: |
+        eval $(opam env)
+        opam update
+
+    - name: 📊 安装Coq核心
+      run: |
+        eval $(opam env)
+        echo "安装Coq ${{ matrix.coq-version }}..."
+        opam install -y coq.${{ matrix.coq-version }}
         
-      - name: 🔄 恢复OPAM缓存
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.opam
-            ~/.cache/opam
-          key: ${{ runner.os }}-opam-${{ matrix.coq-version }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-opam-${{ matrix.coq-version }}-
-            
-      - name: 🔧 确保OPAM环境
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          # 如果opam未初始化，则初始化
-          if [ ! -d "$HOME/.opam" ]; then
-            echo "OPAM未初始化，正在初始化..."
-            opam init --disable-sandboxing -y --compiler=4.14.0
-            eval $(opam env)
-            opam repo add coq-released https://coq.inria.fr/opam/released
-            opam update
-          else
-            echo "OPAM已初始化，加载环境..."
-            eval $(opam env)
-          fi
-          
-      - name: 📊 安装Coq核心
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "安装Coq ${{ matrix.coq-version }}..."
-          opam install -y coq.${{ matrix.coq-version }}
-          
-          echo "验证Coq安装..."
-          coqc --version
-          echo "✅ Coq安装成功"
-          
-      - name: 🧮 安装mathcomp
-        run: |
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "安装coq-mathcomp-ssreflect..."
-          opam install -y coq-mathcomp-ssreflect
-          
-      - name: 📚 安装其他依赖库
-        run: |
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "安装常用Coq库..."
-          opam install -y \
-            coq-mathcomp-analysis \
-            coq-stdlib \
-            coq-micromega \
-            coq-bignums
-          echo "✅ 所有依赖库安装完成"
+        echo "验证Coq安装..."
+        coqc --version
+        if [ $? -ne 0 ]; then
+          echo "❌ Coq安装失败"
+          exit 1
+        fi
 
-  full-verification:
-    name: 🔍 全量验证模式
-    needs: [setup-environment, install-coq-dependencies]
-    if: github.event.inputs.verify_mode == 'full' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && github.ref == 'refs/heads/master')
-    runs-on: ubuntu-22.04
-    env:
-      PARALLEL_JOBS: ${{ needs.setup-environment.outputs.parallel_jobs }}
-    steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
+    - name: 🧮 安装mathcomp
+      run: |
+        eval $(opam env)
+        echo "安装coq-mathcomp-ssreflect.${{ matrix.mathcomp-version }}..."
+        opam install -y coq-mathcomp-ssreflect.${{ matrix.mathcomp-version }}
         
-      - name: 🔧 配置构建环境
-        run: |
-          echo "配置构建环境..."
-          echo "PARALLEL_JOBS=$PARALLEL_JOBS" >> $GITHUB_ENV
-          
-          # 设置内存限制
-          AVAIL_MEM=${{ needs.setup-environment.outputs.available_memory }}
-          if [ "${{ github.event.inputs.memory_limit }}" != "auto" ]; then
-            echo "COQ_MEMORY=${{ github.event.inputs.memory_limit }}" >> $GITHUB_ENV
-          elif [ $AVAIL_MEM -gt 16000 ]; then
-            echo "COQ_MEMORY=16384" >> $GITHUB_ENV
-          elif [ $AVAIL_MEM -gt 8000 ]; then
-            echo "COQ_MEMORY=8192" >> $GITHUB_ENV
-          elif [ $AVAIL_MEM -gt 4000 ]; then
-            echo "COQ_MEMORY=4096" >> $GITHUB_ENV
-          else
-            echo "COQ_MEMORY=2048" >> $GITHUB_ENV
-          fi
-          
-      - name: 🛠️ 运行完整构建
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "开始完整构建..."
-          echo "并行任务: $PARALLEL_JOBS"
-          echo "内存限制: $COQ_MEMORY MB"
-          
-          # 使用Makefile进行完整构建
-          make PARALLEL_JOBS=$PARALLEL_JOBS COQFLAGS="-m $COQ_MEMORY" all || make PARALLEL_JOBS=$PARALLEL_JOBS all
-          
-      - name: 📊 生成验证报告
-        run: |
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "生成验证报告..."
-          make report || echo "报告生成失败，继续执行..."
-          
-      - name: 📈 收集构建统计
-        run: |
-          echo "收集构建统计信息..."
-          make stats || echo "统计生成失败，继续执行..."
-          
-      - name: 📤 上传构建产物
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: frf2-build-artifacts
-          path: |
-            **/*.vo
-            **/*.glob
-            **/*.vok
-            **/*.vos
-            frf_report.json
-            dependencies.*
-          retention-days: 7
+        echo "验证mathcomp安装..."
+        opam list --installed | grep "coq-mathcomp-ssreflect" || (echo "❌ mathcomp安装失败" && exit 1)
 
-  quick-verification:
-    name: ⚡ 快速验证模式
-    needs: [setup-environment, install-coq-dependencies]
-    if: github.event.inputs.verify_mode == 'quick' || github.event_name == 'pull_request'
-    runs-on: ubuntu-22.04
-    env:
-      PARALLEL_JOBS: ${{ needs.setup-environment.outputs.parallel_jobs }}
-    steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
+    - name: 📚 安装外部库
+      run: |
+        eval $(opam env)
+        echo "安装外部依赖库..."
         
-      - name: 🏃 运行快速验证
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "运行快速验证模式..."
-          echo "并行任务: $PARALLEL_JOBS"
-          
-          # 清理之前的构建
-          make clean || true
-          
-          # 快速验证核心模块
-          make PARALLEL_JOBS=$PARALLEL_JOBS quick || make PARALLEL_JOBS=$PARALLEL_JOBS all
-          
-      - name: 🧪 运行基础测试
-        run: |
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "运行基础测试..."
-          make test-only || echo "测试运行失败，继续执行..."
-
-  core-only-verification:
-    name: 🎯 核心验证模式
-    needs: [setup-environment, install-coq-dependencies]
-    if: github.event.inputs.verify_mode == 'core-only'
-    runs-on: ubuntu-22.04
-    env:
-      PARALLEL_JOBS: ${{ needs.setup-environment.outputs.parallel_jobs }}
-    steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
+        # 实数库
+        opam install -y coq-mathcomp-analysis
         
-      - name: 🎯 编译核心模块
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "编译核心模块..."
-          echo "并行任务: $PARALLEL_JOBS"
-          
-          make PARALLEL_JOBS=$PARALLEL_JOBS core-base core-frf || make PARALLEL_JOBS=2 core-base
-          
-      - name: 📋 验证核心功能
-        run: |
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "验证核心功能..."
-          
-          # 检查核心模块是否编译成功
-          if [ -f "SelfContainedLib/Algebra.vo" ] && \
-             [ -f "SelfContainedLib/Geometry.vo" ] && \
-             [ -f "SelfContainedLib/Category.vo" ] && \
-             [ -f "theories/FRF_MetaTheory.vo" ]; then
-            echo "✅ 核心模块编译成功"
-          else
-            echo "❌ 核心模块编译失败"
-            # 列出已编译的文件
-            echo "已编译的文件:"
-            find . -name "*.vo" -type f | head -20
-            exit 1
-          fi
-
-  test-only-verification:
-    name: 🧪 测试专用模式
-    needs: [setup-environment, install-coq-dependencies]
-    if: github.event.inputs.verify_mode == 'test-only'
-    runs-on: ubuntu-22.04
-    env:
-      PARALLEL_JOBS: ${{ needs.setup-environment.outputs.parallel_jobs }}
-    steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
+        # 标准库
+        opam install -y coq-stdlib
         
-      - name: 🧹 清理环境
-        run: |
-          echo "清理测试环境..."
-          make clean || true
-          
-      - name: 🧪 编译测试套件
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env)
-          echo "编译测试套件..."
-          echo "并行任务: $PARALLEL_JOBS"
-          
-          # 先编译必要的依赖
-          make PARALLEL_JOBS=$PARALLEL_JOBS core-base core-frf || make PARALLEL_JOBS=2 core-base
-          
-          # 编译测试
-          make PARALLEL_JOBS=$PARALLEL_JOBS tests || echo "测试编译失败"
-          
-      - name: 📊 测试结果分析
-        run: |
-          echo "分析测试结果..."
-          
-          TEST_FILES="Test/*.vo"
-          TOTAL=0
-          PASSED=0
-          
-          for file in $TEST_FILES 2>/dev/null; do
-            if [ -f "$file" ]; then
-              ((TOTAL++))
-              BASE=$(basename "$file" .vo)
-              if [ -f "Test/${BASE}.v" ]; then
-                echo "✅ $BASE 编译成功"
-                ((PASSED++))
-              fi
-            fi
-          done
-          
-          echo "测试统计: $PASSED/$TOTAL 通过"
-          if [ $PASSED -eq $TOTAL ] && [ $TOTAL -gt 0 ]; then
-            echo "🎉 所有测试通过!"
-          else
-            echo "⚠️  部分测试失败"
-          fi
+        # 可选：数学库
+        opam install -y coq-mathlib || echo "警告: mathlib安装失败，部分模块可能无法编译"
+        
+        # 可选：矩阵和向量库
+        opam install -y coq-mathcomp-algebra || echo "警告: 矩阵库安装失败"
+        
+        echo "✅ 依赖安装完成"
 
-  generate-report:
-    name: 📋 报告生成模式
-    needs: [setup-environment, install-coq-dependencies, full-verification]
-    if: always() && (github.event.inputs.verify_mode == 'full' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 📥 下载构建产物
-        uses: actions/download-artifact@v4
-        with:
-          name: frf2-build-artifacts
-          
-      - name: 📊 生成详细报告
-        run: |
-          # 确保opam在PATH中
-          export PATH="$HOME/.opam/bin:$PATH"
-          eval $(opam env 2>/dev/null || true)
-          echo "生成详细验证报告..."
-          
-          # 创建报告目录
-          mkdir -p verification-report
-          
-          # 生成Markdown报告
-          cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
-# FRF 2.0 形式化验证报告
-
-## 验证概览
-- **验证时间**: $(date)
-- **环境**: Ubuntu 22.04
-- **总文件数**: $TOTAL_FILES
-- **编译成功**: $COMPILED_FILES
-- **编译成功率**: ${SUCCESS_RATE}%
-- **大文件(>3000行)**: $HUGE_FILES
-- **大文件编译成功**: $HUGE_COMPILED
-
-
-## 构建环境
-          **系统**: Ubuntu 22.04
-          **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
-          **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
-          **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
-          **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
-
-## 模块编译状态
-EOF
-          
-          # 检查各个目录的编译状态
-          for dir in SelfContainedLib theories Quantum CS_Null Test; do
-            if [ -d "$dir" ]; then
-              echo "" >> verification-report/FRF2_VERIFICATION_REPORT.md
-              echo "### $dir/" >> verification-report/FRF2_VERIFICATION_REPORT.md
-              echo "| 模块 | 状态 | 大小 |" >> verification-report/FRF2_VERIFICATION_REPORT.md
-              echo "|------|------|------|" >> verification-report/FRF2_VERIFICATION_REPORT.md
-              
-              for vfile in $(find "$dir" -name "*.v" 2>/dev/null | sort); do
-                base=$(basename "$vfile" .v)
-                vo_file="${vfile%.v}.vo"
-                
-                if [ -f "$vo_file" ]; then
-                  lines=$(wc -l < "$vfile" 2>/dev/null || echo "?")
-                  echo "| $base | ✅ | ${lines}行 |" >> verification-report/FRF2_VERIFICATION_REPORT.md
-                else
-                  echo "| $base | ❌ | - |" >> verification-report/FRF2_VERIFICATION_REPORT.md
-                fi
-              done
-            fi
-          done
-          
-          # 添加总结
-          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
-
-## 验证总结
-
-基于当前构建结果，FRF 2.0 形式化验证系统已成功编译所有核心模块。
-
-### 关键成果
-1. ✅ 自包含基础库 (Algebra, Geometry, Category)
-2. ✅ FRF元理论核心 (FRF_MetaTheory, ChurchZero, ChurchNumerals)
-3. ✅ 数学场景验证 (5个Case模块)
-4. ✅ 扩展模块 (量子场论、空值系统)
-5. ✅ 集成模块 (跨系统对比)
-6. ✅ 测试套件
-
-### 性能指标
-- 总文件数: $(find . -name "*.v" -type f | wc -l)
-- 编译成功: $(find . -name "*.vo" -type f | wc -l)
-- 编译时间: 参见GitHub Actions运行时间
-- 内存使用: 优化自适应
-
-### 后续步骤
-1. 详细查看各模块的证明
-2. 运行具体的测试用例
-3. 生成学术论文所需的验证报告
-
----
-*报告由FRF 2.0自动验证系统生成*
-EOF
-          
-          echo "✅ 验证报告生成完成"
+    - name: 📝 依赖验证报告
+      run: |
+        eval $(op
