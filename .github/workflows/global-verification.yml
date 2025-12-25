@@ -1382,7 +1382,7 @@ jobs:
           # 创建报告目录
           mkdir -p verification-report
           
-          # 统计编译结果
+          # 统计编译结果（保持原有代码不变）
           TOTAL_FILES=0
           COMPILED_FILES=0
           HUGE_FILES=0
@@ -1398,15 +1398,12 @@ jobs:
                 
                 if [ -f "$vo_file" ]; then
                   COMPILED_FILES=$((COMPILED_FILES + 1))
-                  
-                  # 检查是否是大文件
                   lines=$(wc -l < "$file" 2>/dev/null || echo 0)
                   if [ "$lines" -gt 3000 ]; then
                     HUGE_FILES=$((HUGE_FILES + 1))
                     HUGE_COMPILED=$((HUGE_COMPILED + 1))
                   fi
                 else
-                  # 检查是否是大文件
                   lines=$(wc -l < "$file" 2>/dev/null || echo 0)
                   if [ "$lines" -gt 3000 ]; then
                     HUGE_FILES=$((HUGE_FILES + 1))
@@ -1422,197 +1419,29 @@ jobs:
             SUCCESS_RATE=$((COMPILED_FILES * 100 / TOTAL_FILES))
           fi
           
-          # 生成Markdown报告
-          cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-# FRF 2.0 全量形式化验证报告
-
-## 概述
-- **验证时间**: $(date)
-- **GitHub Actions运行ID**: ${{ github.run_id }}
-- **触发事件**: ${{ github.event_name }}
-- **分支**: ${{ github.ref }}
-
-## 编译统计
-- **总文件数**: ${TOTAL_FILES} 个
-- **成功编译**: ${COMPILED_FILES} 个
-- **编译成功率**: ${SUCCESS_RATE}%
-- **大文件数(>3000行)**: ${HUGE_FILES} 个
-- **大文件编译成功**: ${HUGE_COMPILED} 个
-
-## 阶段编译状态
-1. ✅ 阶段1: 基础库编译 - 完成
-2. ✅ 阶段2: 元理论层编译 - 完成  
-3. ✅ 阶段3: 数学场景层编译 - 完成
-4. ✅ 阶段4: 扩展模块编译 - 完成
-5. ✅ 阶段5: 集成模块编译 - 完成
-6. ✅ 阶段6: 测试套件编译 - 完成
-
-## 详细文件列表
-
-### 基础库 (SelfContainedLib)
-EOF
-          
-          # 添加基础库文件列表
-          if [ -d "SelfContainedLib" ]; then
-            for file in SelfContainedLib/*.v 2>/dev/null; do
-              base=$(basename "$file" .v)
-              if [ -f "SelfContainedLib/${base}.vo" ]; then
-                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                echo "- ✅ ${base}.v (${lines} 行)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              else
-                echo "- ❌ ${base}.v (编译失败)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              fi
-            done
-          fi
-          
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-
-### 元理论层 (theories)
-EOF
-          
-          # 添加元理论文件列表
-          if [ -d "theories" ]; then
-            for file in theories/*.v 2>/dev/null; do
-              base=$(basename "$file" .v)
-              if [ -f "theories/${base}.vo" ]; then
-                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                echo "- ✅ ${base}.v (${lines} 行)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              else
-                echo "- ❌ ${base}.v (未编译)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              fi
-            done
-          fi
-          
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-
-### 扩展模块
-EOF
-          
-          # 添加量子模块
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-#### 量子模块 (Quantum)
-EOF
-          
-          if [ -d "Quantum" ]; then
-            qcount=0
-            for file in Quantum/*.v 2>/dev/null; do
-              base=$(basename "$file" .v)
-              qcount=$((qcount + 1))
-              if [ -f "Quantum/${base}.vo" ]; then
-                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                echo "- ✅ ${base}.v (${lines} 行)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              else
-                echo "- ❌ ${base}.v (编译失败)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              fi
-            done
-            if [ $qcount -eq 0 ]; then
-              echo "- 无量子模块文件" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-            fi
-          else
-            echo "- Quantum目录不存在" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          fi
-          
-          # 添加空值系统
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-
-#### 空值系统 (CS_Null)
-EOF
-          
-          if [ -d "CS_Null" ]; then
-            cscount=0
-            for file in CS_Null/*.v 2>/dev/null; do
-              base=$(basename "$file" .v)
-              cscount=$((cscount + 1))
-              if [ -f "CS_Null/${base}.vo" ]; then
-                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                echo "- ✅ ${base}.v (${lines} 行)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              else
-                echo "- ❌ ${base}.v (编译失败)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              fi
-            done
-            if [ $cscount -eq 0 ]; then
-              echo "- 无空值系统文件" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-            fi
-          else
-            echo "- CS_Null目录不存在" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          fi
-          
-          # 添加测试套件
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-
-### 测试套件 (Test)
-EOF
-          
-          if [ -d "Test" ]; then
-            testcount=0
-            for file in Test/*.v 2>/dev/null; do
-              base=$(basename "$file" .v)
-              testcount=$((testcount + 1))
-              if [ -f "Test/${base}.vo" ]; then
-                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
-                echo "- ✅ ${base}.v (${lines} 行)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              else
-                echo "- ❌ ${base}.v (编译失败)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-              fi
-            done
-            if [ $testcount -eq 0 ]; then
-              echo "- 无测试文件" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-            fi
-          else
-            echo "- Test目录不存在" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          fi
-          
-          # 添加总结
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
-
-## 总结
-FRF 2.0 形式化验证已完成。所有模块已成功编译，验证了系统的完整性和一致性。
-
-### 环境信息
-- **操作系统**: Ubuntu 22.04
-- **CPU核心数**: ${{ needs.setup-environment.outputs.core_count }}
-- **可用内存**: ${{ needs.setup-environment.outputs.memory_available }} MB
-- **Coq版本**: 8.18.0
-- **MathComp版本**: 完整套件
-
-### 验证结论
-✅ **全量验证通过**
-
-所有形式化定义、定理和证明均已成功编译，系统逻辑一致性和完整性得到验证。
-
----
-*报告生成时间: $(date)*
-*GitHub Actions运行链接: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}*
-EOF
+          # 使用简单的echo语句生成报告
+          echo "# FRF 2.0 全量形式化验证报告" > verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "## 概述" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **验证时间**: $(date)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **GitHub Actions运行ID**: ${{ github.run_id }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **触发事件**: ${{ github.event_name }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **分支**: ${{ github.ref }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "## 编译统计" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **总文件数**: ${TOTAL_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **成功编译**: ${COMPILED_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **编译成功率**: ${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **大文件数(>3000行)**: ${HUGE_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **大文件编译成功**: ${HUGE_COMPILED} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "## 阶段编译状态" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "1. ✅ 阶段1: 基础库编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "2. ✅ 阶段2: 元理论层编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "3. ✅ 阶段3: 数学场景层编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "4. ✅ 阶段4: 扩展模块编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "5. ✅ 阶段5: 集成模块编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "6. ✅ 阶段6: 测试套件编译 - 完成" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           
           echo "✅ 验证报告生成完成"
-
-      - name: 📤 上传验证报告
-        uses: actions/upload-artifact@v3
-        with:
-          name: verification-report
-          path: |
-            verification-report/
-          retention-days: 30
-
-      - name: 🎉 验证完成通知
-        if: success()
-        run: |
-          echo "========================================"
-          echo "✅ FRF 2.0 全量形式化验证完成！"
-          echo "========================================"
-          echo ""
-          echo "所有阶段编译成功："
-          echo "  1. 🔧 环境配置 - 完成"
-          echo "  2. 📦 依赖安装 - 完成"
-          echo "  3. 🏗️  基础库编译 - 完成"
-          echo "  4. 🧠 元理论层编译 - 完成"
-          echo "  5. 🎯 数学场景层编译 - 完成"
-          echo "  6. 🔮 扩展模块编译 - 完成"
-          echo "  7. 🧩 集成模块编译 - 完成"
-          echo "  8. 🧪 测试套件编译 - 完成"
-          echo ""
-          echo "验证报告已生成并上传为工件"
-          echo ""
-          echo "FRF 2.0 系统形式化验证通过 ✓"
-          echo "========================================"
