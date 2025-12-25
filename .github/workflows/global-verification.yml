@@ -389,7 +389,7 @@ jobs:
       "total_vo_files": $TOTAL_VO_FILES,
       "compilation_rate": "$((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))%"
     },
-    "modules": {
+        "modules": {
       "self_contained": {
         "algebra": $(if [ -f "SelfContainedLib/Algebra.vo" ]; then echo "true"; else echo "false"; fi),
         "category": $(if [ -f "SelfContainedLib/Category.vo" ]; then echo "true"; else echo "false"; fi),
