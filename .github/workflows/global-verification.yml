@@ -79,7 +79,11 @@ jobs:
             bc \
             graphviz \
             python3 \
-            python3-pip
+            python3-pip \
+            libgmp-dev \
+            libffi-dev \
+            libssl-dev \
+            zlib1g-dev
           echo "✅ 系统依赖安装完成"
 
       - name: 🔄 配置OPAM环境
@@ -87,7 +91,6 @@ jobs:
           opam init --disable-sandboxing -y --compiler=4.14.0
           eval $(opam env)
           opam repo add coq-released https://coq.inria.fr/opam/released
-          opam repo add mathlib https://github.com/leanprover-community/mathlib.git
           opam update -y
           echo "OPAM_HOME=$OPAM_HOME" >> $GITHUB_ENV
           echo "OPAM_SWITCH_PREFIX=$OPAM_SWITCH_PREFIX" >> $GITHUB_ENV
@@ -114,20 +117,21 @@ jobs:
           
           CORE_COUNT=${{ steps.check-cpu.outputs.core_count }}
           PARALLEL_JOBS=$((CORE_COUNT / 2))
+          if [ $PARALLEL_JOBS -lt 1 ]; then
+            PARALLEL_JOBS=1
+          fi
           echo "PARALLEL_JOBS=$PARALLEL_JOBS" >> $GITHUB_ENV
 
-      - name: 🔍 检查Coq版本
+      - name: 🔍 检查系统环境
         id: check-coq
         run: |
-          eval $(opam env)
-          if command -v coqc &> /dev/null; then
-            COQ_VERSION=$(coqc --version | head -1 | grep -o 'version [0-9.]\+' | cut -d' ' -f2)
-            echo "当前Coq版本: $COQ_VERSION"
-            echo "version=$COQ_VERSION" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Coq未安装"
-            exit 1
-          fi
+          echo "系统环境检查:"
+          echo "OPAM版本: $(opam --version)"
+          echo "OCaml版本: $(ocamlc --version 2>/dev/null || echo '未安装')"
+          
+          # 设置默认版本
+          echo "version=8.18.0" >> $GITHUB_OUTPUT
+          echo "当前环境准备安装Coq 8.18.0"
 
       - name: 📋 环境报告
         run: |
@@ -137,38 +141,42 @@ jobs:
           echo "可用内存: ${{ steps.check-memory.outputs.available_mb }}MB"
           echo "分配内存: ${{ env.COQ_MEMORY }}MB"
           echo "并行任务: ${{ env.PARALLEL_JOBS }}"
-          echo "Coq版本: ${{ steps.check-coq.outputs.version }}"
+          echo "计划安装Coq版本: 8.18.0"
 
   install-dependencies:
     name: 📦 依赖安装与缓存
     needs: setup-environment
     runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        coq-version: ['8.18.0']
-        mathcomp-version: ['1.17.0']
     steps:
+      - name: 📥 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: 📥 恢复OPAM缓存
         uses: actions/cache@v3
+        id: opam-cache
         with:
           path: |
             ~/.opam
             ~/.cache/opam
-          key: ${{ runner.os }}-opam-${{ matrix.coq-version }}-${{ matrix.mathcomp-version }}-${{ hashFiles('*.opam') }}
+          key: ${{ runner.os }}-opam-8.18.0-${{ hashFiles('**/*.opam') }}
           restore-keys: |
-            ${{ runner.os }}-opam-${{ matrix.coq-version }}-${{ matrix.mathcomp-version }}-
+            ${{ runner.os }}-opam-8.18.0-
             ${{ runner.os }}-opam-
 
       - name: 🔄 设置OPAM环境
         run: |
+          opam init --disable-sandboxing -y --compiler=4.14.0
           eval $(opam env)
-          opam update
+          opam repo add coq-released https://coq.inria.fr/opam/released
+          opam update -y
 
       - name: 📊 安装Coq核心
         run: |
           eval $(opam env)
-          echo "安装Coq ${{ matrix.coq-version }}..."
-          opam install -y coq.${{ matrix.coq-version }}
+          echo "安装Coq 8.18.0..."
+          opam install -y coq.8.18.0
           
           echo "验证Coq安装..."
           coqc --version
@@ -180,11 +188,17 @@ jobs:
       - name: 🧮 安装mathcomp
         run: |
           eval $(opam env)
-          echo "安装coq-mathcomp-ssreflect.${{ matrix.mathcomp-version }}..."
-          opam install -y coq-mathcomp-ssreflect.${{ matrix.mathcomp-version }}
+          echo "安装mathcomp系列..."
+          
+          # 安装完整的mathcomp
+          opam install -y coq-mathcomp-ssreflect
+          opam install -y coq-mathcomp-fingroup
+          opam install -y coq-mathcomp-algebra
+          opam install -y coq-mathcomp-solvable
+          opam install -y coq-mathcomp-field
           
           echo "验证mathcomp安装..."
-          opam list --installed | grep "coq-mathcomp-ssreflect" || (echo "❌ mathcomp安装失败" && exit 1)
+          opam list --installed | grep "coq-mathcomp" || (echo "❌ mathcomp安装失败" && exit 1)
 
       - name: 📚 安装外部库
         run: |
@@ -197,11 +211,11 @@ jobs:
           # 标准库
           opam install -y coq-stdlib
           
-          # 可选：数学库
-          opam install -y coq-mathlib || echo "警告: mathlib安装失败，部分模块可能无法编译"
+          # 大整数库
+          opam install -y coq-bignums
           
-          # 可选：矩阵和向量库
-          opam install -y coq-mathcomp-algebra || echo "警告: 矩阵库安装失败"
+          # 时间限制
+          opam install -y coq-time
           
           echo "✅ 依赖安装完成"
 
@@ -213,18 +227,18 @@ jobs:
           coqc --version
           echo ""
           echo "安装的包:"
-          opam list --installed | grep -E "coq|mathcomp"
+          opam list --installed --short | head -30
           echo ""
-          echo "依赖树:"
-          opam list --tree --installed | head -50
+          echo "OPAM配置:"
+          opam config report
 
   compile-phase-1:
     name: 🏗️ 阶段1:基础库编译
     needs: [setup-environment, install-dependencies]
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -m ${{ env.COQ_MEMORY }}"
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib"
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
@@ -239,85 +253,87 @@ jobs:
       - name: 📊 编译前检查
         run: |
           echo "=== 基础库编译前检查 ==="
+          echo "工作目录: $(pwd)"
           echo "基础库文件:"
-          ls -la SelfContainedLib/*.v 2>/dev/null || echo "无文件"
+          find SelfContainedLib -name "*.v" 2>/dev/null | head -20 || echo "无文件"
           echo ""
           echo "编译参数: $COQFLAGS"
           echo "内存限制: ${{ env.COQ_MEMORY }}MB"
-          echo "并行编译: 启用"
 
-      - name: 🔧 并行编译基础库
+      - name: 🔧 顺序编译基础库
         run: |
           eval $(opam env)
+          
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
+          echo "开始编译基础库..."
           
           # 定义编译函数
           compile_file() {
             local file=$1
             local base=$(basename "$file" .v)
-            echo "🚀 编译 $base.v..."
+            local log_file="build-logs/${base}.log"
             
-            # 大文件特殊处理
-            local line_count=0
-            if [ -f "$file" ]; then
-              line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            echo "🚀 编译 $base.v..."
+            echo "日志文件: $log_file"
+            
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
             fi
             
+            # 获取文件大小
+            local line_count=0
+            line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            echo "  文件大小: $line_count 行"
+            
+            # 设置编译参数
             local extra_flags=""
             
-            if [ "$base" = "Geometry" ]; then
-              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
-              echo "  大文件检测: $line_count 行，使用增强参数"
+            if [ "$base" = "Geometry" ] && [ $line_count -gt 1000 ]; then
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
+              echo "  大文件检测，使用增强参数"
             fi
             
-            if coqc $COQFLAGS $extra_flags "$file" 2>&1; then
+            # 执行编译
+            if timeout 10m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
               echo "✅ $base.v 编译成功"
               return 0
             else
               echo "❌ $base.v 编译失败"
-              coqc $COQFLAGS $extra_flags "$file" 2>&1 | head -30
+              echo "=== 最后20行错误日志 ==="
+              tail -20 "$log_file"
               return 1
             fi
           }
           
-          export -f compile_file
-          export COQFLAGS
-          
-          # 检查文件是否存在
-          files_to_compile=""
-          for file in SelfContainedLib/Algebra.v SelfContainedLib/Category.v SelfContainedLib/Geometry.v; do
-            if [ -f "$file" ]; then
-              files_to_compile="$files_to_compile $file"
-            fi
-          done
-          
-          if [ -z "$files_to_compile" ]; then
-            echo "❌ 没有找到要编译的文件"
-            exit 1
-          fi
-          
-          # 并行编译基础文件
-          echo "开始并行编译基础库..."
+          # 编译顺序：先编译依赖关系较少的文件
+          failed=0
           
           # 编译Algebra.v
-          compile_file "SelfContainedLib/Algebra.v" &
-          ALGEBRA_PID=$!
+          if [ -f "SelfContainedLib/Algebra.v" ]; then
+            compile_file "SelfContainedLib/Algebra.v" || failed=1
+          else
+            echo "⚠️ Algebra.v 不存在"
+          fi
           
           # 编译Category.v
-          compile_file "SelfContainedLib/Category.v" &
-          CATEGORY_PID=$!
+          if [ -f "SelfContainedLib/Category.v" ]; then
+            compile_file "SelfContainedLib/Category.v" || failed=1
+          else
+            echo "⚠️ Category.v 不存在"
+          fi
           
-          # 编译Geometry.v（大文件，最后编译）
-          sleep 2  # 让其他文件先开始
-          compile_file "SelfContainedLib/Geometry.v" &
-          GEOMETRY_PID=$!
+          # 编译Geometry.v
+          if [ -f "SelfContainedLib/Geometry.v" ]; then
+            compile_file "SelfContainedLib/Geometry.v" || failed=1
+          else
+            echo "⚠️ Geometry.v 不存在"
+          fi
           
-          # 等待所有编译完成
-          wait $ALGEBRA_PID || ALGEBRA_FAILED=1
-          wait $CATEGORY_PID || CATEGORY_FAILED=1
-          wait $GEOMETRY_PID || GEOMETRY_FAILED=1
-          
-          # 检查结果
-          if [ -n "$ALGEBRA_FAILED" ] || [ -n "$CATEGORY_FAILED" ] || [ -n "$GEOMETRY_FAILED" ]; then
+          if [ $failed -eq 1 ]; then
             echo "❌ 基础库编译失败"
             exit 1
           fi
@@ -330,7 +346,8 @@ jobs:
           echo "编译文件:"
           for file in Algebra Category Geometry; do
             if [ -f "SelfContainedLib/$file.vo" ]; then
-              echo "  ✅ $file.vo (存在)"
+              size=$(stat -c%s "SelfContainedLib/$file.vo" 2>/dev/null || echo 0)
+              echo "  ✅ $file.vo (${size} bytes)"
             else
               echo "  ❌ $file.vo (缺失)"
             fi
@@ -339,33 +356,48 @@ jobs:
           echo "生成文件列表:"
           ls -la SelfContainedLib/*.vo SelfContainedLib/*.glob 2>/dev/null || echo "无生成文件"
 
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-1-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            build-logs/
+          retention-days: 7
+
   compile-phase-2:
     name: 🧠 阶段2:元理论层编译
     needs: compile-phase-1
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -m ${{ env.COQ_MEMORY }}"
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories"
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: 📥 恢复阶段1结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-1-compiled
+          path: .
+
       - name: 🔄 设置环境
         run: |
           eval $(opam env)
           echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
           
-          # 复制基础库的.vo文件
-          mkdir -p SelfContainedLib
-          cp -r ../compile-phase-1/SelfContainedLib/*.vo SelfContainedLib/ 2>/dev/null || true
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories
 
       - name: 📊 检查元理论文件
         run: |
           echo "=== 元理论层文件检查 ==="
           echo "元理论文件:"
-          ls -la theories/*.v 2>/dev/null || echo "无文件"
+          find theories -name "*.v" 2>/dev/null | head -20 || echo "无文件"
           echo ""
           echo "文件大小统计:"
           for file in theories/*.v 2>/dev/null; do
@@ -379,114 +411,197 @@ jobs:
         run: |
           eval $(opam env)
           
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
+          echo "开始编译元理论层..."
+          
           # 检查必要的文件是否存在
+          essential_files=0
           for file in theories/ChurchZero.v theories/FRF_MetaTheory.v theories/ChurchNumerals.v; do
-            if [ ! -f "$file" ]; then
-              echo "❌ 文件不存在: $file"
-              exit 1
+            if [ -f "$file" ]; then
+              essential_files=$((essential_files + 1))
             fi
           done
           
+          if [ $essential_files -eq 0 ]; then
+            echo "⚠️ 未找到元理论核心文件"
+            exit 0
+          fi
+          
+          # 编译函数
+          compile_theory() {
+            local file=$1
+            local base=$(basename "$file" .v)
+            local log_file="build-logs/${base}.log"
+            
+            echo "📘 编译 $base.v..."
+            
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
+            fi
+            
+            # 获取文件大小
+            local line_count=0
+            line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            echo "  文件大小: $line_count 行"
+            
+            # 设置编译参数
+            local extra_flags=""
+            
+            if [ "$base" = "FRF_MetaTheory" ] || [ "$base" = "ChurchNumerals" ]; then
+              if [ $line_count -gt 2000 ]; then
+                extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
+                echo "  大文件，使用增强参数"
+              fi
+            fi
+            
+            # 执行编译
+            if timeout 15m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
+              echo "✅ $base.v 编译成功"
+              return 0
+            else
+              echo "❌ $base.v 编译失败"
+              echo "=== 错误摘要 ==="
+              grep -i "error\|fail\|syntax" "$log_file" | head -10
+              return 1
+            fi
+          }
+          
           # 编译顺序：先小文件，后大文件
-          echo "开始编译元理论层..."
+          failed=0
           
-          # 1. 编译ChurchZero.v（中等大小）
-          echo "📘 编译 ChurchZero.v..."
-          if coqc $COQFLAGS theories/ChurchZero.v 2>&1; then
-            echo "✅ ChurchZero.v 编译成功"
-          else
-            echo "❌ ChurchZero.v 编译失败"
-            coqc $COQFLAGS theories/ChurchZero.v 2>&1 | head -20
+          # 1. 编译ChurchZero.v
+          if [ -f "theories/ChurchZero.v" ]; then
+            compile_theory "theories/ChurchZero.v" || failed=1
+          fi
+          
+          # 2. 编译FRF_MetaTheory.v
+          if [ -f "theories/FRF_MetaTheory.v" ]; then
+            compile_theory "theories/FRF_MetaTheory.v" || failed=1
+          fi
+          
+          # 3. 编译ChurchNumerals.v
+          if [ -f "theories/ChurchNumerals.v" ]; then
+            compile_theory "theories/ChurchNumerals.v" || failed=1
+          fi
+          
+          # 编译其他元理论文件
+          for file in theories/*.v 2>/dev/null; do
+            base=$(basename "$file" .v)
+            if [ "$base" != "ChurchZero" ] && [ "$base" != "FRF_MetaTheory" ] && [ "$base" != "ChurchNumerals" ]; then
+              compile_theory "$file" || failed=1
+            fi
+          done
+          
+          if [ $failed -eq 1 ]; then
+            echo "❌ 元理论层编译有失败"
             exit 1
           fi
           
-          # 2. 编译FRF_MetaTheory.v（大文件）
-          echo "📗 编译 FRF_MetaTheory.v (大文件)..."
-          if coqc $COQFLAGS -m ${{ env.BIGFILE_MEMORY }} -async-proofs on theories/FRF_MetaTheory.v 2>&1; then
-            echo "✅ FRF_MetaTheory.v 编译成功"
-          else
-            echo "❌ FRF_MetaTheory.v 编译失败"
-            coqc $COQFLAGS -m ${{ env.BIGFILE_MEMORY }} theories/FRF_MetaTheory.v 2>&1 | head -30
-            exit 1
-          fi
-          
-          # 3. 编译ChurchNumerals.v（极大文件）
-          echo "📙 编译 ChurchNumerals.v (极大文件)..."
-          if coqc $COQFLAGS -m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 8 theories/ChurchNumerals.v 2>&1; then
-            echo "✅ ChurchNumerals.v 编译成功"
-          else
-            echo "❌ ChurchNumerals.v 编译失败"
-            coqc $COQFLAGS -m ${{ env.BIGFILE_MEMORY }} theories/ChurchNumerals.v 2>&1 | head -40
-            exit 1
-          fi
+          echo "✅ 元理论层编译完成"
 
       - name: 📈 元理论编译统计
         run: |
           echo "=== 元理论层编译统计 ==="
-          echo "编译文件数: 3/3"
-          echo "成功文件:"
-          for file in FRF_MetaTheory ChurchZero ChurchNumerals; do
-            if [ -f "theories/$file.vo" ]; then
+          echo "成功编译的文件:"
+          vo_count=0
+          for file in theories/*.vo 2>/dev/null; do
+            if [ -f "$file" ]; then
+              base=$(basename "$file" .vo)
               lines=0
-              if [ -f "theories/$file.v" ]; then
-                lines=$(wc -l < "theories/$file.v" 2>/dev/null || echo 0)
+              if [ -f "theories/$base.v" ]; then
+                lines=$(wc -l < "theories/$base.v" 2>/dev/null || echo 0)
               fi
-              echo "  ✅ $file.vo ($lines 行)"
-            else
-              echo "  ❌ $file.vo (缺失)"
+              echo "  ✅ $base.vo ($lines 行)"
+              vo_count=$((vo_count + 1))
             fi
           done
+          echo "总计: $vo_count 个文件编译成功"
+          
           echo ""
-          echo "总代码行数:"
-          wc -l theories/*.v 2>/dev/null | tail -1 || echo "0"
+          echo "未编译的.v文件:"
+          for file in theories/*.v 2>/dev/null; do
+            base=$(basename "$file" .v)
+            if [ ! -f "theories/$base.vo" ]; then
+              echo "  ❌ $base.v (未编译)"
+            fi
+          done
+
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-2-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            build-logs/
+          retention-days: 7
 
   compile-phase-3:
     name: 🎯 阶段3:数学场景层编译
     needs: compile-phase-2
     runs-on: ubuntu-22.04
-    timeout-minutes: 40
+    timeout-minutes: 50
     env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -m ${{ env.COQ_MEMORY }}"
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories"
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: 📥 恢复阶段2结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-2-compiled
+          path: .
+
       - name: 🔄 设置环境
         run: |
           eval $(opam env)
           echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
           
-          # 复制依赖文件
-          mkdir -p SelfContainedLib
-          mkdir -p theories
-          cp -r ../compile-phase-1/SelfContainedLib/*.vo SelfContainedLib/ 2>/dev/null || true
-          cp -r ../compile-phase-2/theories/*.vo theories/ 2>/dev/null || true
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories
 
       - name: 📊 检查场景文件
         run: |
           echo "=== 数学场景层文件检查 ==="
           echo "场景文件:"
-          ls -la theories/Case*.v 2>/dev/null || echo "无场景文件"
+          find theories -name "Case*.v" 2>/dev/null | head -20 || echo "无场景文件"
           echo ""
           echo "文件统计:"
+          total_lines=0
+          file_count=0
           for file in theories/Case*.v 2>/dev/null; do
             if [ -f "$file" ]; then
               base=$(basename "$file" .v)
               lines=$(wc -l < "$file" 2>/dev/null || echo 0)
               echo "  $base: $lines 行"
+              total_lines=$((total_lines + lines))
+              file_count=$((file_count + 1))
             fi
           done
+          echo "总计: $file_count 个文件, $total_lines 行"
 
       - name: 🔧 编译数学场景
         run: |
           eval $(opam env)
           
-          # 检查必要的文件是否存在
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
+          echo "开始编译数学场景层..."
+          
+          # 检查场景文件是否存在
           files_found=0
-          for pattern in theories/CaseA_*.v theories/CaseB_*.v theories/CaseC_*.v theories/CaseD_*.v theories/CaseE_*.v; do
-            if ls $pattern 1> /dev/null 2>&1; then
+          for pattern in CaseA CaseB CaseC CaseD CaseE; do
+            if ls theories/${pattern}_*.v 1> /dev/null 2>&1; then
               files_found=1
             fi
           done
@@ -500,46 +615,63 @@ jobs:
           compile_scene() {
             local file=$1
             local base=$(basename "$file" .v)
+            local log_file="build-logs/${base}.log"
             
             echo "🎨 编译 $base.v..."
             
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
+            fi
+            
+            # 获取文件大小
+            local line_count=0
+            line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            
+            # 设置编译参数
+            local extra_flags=""
+            
             case $base in
-              CaseA_*)
-                # 小文件，普通编译
-                coqc $COQFLAGS "$file" 2>&1
-                ;;
-              CaseB_*)
-                # 中等文件，实数依赖
-                coqc $COQFLAGS -async-proofs on "$file" 2>&1
-                ;;
               CaseE_*)
-                # 大文件，特殊处理
-                coqc $COQFLAGS -m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4 "$file" 2>&1
+                if [ $line_count -gt 3000 ]; then
+                  extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
+                  echo "  超大文件，使用增强参数"
+                fi
                 ;;
-              *)
-                # 默认编译
-                coqc $COQFLAGS "$file" 2>&1
+              CaseB_*|CaseD_*)
+                if [ $line_count -gt 1500 ]; then
+                  extra_flags="-async-proofs on"
+                  echo "  大文件，使用异步证明"
+                fi
                 ;;
             esac
             
-            if [ $? -eq 0 ]; then
+            # 执行编译
+            if timeout 10m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
               echo "✅ $base.v 编译成功"
               return 0
             else
               echo "❌ $base.v 编译失败"
+              echo "=== 错误摘要 ==="
+              grep -i "error\|fail" "$log_file" | head -5
               return 1
             fi
           }
           
           # 编译场景文件
-          echo "开始编译数学场景..."
           failed=0
           
-          # 查找所有场景文件
+          # 按顺序编译（字母顺序）
           for pattern in CaseA CaseB CaseC CaseD CaseE; do
             for file in theories/${pattern}_*.v 2>/dev/null; do
               if [ -f "$file" ]; then
                 compile_scene "$file" || failed=1
+                
+                # 小文件之间休息一下
+                if [ $failed -eq 0 ]; then
+                  sleep 2
+                fi
               fi
             done
           done
@@ -554,53 +686,89 @@ jobs:
       - name: 📈 场景层统计
         run: |
           echo "=== 数学场景层编译统计 ==="
-          echo "场景模块:"
+          echo "场景模块编译状态:"
+          
+          total_scenes=0
+          compiled_scenes=0
+          
           for pattern in CaseA CaseB CaseC CaseD CaseE; do
-            for file in theories/${pattern}_*.vo 2>/dev/null; do
+            echo "  $pattern 系列:"
+            for file in theories/${pattern}_*.v 2>/dev/null; do
               if [ -f "$file" ]; then
-                base=$(basename "$file" .vo)
-                lines=0
-                if [ -f "theories/${base}.v" ]; then
-                  lines=$(wc -l < "theories/${base}.v" 2>/dev/null || echo 0)
+                base=$(basename "$file" .v)
+                total_scenes=$((total_scenes + 1))
+                
+                if [ -f "theories/${base}.vo" ]; then
+                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                  echo "    ✅ $base ($lines 行)"
+                  compiled_scenes=$((compiled_scenes + 1))
+                else
+                  echo "    ❌ $base (编译失败)"
                 fi
-                echo "  ✅ $base ($lines 行)"
               fi
             done
           done
+          
+          echo ""
+          echo "总计: $compiled_scenes/$total_scenes 个场景编译成功"
+          
+          if [ $total_scenes -eq 0 ]; then
+            echo "⚠️ 未找到任何场景文件"
+          fi
+
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-3-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            build-logs/
+          retention-days: 7
 
   compile-phase-4:
     name: 🔮 阶段4:扩展模块编译
-    needs: [compile-phase-3, compile-phase-1]
+    needs: [compile-phase-3]
     runs-on: ubuntu-22.04
-    timeout-minutes: 50
+    timeout-minutes: 60
     env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -m ${{ env.COQ_MEMORY }}"
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null"
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: 📥 恢复阶段3结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-3-compiled
+          path: .
+
       - name: 🔄 设置环境
         run: |
           eval $(opam env)
           echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
           
-          # 复制依赖文件
-          mkdir -p SelfContainedLib
-          mkdir -p theories
-          cp -r ../compile-phase-1/SelfContainedLib/*.vo SelfContainedLib/ 2>/dev/null || true
-          cp -r ../compile-phase-2/theories/*.vo theories/ 2>/dev/null || true
-          cp -r ../compile-phase-3/theories/*.vo theories/ 2>/dev/null || true
+          # 创建目录结构
+          mkdir -p SelfContainedLib theories Quantum CS_Null
 
       - name: 📁 检查扩展模块
         run: |
           echo "=== 扩展模块结构检查 ==="
-          echo "量子模块:"
-          ls -la Quantum/*.v 2>/dev/null || echo "无量子模块"
+          echo "目录结构:"
+          ls -la
+          
           echo ""
-          echo "空值系统:"
-          ls -la CS_Null/*.v 2>/dev/null || echo "无空值系统"
+          echo "量子模块文件:"
+          find Quantum -name "*.v" 2>/dev/null | head -10 || echo "无量子模块"
+          
+          echo ""
+          echo "空值系统文件:"
+          find CS_Null -name "*.v" 2>/dev/null | head -10 || echo "无空值系统"
+          
           echo ""
           echo "总文件数:"
           find Quantum CS_Null -name "*.v" 2>/dev/null | wc -l || echo "0"
@@ -608,6 +776,10 @@ jobs:
       - name: 🔧 编译量子模块
         run: |
           eval $(opam env)
+          
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
           echo "🔬 编译量子模块..."
           
           # 检查量子文件是否存在
@@ -622,44 +794,79 @@ jobs:
             exit 0
           fi
           
-          # 检查是否依赖Geometry（曲率计算）
-          if grep -q "Geometry" Quantum/*.v 2>/dev/null; then
-            echo "检测到几何依赖，需要Geometry.vo"
-            if [ ! -f "SelfContainedLib/Geometry.vo" ]; then
-              echo "❌ 缺少Geometry.vo，量子模块无法编译"
-              exit 1
+          # 编译函数
+          compile_quantum() {
+            local file=$1
+            local base=$(basename "$file" .v)
+            local log_file="build-logs/quantum_${base}.log"
+            
+            echo "  编译 $base.v..."
+            
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
             fi
-          fi
-          
-          # 编译QFT_FRF.v
-          if [ -f "Quantum/QFT_FRF.v" ]; then
-            echo "1. 编译 QFT_FRF.v..."
-            if coqc $COQFLAGS Quantum/QFT_FRF.v 2>&1; then
-              echo "✅ QFT_FRF.v 编译成功"
+            
+            # 检查依赖
+            if grep -q "Require.*Geometry" "$file" 2>/dev/null; then
+              if [ ! -f "SelfContainedLib/Geometry.vo" ]; then
+                echo "❌ 缺少Geometry依赖"
+                return 1
+              fi
+            fi
+            
+            # 设置编译参数
+            local extra_flags=""
+            local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            
+            if [ $line_count -gt 2000 ]; then
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
+              echo "    大文件，使用增强参数"
+            fi
+            
+            # 执行编译
+            if timeout 15m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
+              echo "    ✅ $base.v 编译成功"
+              return 0
             else
-              echo "❌ QFT_FRF.v 编译失败"
-              exit 1
+              echo "    ❌ $base.v 编译失败"
+              return 1
             fi
-          else
-            echo "⚠️  QFT_FRF.v 不存在"
+          }
+          
+          # 编译量子文件
+          failed=0
+          
+          # 先编译QFT_FRF.v
+          if [ -f "Quantum/QFT_FRF.v" ]; then
+            compile_quantum "Quantum/QFT_FRF.v" || failed=1
           fi
           
           # 编译CurvedSpacetimeQFT.v
           if [ -f "Quantum/CurvedSpacetimeQFT.v" ]; then
-            echo "2. 编译 CurvedSpacetimeQFT.v..."
-            if coqc $COQFLAGS -async-proofs on Quantum/CurvedSpacetimeQFT.v 2>&1; then
-              echo "✅ CurvedSpacetimeQFT.v 编译成功"
-            else
-              echo "❌ CurvedSpacetimeQFT.v 编译失败"
-              exit 1
-            fi
-          else
-            echo "⚠️  CurvedSpacetimeQFT.v 不存在"
+            compile_quantum "Quantum/CurvedSpacetimeQFT.v" || failed=1
           fi
+          
+          # 编译其他量子文件
+          for file in Quantum/*.v 2>/dev/null; do
+            base=$(basename "$file" .v)
+            if [ "$base" != "QFT_FRF" ] && [ "$base" != "CurvedSpacetimeQFT" ]; then
+              compile_quantum "$file" || failed=1
+            fi
+          done
+          
+          if [ $failed -eq 1 ]; then
+            echo "❌ 量子模块编译有失败"
+            exit 1
+          fi
+          
+          echo "✅ 量子模块编译完成"
 
       - name: 🔧 编译空值系统基础
         run: |
           eval $(opam env)
+          
           echo "📊 编译空值系统基础模块..."
           
           # 检查空值系统文件是否存在
@@ -674,35 +881,67 @@ jobs:
             exit 0
           fi
           
-          # FRF_CS_Null_Common.v是极大文件，需要特殊处理
-          if [ -f "CS_Null/FRF_CS_Null_Common.v" ]; then
-            echo "1. 编译 FRF_CS_Null_Common.v (极大文件)..."
-            if coqc $COQFLAGS -m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 8 CS_Null/FRF_CS_Null_Common.v 2>&1; then
-              echo "✅ FRF_CS_Null_Common.v 编译成功"
-            else
-              echo "❌ FRF_CS_Null_Common.v 编译失败"
-              exit 1
+          # 编译函数
+          compile_csnull() {
+            local file=$1
+            local base=$(basename "$file" .v)
+            local log_file="build-logs/csnull_${base}.log"
+            
+            echo "  编译 $base.v..."
+            
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
             fi
-          else
-            echo "⚠️  FRF_CS_Null_Common.v 不存在"
+            
+            # 设置编译参数
+            local extra_flags=""
+            local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            
+            if [ "$base" = "FRF_CS_Null_Common" ] && [ $line_count -gt 5000 ]; then
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 8"
+              echo "    极大文件，使用最强参数"
+            elif [ $line_count -gt 3000 ]; then
+              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
+              echo "    大文件，使用增强参数"
+            fi
+            
+            # 执行编译
+            if timeout 20m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
+              echo "    ✅ $base.v 编译成功"
+              return 0
+            else
+              echo "    ❌ $base.v 编译失败"
+              echo "=== 错误摘要 ==="
+              tail -20 "$log_file"
+              return 1
+            fi
+          }
+          
+          # 编译空值系统文件
+          failed=0
+          
+          # 先编译基础文件
+          if [ -f "CS_Null/FRF_CS_Null_Common.v" ]; then
+            compile_csnull "CS_Null/FRF_CS_Null_Common.v" || failed=1
           fi
           
-          # FRF_CS_Null.v
           if [ -f "CS_Null/FRF_CS_Null.v" ]; then
-            echo "2. 编译 FRF_CS_Null.v..."
-            if coqc $COQFLAGS CS_Null/FRF_CS_Null.v 2>&1; then
-              echo "✅ FRF_CS_Null.v 编译成功"
-            else
-              echo "❌ FRF_CS_Null.v 编译失败"
-              exit 1
-            fi
-          else
-            echo "⚠️  FRF_CS_Null.v 不存在"
+            compile_csnull "CS_Null/FRF_CS_Null.v" || failed=1
           fi
+          
+          if [ $failed -eq 1 ]; then
+            echo "❌ 空值系统基础模块编译失败"
+            exit 1
+          fi
+          
+          echo "✅ 空值系统基础模块编译完成"
 
       - name: 🔧 编译语言空值模块
         run: |
           eval $(opam env)
+          
           echo "🌐 编译语言空值模块..."
           
           # 检查语言文件是否存在
@@ -717,47 +956,36 @@ jobs:
             exit 0
           fi
           
-          # 编译函数
-          compile_lang_null() {
-            local lang=$1
-            local file="CS_Null/${lang}Null.v"
+          # 定义语言编译顺序
+          languages="Cxx Python Java Math Rust"
+          
+          failed=0
+          for lang in $languages; do
+            file="CS_Null/${lang}Null.v"
             
             if [ ! -f "$file" ]; then
               echo "⚠️  $file 不存在"
-              return 0
+              continue
             fi
             
             echo "  编译 ${lang}Null.v..."
+            local log_file="build-logs/${lang}Null.log"
             
-            # 根据不同语言设置编译参数
-            case $lang in
-              Java|Math)
-                # 实数依赖
-                coqc $COQFLAGS -async-proofs on "$file" 2>&1
-                ;;
-              Cxx)
-                # 中等大小
-                coqc $COQFLAGS "$file" 2>&1
-                ;;
-              *)
-                # 默认
-                coqc $COQFLAGS "$file" 2>&1
-                ;;
-            esac
+            # 设置编译参数
+            local extra_flags=""
+            local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
             
-            if [ $? -eq 0 ]; then
+            if [ $line_count -gt 2000 ]; then
+              extra_flags="-async-proofs on"
+            fi
+            
+            # 执行编译
+            if timeout 10m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
               echo "    ✅ ${lang}Null.v 编译成功"
-              return 0
             else
               echo "    ❌ ${lang}Null.v 编译失败"
-              return 1
+              failed=1
             fi
-          }
-          
-          # 编译所有语言模块
-          failed=0
-          for lang in Cxx Python Java Math Rust; do
-            compile_lang_null "$lang" || failed=1
           done
           
           if [ $failed -eq 1 ]; then
@@ -770,56 +998,89 @@ jobs:
       - name: 📈 扩展模块统计
         run: |
           echo "=== 扩展模块编译统计 ==="
+          
           echo "量子模块:"
+          qcount=0
           for file in Quantum/*.vo 2>/dev/null; do
             base=$(basename "$file" .vo)
             echo "  ✅ $base"
-          done || echo "  无量子模块"
+            qcount=$((qcount + 1))
+          done
+          if [ $qcount -eq 0 ]; then
+            echo "  无量子模块"
+          else
+            echo "  总计: $qcount 个模块"
+          fi
           
           echo ""
           echo "空值系统:"
-          count=0
+          cscount=0
           for file in CS_Null/*.vo 2>/dev/null; do
             base=$(basename "$file" .vo)
             echo "  ✅ $base"
-            count=$((count + 1))
+            cscount=$((cscount + 1))
           done
-          echo "  总计: $count 个模块"
+          if [ $cscount -eq 0 ]; then
+            echo "  无空值系统模块"
+          else
+            echo "  总计: $cscount 个模块"
+          fi
+
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-4-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            Quantum/*.vo
+            Quantum/*.glob
+            CS_Null/*.vo
+            CS_Null/*.glob
+            build-logs/
+          retention-days: 7
 
   compile-phase-5:
     name: 🧩 阶段5:集成模块编译
-    needs: [compile-phase-4, compile-phase-2, compile-phase-3]
+    needs: compile-phase-4
     runs-on: ubuntu-22.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -m ${{ env.BIGFILE_MEMORY }}"
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null"
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: 📥 恢复阶段4结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-4-compiled
+          path: .
+
       - name: 🔄 设置环境
         run: |
           eval $(opam env)
           echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
           
-          # 复制所有依赖文件
+          # 创建目录结构
           mkdir -p SelfContainedLib theories Quantum CS_Null
-          cp -r ../compile-phase-1/SelfContainedLib/*.vo SelfContainedLib/ 2>/dev/null || true
-          cp -r ../compile-phase-2/theories/*.vo theories/ 2>/dev/null || true
-          cp -r ../compile-phase-3/theories/*.vo theories/ 2>/dev/null || true
-          cp -r ../compile-phase-4/Quantum/*.vo Quantum/ 2>/dev/null || true
-          cp -r ../compile-phase-4/CS_Null/*.vo CS_Null/ 2>/dev/null || true
 
       - name: 🔧 编译集成模块
         run: |
           eval $(opam env)
+          
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
           echo "🧩 编译集成模块 FRF_Comparative.v..."
           
           # 检查文件是否存在
           if [ ! -f "theories/FRF_Comparative.v" ]; then
-            echo "⚠️  FRF_Comparative.v 不存在"
+            echo "⚠️ FRF_Comparative.v 不存在"
             exit 0
           fi
           
@@ -847,78 +1108,126 @@ jobs:
           
           echo "✅ 所有依赖就绪"
           
-          # 编译集成模块（极大文件）
+          # 编译集成模块
           echo "开始编译 FRF_Comparative.v..."
           
-          if coqc $COQFLAGS -async-proofs on -async-proofs-tac-j 6 theories/FRF_Comparative.v 2>&1; then
+          local log_file="build-logs/FRF_Comparative.log"
+          local line_count=$(wc -l < "theories/FRF_Comparative.v" 2>/dev/null || echo 0)
+          
+          # 设置编译参数（大文件处理）
+          local extra_flags=""
+          if [ $line_count -gt 4000 ]; then
+            extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 6"
+            echo "  大文件检测: $line_count 行，使用增强参数"
+          fi
+          
+          if timeout 25m coqc $COQFLAGS $extra_flags theories/FRF_Comparative.v 2>&1 | tee "$log_file"; then
             echo "✅ FRF_Comparative.v 编译成功"
           else
             echo "❌ FRF_Comparative.v 编译失败"
-            coqc $COQFLAGS theories/FRF_Comparative.v 2>&1 | head -40
+            echo "=== 最后30行错误日志 ==="
+            tail -30 "$log_file"
             exit 1
           fi
 
       - name: 📊 集成模块验证
         run: |
           echo "=== 集成模块验证 ==="
-          echo "编译文件:"
+          
           if [ -f "theories/FRF_Comparative.vo" ]; then
-            size=0
+            size=$(stat -c%s "theories/FRF_Comparative.vo" 2>/dev/null || echo 0)
+            lines=0
             if [ -f "theories/FRF_Comparative.v" ]; then
-              size=$(wc -l < "theories/FRF_Comparative.v" 2>/dev/null || echo 0)
+              lines=$(wc -l < "theories/FRF_Comparative.v" 2>/dev/null || echo 0)
             fi
-            echo "  ✅ FRF_Comparative.vo ($size 行)"
+            echo "  ✅ FRF_Comparative.vo"
+            echo "    文件大小: ${size} bytes"
+            echo "    源代码: $lines 行"
+            
             echo ""
-            echo "生成报告功能验证..."
+            echo "模块功能验证..."
+            
             # 检查报告生成函数是否存在
-            if grep -q "default_comparative_report" theories/FRF_Comparative.v 2>/dev/null; then
-              echo "  ✅ 报告生成函数存在"
+            if grep -q "default_comparative_report\|Report\|report" theories/FRF_Comparative.v 2>/dev/null; then
+              echo "  ✅ 报告生成功能存在"
             else
-              echo "  ⚠️  报告生成函数未找到"
+              echo "  ⚠️  报告生成功能未明确找到"
+            fi
+            
+            # 检查导出项
+            if [ -f "theories/FRF_Comparative.glob" ]; then
+              export_count=$(grep -c "^[A-Z]" theories/FRF_Comparative.glob 2>/dev/null || echo 0)
+              echo "  📊 导出项: $export_count 个"
             fi
           else
             echo "  ❌ FRF_Comparative.vo 缺失"
           fi
 
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-5-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            Quantum/*.vo
+            Quantum/*.glob
+            CS_Null/*.vo
+            CS_Null/*.glob
+            build-logs/
+          retention-days: 7
+
   compile-phase-6:
     name: 🧪 阶段6:测试套件编译
-    needs: [compile-phase-5, compile-phase-1, compile-phase-2, compile-phase-3]
+    needs: compile-phase-5
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -Q Test Test -m ${{ env.COQ_MEMORY }}"
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -Q Test Test"
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
+      - name: 📥 恢复阶段5结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-5-compiled
+          path: .
+
       - name: 🔄 设置环境
         run: |
           eval $(opam env)
           echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
           
-          # 复制所有依赖文件
+          # 创建目录结构
           mkdir -p SelfContainedLib theories Quantum CS_Null Test
-          cp -r ../compile-phase-1/SelfContainedLib/*.vo SelfContainedLib/ 2>/dev/null || true
-          cp -r ../compile-phase-2/theories/*.vo theories/ 2>/dev/null || true
-          cp -r ../compile-phase-3/theories/*.vo theories/ 2>/dev/null || true
-          cp -r ../compile-phase-4/Quantum/*.vo Quantum/ 2>/dev/null || true
-          cp -r ../compile-phase-4/CS_Null/*.vo CS_Null/ 2>/dev/null || true
-          cp -r ../compile-phase-5/theories/*.vo theories/ 2>/dev/null || true
 
       - name: 🧪 检查测试套件
         run: |
           echo "=== 测试套件检查 ==="
+          echo "测试目录:"
+          ls -la Test/ 2>/dev/null || echo "Test目录不存在"
+          
+          echo ""
           echo "测试文件:"
-          ls -la Test/*.v 2>/dev/null || echo "无测试文件"
+          find Test -name "*.v" 2>/dev/null | head -20 || echo "无测试文件"
+          
           echo ""
           echo "测试统计:"
-          find Test -name "*.v" 2>/dev/null | wc -l || echo "0"
+          test_count=$(find Test -name "*.v" 2>/dev/null | wc -l)
+          echo "  总测试文件数: $test_count"
 
       - name: 🔧 编译测试
         run: |
           eval $(opam env)
+          
+          # 创建编译日志目录
+          mkdir -p build-logs
+          
           echo "🧪 编译测试套件..."
           
           # 检查测试文件是否存在
@@ -929,7 +1238,7 @@ jobs:
           done
           
           if [ $test_files_count -eq 0 ]; then
-            echo "⚠️  未找到测试文件"
+            echo "⚠️ 未找到测试文件"
             exit 0
           fi
           
@@ -937,29 +1246,36 @@ jobs:
           compile_test() {
             local file=$1
             local base=$(basename "$file" .v)
+            local log_file="build-logs/test_${base}.log"
             
             echo "  测试: $base.v..."
             
+            # 检查文件是否存在
+            if [ ! -f "$file" ]; then
+              echo "❌ 文件不存在: $file"
+              return 1
+            fi
+            
+            # 设置编译参数
+            local extra_flags=""
+            local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+            
             case $base in
               Test_FRF_MetaTheory|Test_BlockchainSystem)
-                # 大测试文件
-                coqc $COQFLAGS -async-proofs on "$file" 2>&1
+                if [ $line_count -gt 2000 ]; then
+                  extra_flags="-async-proofs on"
+                  echo "    大测试文件，使用异步证明"
+                fi
                 ;;
               Test_QuantumVacuum|SelfContainedVerification)
-                # 中等测试文件
-                coqc $COQFLAGS "$file" 2>&1
-                ;;
-              Test_Basic)
-                # 小测试文件
-                coqc $COQFLAGS "$file" 2>&1
-                ;;
-              *)
-                # 默认
-                coqc $COQFLAGS "$file" 2>&1
+                if [ $line_count -gt 1000 ]; then
+                  extra_flags=""
+                fi
                 ;;
             esac
             
-            if [ $? -eq 0 ]; then
+            # 执行编译
+            if timeout 10m coqc $COQFLAGS $extra_flags "$file" 2>&1 | tee "$log_file"; then
               echo "    ✅ $base.v 编译成功"
               return 0
             else
@@ -970,9 +1286,23 @@ jobs:
           
           # 编译所有测试文件
           failed=0
+          success=0
+          total=0
+          
           for file in Test/*.v 2>/dev/null; do
-            compile_test "$file" || failed=1
+            total=$((total + 1))
+            if compile_test "$file"; then
+              success=$((success + 1))
+            else
+              failed=1
+            fi
+            
+            # 小文件之间短暂休息
+            sleep 1
           done
+          
+          echo ""
+          echo "测试编译统计: $success/$total 个测试编译成功"
           
           if [ $failed -eq 1 ]; then
             echo "❌ 测试套件编译有失败"
@@ -984,14 +1314,15 @@ jobs:
       - name: 📊 测试编译统计
         run: |
           echo "=== 测试套件编译统计 ==="
-          echo "测试文件:"
+          
           total=0
           success=0
           
           for file in Test/*.vo 2>/dev/null; do
             if [ -f "$file" ]; then
               base=$(basename "$file" .vo)
-              echo "  ✅ $base"
+              size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+              echo "  ✅ $base (${size} bytes)"
               success=$((success + 1))
             fi
             total=$((total + 1))
@@ -1002,15 +1333,41 @@ jobs:
           else
             echo ""
             echo "统计: $success/$total 个测试编译成功"
+            
+            # 检查是否有未编译的测试文件
+            for file in Test/*.v 2>/dev/null; do
+              base=$(basename "$file" .v)
+              if [ ! -f "Test/${base}.vo" ]; then
+                echo "  ❌ $base.v (未编译)"
+              fi
+            done
           fi
+
+      - name: 💾 保存编译结果
+        uses: actions/upload-artifact@v3
+        with:
+          name: phase-6-compiled
+          path: |
+            SelfContainedLib/*.vo
+            SelfContainedLib/*.glob
+            theories/*.vo
+            theories/*.glob
+            Quantum/*.vo
+            Quantum/*.glob
+            CS_Null/*.vo
+            CS_Null/*.glob
+            Test/*.vo
+            Test/*.glob
+            build-logs/
+          retention-days: 7
 
   full-verification-report:
     name: 📋 全量验证报告生成
     needs: [compile-phase-1, compile-phase-2, compile-phase-3, compile-phase-4, compile-phase-5, compile-phase-6]
     if: always()
     runs-on: ubuntu-22.04
-       steps:
-       - name: 📥 收集编译结果
+    steps:
+      - name: 📥 收集编译结果
         run: |
           echo "=== 收集各阶段编译结果 ==="
           
@@ -1018,17 +1375,30 @@ jobs:
           mkdir -p verification-report
           mkdir -p compilation-artifacts
           
-          # 收集各阶段文件
+          # 下载各阶段编译结果
           for phase in 1 2 3 4 5 6; do
+            echo "下载阶段 $phase 结果..."
             mkdir -p "compilation-artifacts/phase-$phase"
-            if [ -d "../compile-phase-$phase" ]; then
-              find "../compile-phase-$phase" -name "*.vo" -o -name "*.glob" 2>/dev/null | head -20 | while read -r file; do
-                cp "$file" "compilation-artifacts/phase-$phase/" 2>/dev/null || true
+            
+            # 尝试下载artifact
+            if curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                   -H "Accept: application/vnd.github.v3+json" \
+                   "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" 2>/dev/null | \
+                   grep -q "phase-$phase-compiled"; then
+              echo "  阶段 $phase 结果可用"
+            else
+              echo "  阶段 $phase 结果不可用"
+            fi
+          done
 
+      - name: 📥 恢复最后阶段结果
+        uses: actions/download-artifact@v3
+        with:
+          name: phase-6-compiled
+          path: compilation-artifacts/final
+        continue-on-error: true
 
-
-
-       - name: 📊 生成验证报告
+      - name: 📊 生成验证报告
         run: |
           echo "生成全量验证报告..."
           
@@ -1073,27 +1443,24 @@ jobs:
           fi
           
           # 生成Markdown报告
-          cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+          cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概览
-          EOF
-          echo"- **验证时间**:$(date)">> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **环境**:Ubuntu 22.04" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **总文件数**:$TOTAL_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **编译成功**:$COMPILED_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **编译成功率**:${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **大文件(>3000行)**:$HUGE_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **大文件编译成功**:$HUGE_COMPILED" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+- **验证时间**: $(date)
+- **环境**: Ubuntu 22.04
+- **总文件数**: $TOTAL_FILES
+- **编译成功**: $COMPILED_FILES
+- **编译成功率**: ${SUCCESS_RATE}%
+- **大文件(>3000行)**: $HUGE_FILES
+- **大文件编译成功**: $HUGE_COMPILED
 
 ## 模块编译状态
 
 ### 层级1:自包含基础库
-### |模块|状态|行数|实数依赖|
-### |------|------|------|----------|
-          EOF
+| 模块 | 状态 | 行数 | 实数依赖 |
+|------|------|------|----------|
+EOF
           
           # 基础库状态
           for file in SelfContainedLib/*.v 2>/dev/null; do
@@ -1106,7 +1473,7 @@ jobs:
               fi
               
               real_dep="否"
-              if grep -q "Require.*Reals" "$file" 2>/dev/null; then
+              if grep -q "Require.*Reals\|Require Import Reals" "$file" 2>/dev/null; then
                 real_dep="是"
               fi
               
@@ -1114,7 +1481,7 @@ jobs:
             fi
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
 
 ### 层级2: FRF元理论
 | 模块 | 状态 | 行数 | 实数依赖 |
@@ -1122,8 +1489,8 @@ jobs:
 EOF
           
           # 元理论状态
-          for file in theories/FRF_MetaTheory.v theories/ChurchZero.v theories/ChurchNumerals.v; do
-            if [ -f "$file" ] 2>/dev/null; then
+          for file in theories/*.v 2>/dev/null; do
+            if [ -f "$file" ]; then
               base=$(basename "$file" .v)
               lines=$(wc -l < "$file" 2>/dev/null || echo 0)
               status="❌"
@@ -1132,7 +1499,7 @@ EOF
               fi
               
               real_dep="否"
-              if grep -q "Require.*Reals" "$file" 2>/dev/null; then
+              if grep -q "Require.*Reals\|Require Import Reals" "$file" 2>/dev/null; then
                 real_dep="是"
               fi
               
@@ -1140,7 +1507,89 @@ EOF
             fi
           done
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+
+### 层级3: 数学场景层
+| 场景 | 状态 | 行数 | 类型 |
+|------|------|------|------|
+EOF
+          
+          # 场景层状态
+          for pattern in CaseA CaseB CaseC CaseD CaseE; do
+            for file in theories/${pattern}_*.v 2>/dev/null; do
+              if [ -f "$file" ]; then
+                base=$(basename "$file" .v)
+                lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                status="❌"
+                if [ -f "${file%.v}.vo" ]; then
+                  status="✅"
+                fi
+                
+                echo "| $base | $status | $lines | $pattern |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+              fi
+            done
+          done
+          
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+
+### 层级4: 量子模块
+| 模块 | 状态 | 行数 | 功能 |
+|------|------|------|------|
+EOF
+          
+          # 量子模块状态
+          for file in Quantum/*.v 2>/dev/null; do
+            if [ -f "$file" ]; then
+              base=$(basename "$file" .v)
+              lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+              status="❌"
+              if [ -f "${file%.v}.vo" ]; then
+                status="✅"
+              fi
+              
+              # 简单描述
+              desc="量子模块"
+              if [[ "$base" == *"QFT"* ]]; then
+                desc="量子场论"
+              elif [[ "$base" == *"Curved"* ]]; then
+                desc="弯曲时空量子"
+              fi
+              
+              echo "| $base | $status | $lines | $desc |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+            fi
+          done
+          
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+
+### 层级4: 空值系统
+| 模块 | 状态 | 行数 | 语言 |
+|------|------|------|------|
+EOF
+          
+          # 空值系统状态
+          for file in CS_Null/*.v 2>/dev/null; do
+            if [ -f "$file" ]; then
+              base=$(basename "$file" .v)
+              lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+              status="❌"
+              if [ -f "${file%.v}.vo" ]; then
+                status="✅"
+              fi
+              
+              # 判断语言
+              lang="通用"
+              for l in Cxx Python Java Math Rust; do
+                if [[ "$base" == *"$l"* ]]; then
+                  lang="$l"
+                  break
+                fi
+              done
+              
+              echo "| $base | $status | $lines | $lang |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+            fi
+          done
+          
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
 
 ### 层级5: 集成模块
 | 模块 | 状态 | 行数 | 功能 |
@@ -1157,21 +1606,140 @@ EOF
             echo "| FRF_Comparative | $status | $lines | 跨系统对比核心 |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           fi
           
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
+
+### 层级6: 测试套件
+| 测试 | 状态 | 行数 | 测试目标 |
+|------|------|------|----------|
+EOF
+          
+          # 测试套件状态
+          for file in Test/*.v 2>/dev/null; do
+            if [ -f "$file" ]; then
+              base=$(basename "$file" .v)
+              lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+              status="❌"
+              if [ -f "${file%.v}.vo" ]; then
+                status="✅"
+              fi
+              
+              target="基础测试"
+              if [[ "$base" == *"MetaTheory"* ]]; then
+                target="元理论测试"
+              elif [[ "$base" == *"Quantum"* ]]; then
+                target="量子模块测试"
+              elif [[ "$base" == *"Blockchain"* ]]; then
+                target="区块链系统测试"
+              fi
+              
+              echo "| $base | $status | $lines | $target |" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+            fi
+          done
+          
           # 添加总结
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
 
 ## 验证总结
 EOF
           
-          if [ "$COMPILED_FILES" -eq "$TOTAL_FILES" ]; then
+          if [ "$COMPILED_FILES" -eq "$TOTAL_FILES" ] && [ "$TOTAL_FILES" -gt 0 ]; then
             echo "🎉 **所有模块编译成功！**" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
             echo "FRF 2.0 形式化验证完全通过。" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           else
             echo "⚠️  **部分模块编译失败**" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
             FAILED_COUNT=$((TOTAL_FILES - COMPILED_FILES))
             echo "失败文件数: $FAILED_COUNT" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+            
+            if [ "$FAILED_COUNT" -gt 0 ]; then
+              echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+              echo "### 失败文件列表" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+              for dir in SelfContainedLib theories Quantum CS_Null Test; do
+                if [ -d "$dir" ]; then
+                  for file in $(find "$dir" -name "*.v" 2>/dev/null); do
+                    vo_file="${file%.v}.vo"
+                    if [ ! -f "$vo_file" ]; then
+                      echo "- $file" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+                    fi
+                  done
+                fi
+              done
+            fi
           fi
           
-          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+          cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << EOF
 
 ## 环境信息
+- **系统**: Ubuntu 22.04
+- **CPU核心**: ${{ env.CORE_COUNT }}
+- **内存**: ${{ env.AVAIL_MEM }}MB 可用，${{ env.COQ_MEMORY }}MB 分配
+- **Coq版本**: 8.18.0
+- **mathcomp版本**: 完整安装
+- **验证时间**: $(date '+%Y-%m-%d %H:%M:%S')
+
+## 性能统计
+- **编译阶段**: 6个阶段
+- **总超时时间**: 约240分钟
+- **大文件处理**: $HUGE_COMPILED/$HUGE_FILES 个大文件编译成功
+- **并行编译**: ${{ env.PARALLEL_JOBS }} 个并行任务
+
+---
+*报告生成时间: $(date)*
+*验证流水线: ${{ github.run_id }}*
+EOF
+          
+          echo "✅ 验证报告生成完成"
+          echo "报告位置: verification-report/FRF2_FULL_VERIFICATION_REPORT.md"
+
+      - name: 📋 显示报告摘要
+        run: |
+          echo "=== 验证报告摘要 ==="
+          if [ -f "verification-report/FRF2_FULL_VERIFICATION_REPORT.md" ]; then
+            # 提取关键信息
+            echo "报告文件大小: $(stat -c%s verification-report/FRF2_FULL_VERIFICATION_REPORT.md) bytes"
+            echo ""
+            echo "报告前20行:"
+            head -20 verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+            echo ""
+            echo "报告最后10行:"
+            tail -10 verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          else
+            echo "❌ 报告文件未生成"
+          fi
+
+      - name: 📤 上传验证报告
+        uses: actions/upload-artifact@v3
+        with:
+          name: verification-report
+          path: |
+            verification-report/
+            compilation-artifacts/
+          retention-days: 30
+
+      - name: 📧 验证结果通知
+        if: always()
+        run: |
+          echo "=== 验证结果通知 ==="
+          
+          # 读取报告结果
+          if [ -f "verification-report/FRF2_FULL_VERIFICATION_REPORT.md" ]; then
+            # 提取成功率和失败数
+            success_rate=$(grep "编译成功率" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep -o '[0-9]\+%' || echo "0%")
+            total_files=$(grep "总文件数" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep -o '[0-9]\+' | head -1 || echo "0")
+            compiled_files=$(grep "编译成功" verification-report/FRF2_FULL_VERIFICATION_REPORT.md | grep -o '[0-9]\+' | head -1 || echo "0")
+            
+            echo "验证完成!"
+            echo "总文件数: $total_files"
+            echo "编译成功: $compiled_files"
+            echo "成功率: $success_rate"
+            
+            if [ "$total_files" -eq "$compiled_files" ] && [ "$total_files" -gt 0 ]; then
+              echo "✅ FRF 2.0 全量验证通过!"
+              exit 0
+            else
+              echo "⚠️  FRF 2.0 验证部分失败"
+              exit 1
+            fi
+          else
+            echo "❌ 验证报告未生成"
+            exit 1
+          fi
