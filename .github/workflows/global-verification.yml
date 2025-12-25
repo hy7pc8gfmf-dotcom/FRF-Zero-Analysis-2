@@ -86,16 +86,23 @@ jobs:
             zlib1g-dev
           echo "✅ 系统依赖安装完成"
 
-      - name: 🔄 初始配置OPAM
+      - name: 🔄 初始配置OPAM（修复版）
         run: |
-          # 初始化OPAM但不安装编译器
-          opam init --disable-sandboxing -y --bare
+          # 参考可执行版本的初始化方式
+          opam init --disable-sandboxing -y --compiler=4.14.0
+          
+          # 设置环境
+          eval $(opam env)
+          
+          # 添加Coq仓库
           opam repo add coq-released https://coq.inria.fr/opam/released
           opam update -y
           
           # 设置环境变量
           echo "OPAMROOT=~/.opam" >> $GITHUB_ENV
           echo "OPAMSWITCH=4.14.0" >> $GITHUB_ENV
+          
+          echo "✅ OPAM配置完成，当前switch: $(opam switch show)"
 
       - name: 📊 配置验证环境
         run: |
@@ -130,6 +137,7 @@ jobs:
           echo "系统环境检查:"
           echo "OPAM版本: $(opam --version)"
           echo "OCaml版本: $(ocamlc --version 2>/dev/null || echo '未安装')"
+          echo "当前switch: $(opam switch show)"
           
           # 设置默认版本
           echo "version=8.18.0" >> $GITHUB_OUTPUT
@@ -143,6 +151,7 @@ jobs:
           echo "可用内存: ${{ steps.check-memory.outputs.available_mb }}MB"
           echo "分配内存: ${{ env.COQ_MEMORY }}MB"
           echo "并行任务: ${{ env.PARALLEL_JOBS }}"
+          echo "当前switch: $(opam switch show)"
           echo "计划安装Coq版本: 8.18.0"
 
   install-dependencies:
@@ -155,36 +164,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: 🔄 设置OPAM环境
-        id: setup-opam
-        run: |
-          # 确保OPAM环境正确设置
-          eval $(opam env)
-          
-          # 设置OPAM根目录
-          OPAM_ROOT="${HOME}/.opam"
-          echo "OPAM_ROOT=${OPAM_ROOT}" >> $GITHUB_ENV
-          
-          # 创建切换（如果不存在）
-          if ! opam switch list --short | grep -q "4.14.0"; then
-            echo "创建OCaml 4.14.0切换..."
-            opam switch create 4.14.0 --yes
-          else
-            echo "切换到现有的4.14.0..."
-            opam switch 4.14.0
-          fi
-          
-          eval $(opam env)
-          
-          # 添加Coq仓库
-          opam repo add coq-released https://coq.inria.fr/opam/released --all-switches
-          opam update -y
-          
-          # 输出缓存键信息
-          echo "OPAM setup completed at $(date)" > opam-setup.log
-          echo "Cache will be based on this setup" >> opam-setup.log
-
-      - name: 📥 恢复OPAM缓存
+      - name: 🔄 恢复OPAM缓存
         uses: actions/cache@v3
         id: opam-cache
         with:
@@ -197,7 +177,27 @@ jobs:
             ${{ runner.os }}-opam-4.14.0-
             ${{ runner.os }}-opam-
 
-      - name: 📊 安装Coq核心
+      - name: 🔄 设置OPAM环境（优化版）
+        run: |
+          # 如果OPAM目录不存在，重新初始化
+          if [ ! -d "${HOME}/.opam" ]; then
+            echo "OPAM目录不存在，重新初始化..."
+            opam init --disable-sandboxing -y --compiler=4.14.0
+          fi
+          
+          # 确保使用正确的switch
+          opam switch 4.14.0
+          eval $(opam env)
+          
+          # 添加Coq仓库
+          opam repo add coq-released https://coq.inria.fr/opam/released --all-switches
+          opam update -y
+          
+          echo "✅ OPAM环境设置完成"
+          echo "当前switch: $(opam switch show)"
+          echo "OCaml版本: $(ocamlc --version)"
+
+      - name: 📊 安装Coq核心（匹配修复版本）
         run: |
           eval $(opam env)
           echo "安装Coq 8.18.0..."
@@ -212,12 +212,12 @@ jobs:
             exit 1
           fi
 
-      - name: 🧮 安装mathcomp
+      - name: 🧮 安装mathcomp（匹配版本）
         run: |
           eval $(opam env)
           echo "安装mathcomp系列..."
           
-          # 安装完整的mathcomp
+          # 安装完整的mathcomp，指定兼容版本
           opam install -y coq-mathcomp-ssreflect coq-mathcomp-fingroup coq-mathcomp-algebra
           opam install -y coq-mathcomp-solvable coq-mathcomp-field
           
@@ -256,9 +256,10 @@ jobs:
           echo "OPAM配置:"
           opam config report
           echo ""
-          echo "环境变量检查:"
+          echo "环境检查:"
           echo "OPAMROOT: $OPAMROOT"
           echo "OPAMSWITCH: $OPAMSWITCH"
+          echo "当前switch: $(opam switch show)"
 
   compile-phase-1:
     name: 🏗️ 阶段1:基础库编译
@@ -267,6 +268,8 @@ jobs:
     timeout-minutes: 45
     env:
       COQFLAGS: "-Q SelfContainedLib SelfContainedLib"
+      COQ_MEMORY: ${{ needs.setup-environment.outputs.memory_available }}
+      PARALLEL_JOBS: ${{ needs.setup-environment.outputs.core_count }}
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
@@ -287,7 +290,8 @@ jobs:
           find SelfContainedLib -name "*.v" 2>/dev/null | head -20 || echo "无文件"
           echo ""
           echo "编译参数: $COQFLAGS"
-          echo "内存限制: ${{ env.COQ_MEMORY }}MB"
+          echo "内存限制: $COQ_MEMORY MB"
+          echo "并行任务: $PARALLEL_JOBS"
 
       - name: 🔧 顺序编译基础库
         run: |
@@ -322,7 +326,7 @@ jobs:
             local extra_flags=""
             
             if [ "$base" = "Geometry" ] && [ $line_count -gt 1000 ]; then
-              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
+              extra_flags="-m 8192 -async-proofs on"
               echo "  大文件检测，使用增强参数"
             fi
             
@@ -402,6 +406,7 @@ jobs:
     timeout-minutes: 60
     env:
       COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories"
+      COQ_MEMORY: ${{ needs.setup-environment.outputs.memory_available }}
     steps:
       - name: 📥 检出代码
         uses: actions/checkout@v4
@@ -479,7 +484,7 @@ jobs:
             
             if [ "$base" = "FRF_MetaTheory" ] || [ "$base" = "ChurchNumerals" ]; then
               if [ $line_count -gt 2000 ]; then
-                extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
+                extra_flags="-m 8192 -async-proofs on -async-proofs-tac-j 4"
                 echo "  大文件，使用增强参数"
               fi
             fi
@@ -658,7 +663,7 @@ jobs:
             case $base in
               CaseE_*)
                 if [ $line_count -gt 3000 ]; then
-                  extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
+                  extra_flags="-m 8192 -async-proofs on -async-proofs-tac-j 4"
                   echo "  超大文件，使用增强参数"
                 fi
                 ;;
@@ -841,7 +846,7 @@ jobs:
             local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
             
             if [ $line_count -gt 2000 ]; then
-              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
+              extra_flags="-m 8192 -async-proofs on"
               echo "    大文件，使用增强参数"
             fi
             
@@ -920,10 +925,10 @@ jobs:
             local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
             
             if [ "$base" = "FRF_CS_Null_Common" ] && [ $line_count -gt 5000 ]; then
-              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 8"
+              extra_flags="-m 16384 -async-proofs on -async-proofs-tac-j 8"
               echo "    极大文件，使用最强参数"
             elif [ $line_count -gt 3000 ]; then
-              extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on"
+              extra_flags="-m 8192 -async-proofs on"
               echo "    大文件，使用增强参数"
             fi
             
@@ -1134,7 +1139,7 @@ jobs:
           # 设置编译参数（大文件处理）
           local extra_flags=""
           if [ $line_count -gt 4000 ]; then
-            extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 6"
+            extra_flags="-m 8192 -async-proofs on -async-proofs-tac-j 6"
             echo "  大文件检测: $line_count 行，使用增强参数"
           fi
           
@@ -1382,7 +1387,7 @@ jobs:
           # 创建报告目录
           mkdir -p verification-report
           
-          # 统计编译结果（保持原有代码不变）
+          # 统计编译结果
           TOTAL_FILES=0
           COMPILED_FILES=0
           HUGE_FILES=0
@@ -1427,6 +1432,8 @@ jobs:
           echo "- **GitHub Actions运行ID**: ${{ github.run_id }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **触发事件**: ${{ github.event_name }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **分支**: ${{ github.ref }}" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **OPAM Switch**: $(opam switch show)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **Coq版本**: $(coqc --version | head -1)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "## 编译统计" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **总文件数**: ${TOTAL_FILES} 个" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
@@ -1445,3 +1452,31 @@ jobs:
           echo "" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           
           echo "✅ 验证报告生成完成"
+
+    - name: 📤 上传验证报告
+      uses: actions/upload-artifact@v3
+      with:
+        name: full-verification-report
+        path: verification-report/
+        retention-days: 14
+
+  verification-summary:
+    name: 📋 验证总结
+    needs: [compile-phase-6]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 🎉 验证成功报告
+        run: |
+          echo "========================================="
+          echo "       🎉 FRF 2.0 全量验证完成！       "
+          echo "========================================="
+          echo ""
+          echo "✅ 所有编译阶段均成功完成"
+          echo "✅ 修复的OPAM环境配置正常工作"
+          echo "✅ 所有核心模块编译通过"
+          echo ""
+          echo "📊 验证结果已保存为 artifacts"
+          echo "📄 详细报告可在 artifacts 中查看"
+          echo ""
+          echo "🚀 验证流程结束状态: SUCCESS"
+          echo "========================================="
