@@ -787,7 +787,7 @@ jobs:
           echo "  总计: $count 个模块"
 
   compile-phase-5:
-    name: 🧩 阶段5: 集成模块编译
+    name: 🧩 阶段5:集成模块编译
     needs: [compile-phase-4, compile-phase-2, compile-phase-3]
     runs-on: ubuntu-22.04
     timeout-minutes: 35
