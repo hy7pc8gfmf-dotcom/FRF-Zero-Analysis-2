@@ -374,7 +374,7 @@ jobs:
         
         # 生成JSON格式的报告
         cat > verification-reports/full/verification_summary.json << EOF
-{
+        {
   "verification": {
     "timestamp": "$(date -Iseconds)",
     "environment": {
