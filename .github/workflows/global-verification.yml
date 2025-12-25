@@ -1409,8 +1409,8 @@ jobs:
           cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
 # FRF 2.0 全量形式化验证报告
 ## 环境信息
-- **系统**: Ubuntu 22.04
-- **CPU核心**: ${{ env.CORE_COUNT }}
+- **系统**:Ubuntu 22.04
+- **CPU核心**:${{ env.CORE_COUNT }}
 - **内存**: ${{ env.AVAIL_MEM }}MB 可用，${{ env.COQ_MEMORY }}MB 分配
 - **Coq版本**: 8.18.0
 - **mathcomp版本**: 完整安装
