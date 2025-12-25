@@ -205,4 +205,130 @@ jobs:
 
     - name: 📝 依赖验证报告
       run: |
-        eval $(op
+        eval $(opam env)
+        echo "=== 依赖验证报告 ==="
+        echo "Coq版本:"
+        coqc --version
+        echo ""
+        echo "安装的包:"
+        opam list --installed | grep -E "coq|mathcomp"
+        echo ""
+        echo "依赖树:"
+        opam list --tree --installed | head -50
+
+  compile-phase-1:
+    name: 🏗️ 阶段1: 基础库编译
+    needs: [setup-environment, install-dependencies]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -m ${{ env.COQ_MEMORY }}"
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: 🔄 设置环境
+      run: |
+        eval $(opam env)
+        echo "COQFLAGS=${{ env.COQFLAGS }}" >> $GITHUB_ENV
+
+    - name: 📊 编译前检查
+      run: |
+        echo "=== 基础库编译前检查 ==="
+        echo "基础库文件:"
+        ls -la SelfContainedLib/*.v
+        echo ""
+        echo "编译参数: $COQFLAGS"
+        echo "内存限制: ${{ env.COQ_MEMORY }}MB"
+        echo "并行编译: 启用"
+
+    - name: 🔧 并行编译基础库
+      run: |
+        eval $(opam env)
+        
+        # 定义编译函数
+        compile_file() {
+          local file=$1
+          local base=$(basename $file .v)
+          echo "🚀 编译 $base.v..."
+          
+          # 大文件特殊处理
+          local line_count=$(wc -l < "$file" 2>/dev/null || echo 0)
+          local extra_flags=""
+          
+          if [ "$base" = "Geometry" ]; then
+            extra_flags="-m ${{ env.BIGFILE_MEMORY }} -async-proofs on -async-proofs-tac-j 4"
+            echo "  大文件检测: $line_count 行，使用增强参数"
+          fi
+          
+          if coqc $COQFLAGS $extra_flags "$file" 2>&1; then
+            echo "✅ $base.v 编译成功"
+            return 0
+          else
+            echo "❌ $base.v 编译失败"
+            # 输出详细错误信息
+            coqc $COQFLAGS $extra_flags "$file" 2>&1 | head -30
+            return 1
+          fi
+        }
+        
+        export -f compile_file
+        export COQFLAGS
+        
+        # 并行编译三个基础文件
+        echo "开始并行编译基础库..."
+        
+        # 编译Algebra.v
+        compile_file "SelfContainedLib/Algebra.v" &
+        ALGEBRA_PID=$!
+        
+        # 编译Category.v
+        compile_file "SelfContainedLib/Category.v" &
+        CATEGORY_PID=$!
+        
+        # 编译Geometry.v（大文件，最后编译）
+        sleep 2  # 让其他文件先开始
+        compile_file "SelfContainedLib/Geometry.v" &
+        GEOMETRY_PID=$!
+        
+        # 等待所有编译完成
+        wait $ALGEBRA_PID || ALGEBRA_FAILED=1
+        wait $CATEGORY_PID || CATEGORY_FAILED=1
+        wait $GEOMETRY_PID || GEOMETRY_FAILED=1
+        
+        # 检查结果
+        if [ -n "$ALGEBRA_FAILED" ] || [ -n "$CATEGORY_FAILED" ] || [ -n "$GEOMETRY_FAILED" ]; then
+          echo "❌ 基础库编译失败"
+          exit 1
+        fi
+        
+        echo "✅ 基础库编译完成"
+
+    - name: 📈 编译结果统计
+      run: |
+        echo "=== 基础库编译统计 ==="
+        echo "编译文件:"
+        for file in Algebra Category Geometry; do
+          if [ -f "SelfContainedLib/$file.vo" ]; then
+            echo "  ✅ $file.vo (存在)"
+          else
+            echo "  ❌ $file.vo (缺失)"
+          fi
+        done
+        echo ""
+        echo "生成文件列表:"
+        ls -la SelfContainedLib/*.vo SelfContainedLib/*.glob 2>/dev/null || echo "无生成文件"
+
+  compile-phase-2:
+    name: 🧠 阶段2: 元理论层编译
+    needs: compile-phase-1
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -m ${{ env.COQ_MEMORY }}"
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v
+
