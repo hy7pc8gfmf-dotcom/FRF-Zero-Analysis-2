@@ -1199,31 +1199,7 @@ jobs:
             CS_Null/*.vo
             CS_Null/*.glob
             build-logs/
-          retention-days: 7
-
-  compile-phase-6:
-    name: 🧪 阶段6:测试套件编译
-    needs: compile-phase-5
-    runs-on: ubuntu-22.04
-    timeout-minutes: 40
-    env:
-      COQFLAGS: "-Q SelfContainedLib SelfContainedLib -Q theories theories -Q Quantum Quantum -Q CS_Null CS_Null -Q Test Test"
-    steps:
-      - name: 📥 检出代码
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: 🔄 设置Coq环境
-        run: |
-          eval $(opam env)
-          echo "Coq环境已设置"
-
-      - name: 📥 恢复阶段5结果
-        uses: actions/download-artifact@v3
-        with:
-          name: phase-5-compiled
-          path: .
+          retention-days
 
       - name: 🧪 检查测试套件
         run: |
