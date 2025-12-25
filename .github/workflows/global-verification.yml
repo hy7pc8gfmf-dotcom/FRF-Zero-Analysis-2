@@ -1468,7 +1468,7 @@ jobs:
           # 开始生成报告
           cat > "$REPORT_FILE" << EOF
 
-*报告生成时间: $(date)*
+*** 报告生成时间: $(date)*
 *验证流水线: ${GITHUB_RUN_ID}*
 EOF
           
