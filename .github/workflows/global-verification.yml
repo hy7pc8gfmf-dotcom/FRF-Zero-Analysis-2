@@ -569,7 +569,7 @@ jobs:
           done
 
   compile-phase-4:
-    name: 阶段4: 扩展模块编译
+    name: 阶段4:
     needs: [compile-phase-3, compile-phase-1]
     runs-on: ubuntu-22.04
     timeout-minutes: 50
