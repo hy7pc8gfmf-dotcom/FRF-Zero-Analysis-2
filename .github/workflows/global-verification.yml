@@ -430,12 +430,15 @@ jobs:
           cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
 # FRF 2.0 形式化验证报告
 
-## 验证概览
-- **验证时间**: $(date)
-- **触发事件**: ${{ github.event_name }}
-- **触发分支**: ${{ github.ref }}
-- **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
+FRF 2.0 形式化验证报告
+验证概览
+验证时间: $(date)
 
+触发事件: ${{ github.event_name }}
+
+触发分支: ${{ github.ref }}
+
+验证模式: ${{ github.event.inputs.verify_mode || 'full' }}
 ## 构建环境
 - **系统**: Ubuntu 22.04
 - **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
