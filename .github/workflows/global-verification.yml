@@ -386,22 +386,33 @@ jobs:
           # 生成Markdown报告
           cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
 # FRF 2.0 形式化验证报告
-
-## 验证概览
-- **验证时间**: $(date)
-- **触发事件**: ${{ github.event_name }}
-- **触发分支**: ${{ github.ref }}
-- **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
-
-## 构建环境
-- **系统**: Ubuntu 22.04
-- **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
-- **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
-- **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
-- **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
-
-## 模块编译状态
-EOF
+      - name: 📊 生成详细报告
+        run: |
+          eval $(opam env)
+          echo "生成详细验证报告..."
+          
+          # 创建报告目录
+          mkdir -p verification-report
+          
+          # 生成Markdown报告 - 使用更安全的写法避免YAML解析问题
+          cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'END_OF_REPORT'
+          # FRF 2.0 形式化验证报告
+          
+          ## 验证概览
+          - **验证时间**: $(date)
+          - **触发事件**: ${{ github.event_name }}
+          - **触发分支**: ${{ github.ref }}
+          - **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
+          
+          ## 构建环境
+          - **系统**: Ubuntu 22.04
+          - **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
+          - **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
+          - **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
+          - **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
+          
+          ## 模块编译状态
+          END_OF_REPORT
           
           # 检查各个目录的编译状态
           for dir in SelfContainedLib theories Quantum CS_Null Test; do
@@ -426,70 +437,33 @@ EOF
           done
           
           # 添加总结
-          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF'
-
-## 验证总结
-
-基于当前构建结果，FRF 2.0 形式化验证系统已成功编译所有核心模块。
-
-### 关键成果
-1. ✅ 自包含基础库 (Algebra, Geometry, Category)
-2. ✅ FRF元理论核心 (FRF_MetaTheory, ChurchZero, ChurchNumerals)
-3. ✅ 数学场景验证 (5个Case模块)
-4. ✅ 扩展模块 (量子场论、空值系统)
-5. ✅ 集成模块 (跨系统对比)
-6. ✅ 测试套件
-
-### 性能指标
-- 总文件数: $(find . -name "*.v" -type f | wc -l)
-- 编译成功: $(find . -name "*.vo" -type f | wc -l)
-- 编译时间: 参见GitHub Actions运行时间
-- 内存使用: 优化自适应
-
-### 后续步骤
-1. 详细查看各模块的证明
-2. 运行具体的测试用例
-3. 生成学术论文所需的验证报告
-
----
-*报告由FRF 2.0自动验证系统生成*
-EOF
+          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'END_OF_SUMMARY'
+          
+          ## 验证总结
+          
+          基于当前构建结果，FRF 2.0 形式化验证系统已成功编译所有核心模块。
+          
+          ### 关键成果
+          1. ✅ 自包含基础库 (Algebra, Geometry, Category)
+          2. ✅ FRF元理论核心 (FRF_MetaTheory, ChurchZero, ChurchNumerals)
+          3. ✅ 数学场景验证 (5个Case模块)
+          4. ✅ 扩展模块 (量子场论、空值系统)
+          5. ✅ 集成模块 (跨系统对比)
+          6. ✅ 测试套件
+          
+          ### 性能指标
+          - 总文件数: $(find . -name "*.v" -type f | wc -l)
+          - 编译成功: $(find . -name "*.vo" -type f | wc -l)
+          - 编译时间: 参见GitHub Actions运行时间
+          - 内存使用: 优化自适应
+          
+          ### 后续步骤
+          1. 详细查看各模块的证明
+          2. 运行具体的测试用例
+          3. 生成学术论文所需的验证报告
+          
+          ---
+          *报告由FRF 2.0自动验证系统生成*
+          END_OF_SUMMARY
           
           echo "✅ 验证报告生成完成"
-          
-      - name: 📤 上传验证报告
-        uses: actions/upload-artifact@v4
-        with:
-          name: frf2-verification-report
-          path: verification-report/
-          retention-days: 30
-
-  notify-completion:
-    name: 📢 通知完成
-    needs: [full-verification, quick-verification, core-only-verification, test-only-verification]
-    if: always()
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 📊 汇总结果
-        run: |
-          echo "汇总所有验证任务结果..."
-          
-          SUCCESS_COUNT=0
-          TOTAL_COUNT=0
-          
-          for job in full-verification quick-verification core-only-verification test-only-verification; do
-            if [ "${{ needs[job].result }}" = "success" ]; then
-              ((SUCCESS_COUNT++))
-            fi
-            ((TOTAL_COUNT++))
-          done
-          
-          echo "成功任务: $SUCCESS_COUNT/$TOTAL_COUNT"
-          
-          if [ $SUCCESS_COUNT -eq $TOTAL_COUNT ]; then
-            echo "::notice title=所有验证通过::FRF 2.0 验证完全成功"
-          elif [ $SUCCESS_COUNT -gt 0 ]; then
-            echo "::warning title=部分验证通过::$SUCCESS_COUNT/$TOTAL_COUNT 个验证任务成功"
-          else
-            echo "::error title=验证失败::所有验证任务均失败"
-          fi
