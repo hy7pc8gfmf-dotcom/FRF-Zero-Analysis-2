@@ -1080,10 +1080,10 @@ jobs:
           EOF
           echo"- **验证时间**:$(date)">> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **环境**:Ubuntu 22.04" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **总文件数**: $TOTAL_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **编译成功**: $COMPILED_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **编译成功率**: ${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
-          echo "- **大文件(>3000行)**: $HUGE_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **总文件数**:$TOTAL_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **编译成功**:$COMPILED_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **编译成功率**:${SUCCESS_RATE}%" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
+          echo "- **大文件(>3000行)**:$HUGE_FILES" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           echo "- **大文件编译成功**: $HUGE_COMPILED" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
           
           cat >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
