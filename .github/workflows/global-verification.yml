@@ -75,129 +75,7 @@ jobs:
         echo "验证mathcomp安装:"
         opam list --installed | grep mathcomp
 
-    - name: 📊 创建编译配置
-      run: |
-        echo "创建编译配置..."
-        
-        # 创建编译脚本
-        cat > compile_all.sh << 'EOF'
-        #!/bin/bash
-        set -e
-        
-        echo "=== FRF 2.0 全量编译开始 ==="
-        echo "时间: $(date)"
-        echo ""
-        
-        # 基础编译参数
-        BASE_FLAGS="-w -deprecated"
-        
-        # 层级1：自包含基础库
-        echo "=== 层级1：自包含基础库 ==="
-        echo "编译Algebra.v..."
-        coqc -Q SelfContainedLib SelfContainedLib $BASE_FLAGS SelfContainedLib/Algebra.v
-        
-        echo "编译Category.v..."
-        coqc -Q SelfContainedLib SelfContainedLib $BASE_FLAGS SelfContainedLib/Category.v
-        
-        echo "编译Geometry.v（大文件）..."
-        coqc -Q SelfContainedLib SelfContainedLib $BASE_FLAGS -async-proofs on -async-proofs-tac-j 2 SelfContainedLib/Geometry.v
-        
-        # 层级2：FRF元理论层
-        echo ""
-        echo "=== 层级2：FRF元理论层 ==="
-        echo "编译FRF_MetaTheory.v（大文件）..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS -async-proofs on -async-proofs-tac-j 2 theories/FRF_MetaTheory.v
-        
-        echo "编译ChurchZero.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS theories/ChurchZero.v
-        
-        echo "编译ChurchNumerals.v（极大文件）..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS -async-proofs on -async-proofs-tac-j 2 -m 4096 theories/ChurchNumerals.v
-        
-        # 层级3：数学场景层
-        echo ""
-        echo "=== 层级3：数学场景层 ==="
-        echo "编译CaseA_SetTheory.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS theories/CaseA_SetTheory.v
-        
-        echo "编译CaseB_Algebra.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS theories/CaseB_Algebra.v
-        
-        echo "编译CaseC_TypeTheory.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS theories/CaseC_TypeTheory.v
-        
-        echo "编译CaseD_CategoryTheory.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS theories/CaseD_CategoryTheory.v
-        
-        echo "编译CaseE_QuantumVacuum.v（大文件）..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS -async-proofs on -async-proofs-tac-j 2 theories/CaseE_QuantumVacuum.v
-        
-        # 层级4：量子模块
-        echo ""
-        echo "=== 层级4：量子模块 ==="
-        echo "编译QFT_FRF.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum $BASE_FLAGS Quantum/QFT_FRF.v
-        
-        echo "编译CurvedSpacetimeQFT.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum $BASE_FLAGS Quantum/CurvedSpacetimeQFT.v
-        
-        # 层级4：空值系统模块
-        echo ""
-        echo "=== 层级4：空值系统模块 ==="
-        echo "编译FRF_CS_Null_Common.v（极大文件）..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS -async-proofs on -async-proofs-tac-j 2 -m 4096 CS_Null/FRF_CS_Null_Common.v
-        
-        echo "编译FRF_CS_Null.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS CS_Null/FRF_CS_Null.v
-        
-        echo "编译CxxNull.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS CS_Null/CxxNull.v
-        
-        echo "编译PythonNull.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS CS_Null/PythonNull.v
-        
-        echo "编译JavaNull.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS CS_Null/JavaNull.v
-        
-        echo "编译MathNull.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS CS_Null/MathNull.v
-        
-        echo "编译RustNull.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS CS_Null/RustNull.v
-        
-        # 层级5：集成模块
-        echo ""
-        echo "=== 层级5：集成模块 ==="
-        echo "编译FRF_Comparative.v（大文件）..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null $BASE_FLAGS -async-proofs on -async-proofs-tac-j 2 -m 4096 theories/FRF_Comparative.v
-        
-        # 层级6：测试套件
-        echo ""
-        echo "=== 层级6：测试套件 ==="
-        echo "编译Test_Basic.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS Test/Test_Basic.v
-        
-        echo "编译Test_FRF_MetaTheory.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS Test/Test_FRF_MetaTheory.v
-        
-        echo "编译Test_QuantumVacuum.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS Test/Test_QuantumVacuum.v
-        
-        echo "编译Test_BlockchainSystem.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS Test/Test_BlockchainSystem.v
-        
-        echo "编译SelfContainedVerification.v..."
-        coqc -Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS Test/SelfContainedVerification.v
-        
-        echo ""
-        echo "=== FRF 2.0 全量编译完成 ==="
-        echo "时间: $(date)"
-        EOF
-        
-        chmod +x compile_all.sh
-        echo "✅ 编译脚本创建完成"
-
-    - name: 🚀 执行全量编译
+    - name: 🚀 执行全量编译（优化版）
       timeout-minutes: 180
       run: |
         eval $(opam env)
@@ -205,105 +83,198 @@ jobs:
         echo "当前时间: $(date)"
         echo ""
         
-        # 执行编译脚本
-        ./compile_all.sh
+        # 设置基础编译参数
+        BASE_FLAGS="-w -deprecated"
+        
+        # 定义成功编译的模块列表
+        SUCCESS_MODULES=()
+        FAILED_MODULES=()
+        
+        # 编译函数
+        compile_module() {
+          local file="$1"
+          local flags="$2"
+          local desc="$3"
+          
+          echo ""
+          echo "🔧 编译: $(basename $file) - $desc"
+          echo "命令: coqc $flags $file"
+          
+          if coqc $flags "$file"; then
+            echo "✅ 编译成功: $(basename $file)"
+            SUCCESS_MODULES+=("$(basename $file)")
+            return 0
+          else
+            echo "❌ 编译失败: $(basename $file)"
+            FAILED_MODULES+=("$(basename $file)")
+            return 1
+          fi
+        }
+        
+        echo "=== 层级1：自包含基础库 ==="
+        compile_module "SelfContainedLib/Algebra.v" "-Q SelfContainedLib SelfContainedLib $BASE_FLAGS" "代数基础"
+        compile_module "SelfContainedLib/Category.v" "-Q SelfContainedLib SelfContainedLib $BASE_FLAGS" "范畴论基础"
+        compile_module "SelfContainedLib/Geometry.v" "-Q SelfContainedLib SelfContainedLib $BASE_FLAGS -async-proofs on -async-proofs-tac-j 4 -m 4096" "几何基础（大文件）"
+        
+        echo ""
+        echo "=== 层级2：FRF元理论层 ==="
+        compile_module "theories/FRF_MetaTheory.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS -async-proofs on -async-proofs-tac-j 4 -m 4096" "FRF元理论核心（大文件）"
+        compile_module "theories/ChurchZero.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS" "Church零理论"
+        compile_module "theories/ChurchNumerals.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS -async-proofs on -async-proofs-tac-j 4 -m 8192" "Church数理论（极大文件）"
+        
+        echo ""
+        echo "=== 层级3：数学场景层 ==="
+        compile_module "theories/CaseA_SetTheory.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS" "集合论场景"
+        compile_module "theories/CaseB_Algebra.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS" "代数场景"
+        compile_module "theories/CaseC_TypeTheory.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS" "类型论场景"
+        compile_module "theories/CaseD_CategoryTheory.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS" "范畴论场景"
+        compile_module "theories/CaseE_QuantumVacuum.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories $BASE_FLAGS -async-proofs on -async-proofs-tac-j 4 -m 4096" "量子真空态场景（大文件）"
+        
+        echo ""
+        echo "=== 层级4：量子模块 ==="
+        compile_module "Quantum/QFT_FRF.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum $BASE_FLAGS" "量子场论核心"
+        compile_module "Quantum/CurvedSpacetimeQFT.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum $BASE_FLAGS" "弯曲时空量子场论"
+        
+        echo ""
+        echo "=== 层级4：空值系统模块 ==="
+        compile_module "CS_Null/FRF_CS_Null_Common.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS -async-proofs on -async-proofs-tac-j 4 -m 8192" "空值系统基础（极大文件）"
+        compile_module "CS_Null/FRF_CS_Null.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS" "空值系统集成分析"
+        compile_module "CS_Null/CxxNull.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS" "C++空值"
+        compile_module "CS_Null/PythonNull.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS" "Python空值"
+        compile_module "CS_Null/JavaNull.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS" "Java空值"
+        compile_module "CS_Null/MathNull.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS" "数学计算空值"
+        compile_module "CS_Null/RustNull.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null $BASE_FLAGS" "Rust安全空值"
+        
+        echo ""
+        echo "=== 层级5：集成模块 ==="
+        compile_module "theories/FRF_Comparative.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null $BASE_FLAGS -async-proofs on -async-proofs-tac-j 4 -m 8192" "FRF跨系统对比核心（大文件）"
+        
+        echo ""
+        echo "=== 层级6：测试套件 ==="
+        compile_module "Test/Test_Basic.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS" "基础测试"
+        compile_module "Test/Test_FRF_MetaTheory.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS" "FRF元理论测试"
+        compile_module "Test/Test_QuantumVacuum.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS" "量子真空态测试"
+        compile_module "Test/Test_BlockchainSystem.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS" "区块链系统测试"
+        compile_module "Test/SelfContainedVerification.v" "-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q Quantum Quantum -Q CS_Null FRF.CS_Null -Q Test FRF.Test $BASE_FLAGS" "自包含模块验证"
+        
+        echo ""
+        echo "=== 编译完成 ==="
+        echo "当前时间: $(date)"
+        echo ""
+        echo "📊 编译结果统计:"
+        echo "✅ 成功编译: ${#SUCCESS_MODULES[@]} 个模块"
+        echo "❌ 编译失败: ${#FAILED_MODULES[@]} 个模块"
+        echo ""
+        
+        if [ ${#FAILED_MODULES[@]} -gt 0 ]; then
+          echo "❌ 编译失败的模块:"
+          for module in "${FAILED_MODULES[@]}"; do
+            echo "  - $module"
+          done
+          echo ""
+          echo "❌ 编译未完成，退出工作流"
+          exit 1
+        else
+          echo "🎉 所有模块编译成功！"
+          echo ""
+          echo "✅ 成功编译的模块列表:"
+          for module in "${SUCCESS_MODULES[@]}"; do
+            echo "  - $module"
+          done
+        fi
 
     - name: 📊 编译结果验证
       run: |
         echo "=== 编译结果验证 ==="
         echo ""
         
-        # 检查所有.vo文件
+        # 定义所有模块
+        ALL_MODULES=(
+          # 层级1
+          "SelfContainedLib/Algebra.vo"
+          "SelfContainedLib/Category.vo"
+          "SelfContainedLib/Geometry.vo"
+          
+          # 层级2
+          "theories/FRF_MetaTheory.vo"
+          "theories/ChurchZero.vo"
+          "theories/ChurchNumerals.vo"
+          
+          # 层级3
+          "theories/CaseA_SetTheory.vo"
+          "theories/CaseB_Algebra.vo"
+          "theories/CaseC_TypeTheory.vo"
+          "theories/CaseD_CategoryTheory.vo"
+          "theories/CaseE_QuantumVacuum.vo"
+          
+          # 层级4
+          "Quantum/QFT_FRF.vo"
+          "Quantum/CurvedSpacetimeQFT.vo"
+          "CS_Null/FRF_CS_Null_Common.vo"
+          "CS_Null/FRF_CS_Null.vo"
+          "CS_Null/CxxNull.vo"
+          "CS_Null/PythonNull.vo"
+          "CS_Null/JavaNull.vo"
+          "CS_Null/MathNull.vo"
+          "CS_Null/RustNull.vo"
+          
+          # 层级5
+          "theories/FRF_Comparative.vo"
+          
+          # 层级6
+          "Test/Test_Basic.vo"
+          "Test/Test_FRF_MetaTheory.vo"
+          "Test/Test_QuantumVacuum.vo"
+          "Test/Test_BlockchainSystem.vo"
+          "Test/SelfContainedVerification.vo"
+        )
+        
+        # 大文件列表
+        HUGE_MODULES=(
+          "Geometry.vo"
+          "FRF_MetaTheory.vo"
+          "ChurchNumerals.vo"
+          "CaseE_QuantumVacuum.vo"
+          "FRF_CS_Null_Common.vo"
+          "FRF_Comparative.vo"
+        )
+        
         echo "检查.vo文件生成情况:"
         echo ""
         
-        # 层级1：基础库
-        echo "层级1 - 自包含基础库:"
-        for file in Algebra Category Geometry; do
-          if [ -f "SelfContainedLib/$file.vo" ]; then
-            echo "  ✅ SelfContainedLib/$file.vo"
+        success_count=0
+        huge_success_count=0
+        
+        for vo_file in "${ALL_MODULES[@]}"; do
+          if [ -f "$vo_file" ]; then
+            module_name=$(basename "$vo_file")
+            size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
+            echo "  ✅ $vo_file (${size} bytes)"
+            success_count=$((success_count + 1))
+            
+            # 检查是否为大文件
+            for huge in "${HUGE_MODULES[@]}"; do
+              if [ "$module_name" = "$huge" ]; then
+                huge_success_count=$((huge_success_count + 1))
+                echo "     🔴 大文件编译成功!"
+                break
+              fi
+            done
           else
-            echo "  ❌ SelfContainedLib/$file.vo 缺失"
+            echo "  ❌ $vo_file 缺失"
           fi
         done
-        echo ""
         
-        # 层级2：FRF元理论
-        echo "层级2 - FRF元理论:"
-        for file in FRF_MetaTheory ChurchZero ChurchNumerals; do
-          if [ -f "theories/$file.vo" ]; then
-            echo "  ✅ theories/$file.vo"
-          else
-            echo "  ❌ theories/$file.vo 缺失"
-          fi
-        done
         echo ""
+        echo "📊 验证统计:"
+        echo "总模块数: ${#ALL_MODULES[@]}"
+        echo "成功编译: $success_count"
+        echo "大文件成功编译: $huge_success_count/${#HUGE_MODULES[@]}"
         
-        # 层级3：数学场景
-        echo "层级3 - 数学场景:"
-        for file in CaseA_SetTheory CaseB_Algebra CaseC_TypeTheory CaseD_CategoryTheory CaseE_QuantumVacuum; do
-          if [ -f "theories/$file.vo" ]; then
-            echo "  ✅ theories/$file.vo"
-          else
-            echo "  ❌ theories/$file.vo 缺失"
-          fi
-        done
-        echo ""
-        
-        # 层级4：量子模块
-        echo "层级4 - 量子模块:"
-        for file in QFT_FRF CurvedSpacetimeQFT; do
-          if [ -f "Quantum/$file.vo" ]; then
-            echo "  ✅ Quantum/$file.vo"
-          else
-            echo "  ❌ Quantum/$file.vo 缺失"
-          fi
-        done
-        echo ""
-        
-        # 层级4：空值系统
-        echo "层级4 - 空值系统:"
-        for file in FRF_CS_Null_Common FRF_CS_Null CxxNull PythonNull JavaNull MathNull RustNull; do
-          if [ -f "CS_Null/$file.vo" ]; then
-            echo "  ✅ CS_Null/$file.vo"
-          else
-            echo "  ❌ CS_Null/$file.vo 缺失"
-          fi
-        done
-        echo ""
-        
-        # 层级5：集成模块
-        echo "层级5 - 集成模块:"
-        if [ -f "theories/FRF_Comparative.vo" ]; then
-          echo "  ✅ theories/FRF_Comparative.vo"
+        if [ $success_count -eq ${#ALL_MODULES[@]} ]; then
+          echo "🎉 所有模块验证通过!"
         else
-          echo "  ❌ theories/FRF_Comparative.vo 缺失"
-        fi
-        echo ""
-        
-        # 层级6：测试套件
-        echo "层级6 - 测试套件:"
-        for file in Test_Basic Test_FRF_MetaTheory Test_QuantumVacuum Test_BlockchainSystem SelfContainedVerification; do
-          if [ -f "Test/$file.vo" ]; then
-            echo "  ✅ Test/$file.vo"
-          else
-            echo "  ❌ Test/$file.vo 缺失"
-          fi
-        done
-        echo ""
-        
-        # 统计总数
-        total_files=$(find . -name "*.v" -type f | wc -l)
-        compiled_files=$(find . -name "*.vo" -type f | wc -l)
-        
-        echo "统计摘要:"
-        echo "总.v文件数: $total_files"
-        echo "编译成功数: $compiled_files"
-        
-        if [ $compiled_files -eq $total_files ]; then
-          echo "🎉 所有文件编译成功！"
-        else
-          echo "⚠️  有 $((total_files - compiled_files)) 个文件未编译成功"
+          echo "⚠️  有 $((${#ALL_MODULES[@]} - success_count)) 个模块未通过验证"
         fi
 
     - name: 📄 生成详细报告
@@ -326,140 +297,157 @@ jobs:
         echo "- **编译状态**: 全量编译" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        echo "## 模块编译状态" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        # 成功编译模块列表
+        echo "## ✅ 成功编译的模块列表" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        echo "### 层级1：自包含基础库 (3个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加层级1状态
-        for file in Algebra Category Geometry; do
-          if [ -f "SelfContainedLib/$file.vo" ]; then
-            echo "- ✅ **$file.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          else
-            echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          fi
-        done
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        # 检查并列出所有成功编译的模块
+        modules=(
+          # 层级1
+          "Algebra" "Category" "Geometry"
+          # 层级2
+          "FRF_MetaTheory" "ChurchZero" "ChurchNumerals"
+          # 层级3
+          "CaseA_SetTheory" "CaseB_Algebra" "CaseC_TypeTheory" "CaseD_CategoryTheory" "CaseE_QuantumVacuum"
+          # 层级4 - 量子
+          "QFT_FRF" "CurvedSpacetimeQFT"
+          # 层级4 - 空值系统
+          "FRF_CS_Null_Common" "FRF_CS_Null" "CxxNull" "PythonNull" "JavaNull" "MathNull" "RustNull"
+          # 层级5
+          "FRF_Comparative"
+          # 层级6
+          "Test_Basic" "Test_FRF_MetaTheory" "Test_QuantumVacuum" "Test_BlockchainSystem" "SelfContainedVerification"
+        )
         
-        echo "### 层级2：FRF元理论层 (3个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加层级2状态
-        for file in FRF_MetaTheory ChurchZero ChurchNumerals; do
-          if [ -f "theories/$file.vo" ]; then
-            echo "- ✅ **$file.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          else
-            echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          fi
-        done
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        dirs=(
+          "SelfContainedLib" "SelfContainedLib" "SelfContainedLib"
+          "theories" "theories" "theories"
+          "theories" "theories" "theories" "theories" "theories"
+          "Quantum" "Quantum"
+          "CS_Null" "CS_Null" "CS_Null" "CS_Null" "CS_Null" "CS_Null" "CS_Null"
+          "theories"
+          "Test" "Test" "Test" "Test" "Test"
+        )
         
-        echo "### 层级3：数学场景层 (5个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加层级3状态
-        for file in CaseA_SetTheory CaseB_Algebra CaseC_TypeTheory CaseD_CategoryTheory CaseE_QuantumVacuum; do
-          if [ -f "theories/$file.vo" ]; then
-            echo "- ✅ **$file.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          else
-            echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          fi
-        done
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        total_modules=${#modules[@]}
+        success_count=0
         
-        echo "### 层级4：量子模块 (2个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加量子模块状态
-        for file in QFT_FRF CurvedSpacetimeQFT; do
-          if [ -f "Quantum/$file.vo" ]; then
-            echo "- ✅ **$file.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          else
-            echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          fi
-        done
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "| 模块 | 层级 | 状态 | 文件大小 |" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "|------|------|------|----------|" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        echo "### 层级4：空值系统模块 (8个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加空值系统状态
-        for file in FRF_CS_Null_Common FRF_CS_Null CxxNull PythonNull JavaNull MathNull RustNull; do
-          if [ -f "CS_Null/$file.vo" ]; then
-            echo "- ✅ **$file.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          else
-            echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          fi
-        done
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        
-        echo "### 层级5：集成模块 (1个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加集成模块状态
-        if [ -f "theories/FRF_Comparative.vo" ]; then
-          echo "- ✅ **FRF_Comparative.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        else
-          echo "- ❌ **FRF_Comparative.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        fi
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        
-        echo "### 层级6：测试套件 (5个文件)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 添加测试套件状态
-        for file in Test_Basic Test_FRF_MetaTheory Test_QuantumVacuum Test_BlockchainSystem SelfContainedVerification; do
-          if [ -f "Test/$file.vo" ]; then
-            echo "- ✅ **$file.v** - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          else
-            echo "- ❌ **$file.v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          fi
-        done
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        
-        # 计算统计
-        total_files=27
-        compiled_files=$(find . -name "*.vo" -type f | wc -l)
-        success_rate=$((compiled_files * 100 / total_files))
-        
-        echo "## 统计摘要" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        echo "- **总模块数**: $total_files" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        echo "- **编译成功数**: $compiled_files" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        echo "- **编译成功率**: $success_rate%" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        
-        echo "## 大文件编译状态" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        # 大文件状态
-        huge_files=("Geometry.v" "FRF_MetaTheory.v" "ChurchNumerals.v" "CaseE_QuantumVacuum.v" "FRF_CS_Null_Common.v" "FRF_Comparative.v")
-        for file in "${huge_files[@]}"; do
-          # 查找文件位置
-          found=false
-          for dir in SelfContainedLib theories Quantum CS_Null; do
-            if [ -f "$dir/$file" ]; then
-              if [ -f "$dir/${file%.v}.vo" ]; then
-                echo "- ✅ **$file** (大文件) - 编译成功" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-              else
-                echo "- ❌ **$file** (大文件) - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-              fi
-              found=true
-              break
+        for i in "${!modules[@]}"; do
+          module="${modules[$i]}"
+          dir="${dirs[$i]}"
+          vo_file="$dir/$module.vo"
+          
+          if [ -f "$vo_file" ]; then
+            size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
+            size_kb=$((size / 1024))
+            
+            # 确定层级
+            if [[ $i -lt 3 ]]; then
+              level="层级1 - 基础库"
+            elif [[ $i -lt 6 ]]; then
+              level="层级2 - FRF元理论"
+            elif [[ $i -lt 11 ]]; then
+              level="层级3 - 数学场景"
+            elif [[ $i -lt 13 ]]; then
+              level="层级4 - 量子模块"
+            elif [[ $i -lt 20 ]]; then
+              level="层级4 - 空值系统"
+            elif [[ $i -lt 21 ]]; then
+              level="层级5 - 集成模块"
+            else
+              level="层级6 - 测试套件"
             fi
-          done
-          if [ "$found" = false ]; then
-            echo "- ❓ **$file** (大文件) - 文件未找到" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+            
+            # 标记大文件
+            huge_files=("Geometry" "FRF_MetaTheory" "ChurchNumerals" "CaseE_QuantumVacuum" "FRF_CS_Null_Common" "FRF_Comparative")
+            is_huge=""
+            for huge in "${huge_files[@]}"; do
+              if [ "$module" = "$huge" ]; then
+                is_huge=" 🔴"
+                break
+              fi
+            done
+            
+            echo "| $module.v$is_huge | $level | ✅ 成功 | ${size_kb}KB |" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+            success_count=$((success_count + 1))
+          else
+            echo "| $module.v | 未知 | ❌ 失败 | - |" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           fi
         done
+        
         echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
-        echo "## 结论" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-        if [ $compiled_files -eq $total_files ]; then
-          echo "🎉 **FRF 2.0 全量形式化编译完全成功！**" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        # 大文件特别报告
+        echo "## 🔴 大文件编译状态" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        
+        huge_files=(
+          "SelfContainedLib/Geometry.vo"
+          "theories/FRF_MetaTheory.vo"
+          "theories/ChurchNumerals.vo"
+          "theories/CaseE_QuantumVacuum.vo"
+          "CS_Null/FRF_CS_Null_Common.vo"
+          "theories/FRF_Comparative.vo"
+        )
+        
+        huge_success=0
+        for file in "${huge_files[@]}"; do
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            size_mb=$((size / 1048576))
+            if [ $size_mb -eq 0 ]; then
+              size_kb=$((size / 1024))
+              echo "- ✅ **$(basename "$file")** - 编译成功 (${size_kb}KB)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+            else
+              echo "- ✅ **$(basename "$file")** - 编译成功 (${size_mb}MB)" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+            fi
+            huge_success=$((huge_success + 1))
+          else
+            echo "- ❌ **$(basename "$file" .vo).v** - 编译失败" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          fi
+        done
+        
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        
+        # 统计摘要
+        success_rate=$((success_count * 100 / total_modules))
+        huge_rate=$((huge_success * 100 / ${#huge_files[@]}))
+        
+        echo "## 📊 统计摘要" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **总模块数**: $total_modules" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **编译成功数**: $success_count" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **编译成功率**: $success_rate%" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **大文件总数**: ${#huge_files[@]}" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **大文件成功数**: $huge_success" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "- **大文件成功率**: $huge_rate%" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        
+        # 结论
+        echo "## 🎉 结论" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+        if [ $success_count -eq $total_modules ]; then
+          echo "**FRF 2.0 全量形式化编译完全成功！**" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          echo "所有27个核心模块均编译成功，包括6个大文件也已成功编译。项目架构完整，形式化验证基础就绪。" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "所有27个核心模块均已成功编译，包括6个大文件也成功编译。项目架构完整，形式化验证基础就绪。" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          echo "**下一步建议**：" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "### 下一步建议：" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "1. 运行 `make report` 生成跨系统对比报告" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          echo "2. 执行测试验证功能正确性" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "2. 执行 `make test-only` 运行完整测试套件" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "3. 进行性能分析和优化" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         else
-          echo "⚠️ **FRF 2.0 编译部分成功**" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "**FRF 2.0 编译部分成功**" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          echo "已编译 $compiled_files 个模块（共 $total_files 个），$((total_files - compiled_files)) 个模块编译失败。" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "已编译 $success_count 个模块（共 $total_modules 个），$(($total_modules - $success_count)) 个模块编译失败。" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
-          echo "**建议**：" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
+          echo "### 建议：" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "1. 检查编译错误日志" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "2. 验证依赖关系" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
           echo "3. 调整大文件编译参数" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         fi
-        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         
+        echo "" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         echo "---" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         echo "*报告生成时间: $(date)*" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
         echo "*GitHub Actions Run ID: $GITHUB_RUN_ID*" >> verification-reports/FRF_FULL_COMPILATION_REPORT.md
@@ -486,38 +474,48 @@ jobs:
         echo "🕒 完成时间: $(date)"
         echo "========================================="
         
-        # 显示编译文件统计
+        # 显示成功编译的模块列表
         echo ""
-        echo "📊 编译统计:"
-        echo "总文件数: $(find . -name "*.vo" | wc -l)"
-        echo "大文件编译: 6/6"
-        echo "测试文件: 5/5"
+        echo "✅ 成功编译的模块列表:"
         
-        # 列出大文件编译状态
-        echo ""
-        echo "🔴 大文件编译状态:"
-        huge_files_success=0
-        for file in Geometry FRF_MetaTheory ChurchNumerals CaseE_QuantumVacuum FRF_CS_Null_Common FRF_Comparative; do
-          # 查找文件
-          found=false
-          for dir in SelfContainedLib theories Quantum CS_Null; do
-            if [ -f "$dir/$file.vo" ]; then
-              echo "  ✅ $file.vo"
-              huge_files_success=$((huge_files_success + 1))
-              found=true
-              break
-            fi
-          done
-          if [ "$found" = false ]; then
-            echo "  ❌ $file.vo"
+        # 列出所有.vo文件
+        for vo_file in $(find . -name "*.vo" | sort); do
+          size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
+          size_kb=$((size / 1024))
+          if [ $size_kb -gt 1024 ]; then
+            size_mb=$((size_kb / 1024))
+            echo "  📦 $vo_file (${size_mb}MB)"
+          else
+            echo "  📦 $vo_file (${size_kb}KB)"
           fi
         done
         
-        if [ $huge_files_success -eq 6 ]; then
-          echo "✅ 所有大文件编译成功！"
-        else
-          echo "⚠️  有 $((6 - huge_files_success)) 个大文件编译失败"
-        fi
+        # 特别列出大文件
+        echo ""
+        echo "🔴 大文件编译状态:"
+        huge_files=(
+          "SelfContainedLib/Geometry.vo"
+          "theories/FRF_MetaTheory.vo"
+          "theories/ChurchNumerals.vo"
+          "theories/CaseE_QuantumVacuum.vo"
+          "CS_Null/FRF_CS_Null_Common.vo"
+          "theories/FRF_Comparative.vo"
+        )
+        
+        for file in "${huge_files[@]}"; do
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            size_mb=$((size / 1048576))
+            if [ $size_mb -gt 0 ]; then
+              echo "  ✅ $(basename "$file") (${size_mb}MB)"
+            else
+              size_kb=$((size / 1024))
+              echo "  ✅ $(basename "$file") (${size_kb}KB)"
+            fi
+          else
+            echo "  ❌ $(basename "$file" .vo).v"
+          fi
+        done
 
     - name: ⚠️ 失败通知
       if: failure()
@@ -529,7 +527,7 @@ jobs:
         echo ""
         echo "🔍 建议检查:"
         echo "1. 查看编译日志中的具体错误"
-        echo "2. 检查大文件编译参数"
+        echo "2. 检查大文件编译参数（特别是内存设置）"
         echo "3. 验证Coq环境配置"
         echo "4. 确认所有依赖文件存在"
         echo "========================================="
@@ -537,16 +535,9 @@ jobs:
         # 显示失败文件
         echo ""
         echo "📋 可能失败的文件:"
-        total_files=$(find . -name "*.v" | wc -l)
-        compiled_files=$(find . -name "*.vo" | wc -l)
-        echo "总文件数: $total_files"
-        echo "编译成功数: $compiled_files"
-        echo "失败文件数: $((total_files - compiled_files))"
         
-        # 列出未编译的文件
-        echo ""
-        echo "📁 未编译的.v文件:"
-        for v_file in $(find . -name "*.v"); do
+        # 列出所有.v文件，检查对应的.vo文件
+        for v_file in $(find . -name "*.v" | sort); do
           vo_file="${v_file%.v}.vo"
           if [ ! -f "$vo_file" ]; then
             echo "  ❌ $v_file"
