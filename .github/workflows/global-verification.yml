@@ -1,4 +1,4 @@
-name: FRF 2.0 全量形式化验证（并行全模块版）
+name: FRF 2.0 全量并行编译验证
 
 on:
   push:
@@ -7,43 +7,46 @@ on:
     branches: [main, master]
   workflow_dispatch:
     inputs:
-      modules:
-        description: '选择要验证的模块组 (all, core, quantum, cs-null, tests)'
+      compile_mode:
+        description: '编译模式'
         required: false
-        default: 'all'
+        default: 'full'
+        type: choice
+        options:
+        - full
+        - quick
+        - test-only
+      parallel_jobs:
+        description: '并行任务数'
+        required: false
+        default: '4'
 
 jobs:
-  formal-verification:
+  setup-environment:
+    name: 📦 环境配置
     runs-on: ubuntu-22.04
-    timeout-minutes: 180  # 全量编译需要更长时间
-    strategy:
-      matrix:
-        # 并行编译组配置
-        compile-group: [1, 2, 3, 4, 5, 6]
-        # 1: 基础层, 2: FRF元理论, 3: 数学场景, 4: 扩展模块, 5: 集成模块, 6: 测试套件
-    
+    timeout-minutes: 40
+    outputs:
+      coq_version: ${{ steps.coq-version.outputs.version }}
+      opam_root: ${{ steps.opam-env.outputs.opam_root }}
+      opam_switch: ${{ steps.opam-env.outputs.opam_switch }}
     steps:
-    - name: 📥 检出代码仓库
+    - name: 📥 检出代码
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
-        submodules: false
-
-    - name: 🖥️ 系统信息检查
+        
+    - name: 🖥️ 系统信息
       run: |
         echo "=== 系统信息 ==="
         echo "系统: $(uname -a)"
         echo "CPU核心: $(nproc)"
-        echo "内存: $(free -m | awk '/^Mem:/{print "总量:" $2 "MB, 可用:" $7 "MB"}')"
-        echo "磁盘使用:"
-        df -h
-        echo "GitHub Runner信息:"
-        echo "Runner名称: ${{ runner.name }}"
-        echo "Runner OS: ${{ runner.os }}"
-
-    - name: 📦 安装系统依赖（全量版）
+        echo "内存: $(free -m | awk '/^Mem:/{printf "%.0f MB可用", $7}')"
+        echo "磁盘: $(df -h . | tail -1 | awk '{print $4 "可用"}')"
+        
+    - name: 📦 安装系统依赖
       run: |
-        echo "安装全量系统依赖..."
+        echo "安装系统依赖..."
         sudo apt-get update
         sudo apt-get install -y \
           opam \
@@ -54,531 +57,462 @@ jobs:
           rsync \
           git \
           wget \
-          make \
-          graphviz \
           bc \
-          jq \
-          python3 \
+          graphviz \
           python3-pip
         echo "✅ 系统依赖安装完成"
         
-        # 检查并行工具
-        echo "并行编译支持:"
-        nproc --all
-        echo "Make版本:"
-        make --version | head -1
-
-    - name: 🔄 初始化OPAM环境（稳定版）
-      timeout-minutes: 20
+    - name: 🔄 初始化OPAM环境
+      id: opam-init
+      timeout-minutes: 15
       run: |
-        echo "初始化OPAM环境（稳定版）..."
+        echo "初始化OPAM环境..."
+        # 使用无沙盒模式，避免权限问题
+        opam init --disable-sandboxing -y --auto-setup
+        echo "OPAMROOT=$(opam config var root)" >> $GITHUB_OUTPUT
+        echo "OPAMSWITCH=$(opam switch show)" >> $GITHUB_OUTPUT
         
-        # 设置OPAM配置
-        export OPAMROOT=/tmp/opam-root
-        export OPAMYES=1
-        export OPAMSOLVERTIMEOUT=300
-        
-        # 初始化OPAM（禁用沙箱，避免权限问题）
-        opam init --disable-sandboxing -y --compiler=4.14.0
+    - name: 🔧 配置OPAM仓库
+      run: |
         eval $(opam env)
-        
-        # 添加Coq仓库（稳定版）
+        echo "配置OPAM仓库..."
         opam repo add coq-released https://coq.inria.fr/opam/released
-        opam repo add coq-core-dev https://coq.inria.fr/opam/core-dev
-        
-        # 更新仓库
+        opam repo add coq-extra-dev https://coq.inria.fr/opam/extra-dev
         opam update
+        echo "✅ OPAM仓库配置完成"
         
-        echo "✅ OPAM环境初始化完成"
-        echo "OPAM版本: $(opam --version)"
-        echo "OPAM根目录: $OPAMROOT"
-
-    - name: 📚 安装Coq核心（弹性版本管理）
+    - name: 📚 安装Coq核心（宽松版本）
+      id: coq-install
       timeout-minutes: 30
       run: |
         eval $(opam env)
-        echo "安装Coq核心（弹性版本管理）..."
+        echo "安装Coq核心..."
         
-        # 尝试安装指定版本，但接受可能的版本升级
-        echo "尝试安装Coq 8.18.0..."
-        if opam install -y --no-depexts coq.8.18.0; then
+        # 尝试安装指定版本，但允许降级/升级
+        if opam install -y coq.8.18.0; then
           echo "✅ Coq 8.18.0 安装成功"
+          COQ_VERSION="8.18.0"
         else
-          echo "⚠️  Coq 8.18.0 安装失败，尝试安装最新稳定版..."
-          opam install -y --no-depexts coq
-          echo "⚠️  已安装Coq其他版本，继续编译流程"
+          echo "⚠️  尝试安装最新稳定版Coq"
+          opam install -y coq
+          COQ_VERSION=$(coqc --version | head -1 | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+' || echo "未知")
+          echo "✅ Coq $COQ_VERSION 安装成功"
         fi
         
-        echo "验证Coq安装..."
-        coqc --version || echo "❌ coqc未找到，但继续流程"
+        # 记录版本信息
+        echo "version=$COQ_VERSION" >> $GITHUB_OUTPUT
         
-        # 安装标准库（如果尚未安装）
-        echo "安装Coq标准库..."
-        opam install -y --no-depexts coq-stdlib || echo "⚠️  标准库安装可能失败，继续"
-
-    - name: 🧮 安装mathcomp和扩展库
-      timeout-minutes: 25
+    - name: 🧮 安装mathcomp-ssreflect
+      timeout-minutes: 20
       run: |
         eval $(opam env)
-        echo "安装数学组件和扩展库..."
-        
-        # 安装mathcomp（精确版本，但接受降级/升级）
         echo "安装mathcomp-ssreflect..."
-        opam install -y --no-depexts coq-mathcomp-ssreflect || \
-        opam install -y --no-depexts coq-mathcomp-ssreflect.1.17.0 || \
-        echo "⚠️  mathcomp安装可能不完整，继续"
         
-        # 安装其他可能需要的库
-        echo "安装常用扩展库..."
-        for lib in coq-mathcomp-algebra coq-mathcomp-field; do
-          opam install -y --no-depexts $lib 2>/dev/null || true
-        done
+        # 尝试安装指定版本
+        if opam install -y coq-mathcomp-ssreflect.1.17.0; then
+          echo "✅ mathcomp-ssreflect 1.17.0 安装成功"
+        else
+          echo "⚠️  尝试安装其他版本的mathcomp"
+          opam install -y coq-mathcomp-ssreflect
+          echo "✅ mathcomp-ssreflect 安装成功"
+        fi
         
-        echo "验证已安装的库..."
-        opam list --installed --short | grep -E "coq|mathcomp" || echo "⚠️  未找到相关库"
-
-    - name: 📁 项目结构检查
-      run: |
-        echo "=== 项目结构检查 ==="
-        echo "当前目录: $(pwd)"
-        echo "目录结构:"
-        find . -type f -name "*.v" | head -20
-        echo ""
+        # 安装其他可能需要的数学库
+        opam install -y coq-mathcomp-algebra || true
+        opam install -y coq-mathcomp-fingroup || true
+        opam install -y coq-mathcomp-solvable || true
         
-        # 检查关键目录
-        for dir in SelfContainedLib theories Quantum CS_Null Test; do
-          if [ -d "$dir" ]; then
-            echo "✅ 目录存在: $dir"
-            find "$dir" -name "*.v" | wc -l | xargs echo "  文件数:"
-          else
-            echo "❌ 目录缺失: $dir"
-          fi
-        done
-        
-        # 统计总文件数
-        TOTAL_V_FILES=$(find . -name "*.v" | wc -l)
-        echo "总.v文件数: $TOTAL_V_FILES"
-
-    - name: 🔧 并行编译组 ${{ matrix.compile-group }}
-      timeout-minutes: 60
+    - name: 📊 环境验证
+      id: coq-version
       run: |
         eval $(opam env)
-        echo "=== 编译组 ${{ matrix.compile-group }} 开始 ==="
+        echo "=== 环境验证 ==="
+        echo "Coq版本:"
+        coqc --version 2>/dev/null || echo "未找到coqc"
+        echo ""
+        echo "已安装的Coq包:"
+        opam list --installed --short | grep -E "^coq" | sort || echo "无"
+        echo ""
+        echo "OPAM环境:"
+        echo "OPAMROOT: $OPAMROOT"
+        echo "OPAMSWITCH: $OPAMSWITCH"
         
-        # 根据编译组选择要编译的模块
-        case ${{ matrix.compile-group }} in
-          1)
-            echo "编译组1: 一级基础层 (SelfContainedLib)"
-            MODULES=(
-              "SelfContainedLib/Algebra.v"
-              "SelfContainedLib/Category.v"
-              "SelfContainedLib/Geometry.v"
-            )
-            FLAGS="-Q SelfContainedLib SelfContainedLib"
+        # 提取版本号
+        VERSION=$(coqc --version 2>/dev/null | grep -o 'version [0-9.]\+' | cut -d' ' -f2 || echo "unknown")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+    - name: 📦 缓存OPAM包
+      uses: actions/cache@v3
+      with:
+        path: ~/.opam
+        key: opam-${{ runner.os }}-${{ hashFiles('Makefile') }}
+        restore-keys: |
+          opam-${{ runner.os }}-
+          
+  parallel-compilation:
+    name: 🔧 并行编译验证
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    needs: setup-environment
+    strategy:
+      matrix:
+        compile_stage:
+          - core-base
+          - core-frf
+          - core-scenes
+          - extensions
+          - integrations
+          - tests
+        parallel_jobs: [4]
+      fail-fast: false  # 允许部分失败继续其他编译
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 🔧 恢复OPAM环境
+      uses: actions/cache@v3
+      with:
+        path: ~/.opam
+        key: opam-${{ runner.os }}-${{ hashFiles('Makefile') }}
+        
+    - name: ⚙️ 设置环境变量
+      run: |
+        echo "PARALLEL_JOBS=${{ matrix.parallel_jobs }}" >> $GITHUB_ENV
+        echo "COMPILE_STAGE=${{ matrix.compile_stage }}" >> $GITHUB_ENV
+        
+    - name: 📊 编译前检查
+      run: |
+        eval $(opam env)
+        echo "=== 编译阶段: $COMPILE_STAGE ==="
+        echo "并行任务数: $PARALLEL_JOBS"
+        echo "Coq版本:"
+        coqc --version 2>/dev/null || echo "未找到coqc"
+        echo ""
+        echo "项目结构:"
+        find . -name "*.v" -type f | head -20 | sort
+        echo "..."
+        
+    - name: 🔧 执行编译阶段
+      timeout-minutes: 45
+      run: |
+        eval $(opam env)
+        
+        # 选择编译模式
+        case "${{ github.event.inputs.compile_mode || 'full' }}" in
+          quick)
+            echo "快速验证模式"
+            make -j$PARALLEL_JOBS check-env core-base core-frf
             ;;
-          2)
-            echo "编译组2: 二级FRF元理论层"
-            MODULES=(
-              "theories/FRF_MetaTheory.v"
-              "theories/ChurchNumerals.v"
-              "theories/ChurchZero.v"
-            )
-            FLAGS="-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories"
-            ;;
-          3)
-            echo "编译组3: 三级数学场景层"
-            MODULES=(
-              "theories/CaseA_SetTheory.v"
-              "theories/CaseB_Algebra.v"
-              "theories/CaseC_TypeTheory.v"
-              "theories/CaseD_CategoryTheory.v"
-              "theories/CaseE_QuantumVacuum.v"
-            )
-            FLAGS="-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories"
-            ;;
-          4)
-            echo "编译组4: 四级扩展模块"
-            # 检查Quantum目录是否存在
-            if [ -d "Quantum" ]; then
-              MODULES=(
-                "Quantum/QFT_FRF.v"
-                "Quantum/CurvedSpacetimeQFT.v"
-                "CS_Null/FRF_CS_Null_Common.v"
-                "CS_Null/FRF_CS_Null.v"
-              )
-            else
-              MODULES=(
-                "CS_Null/FRF_CS_Null_Common.v"
-                "CS_Null/FRF_CS_Null.v"
-              )
-            fi
-            FLAGS="-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null"
-            ;;
-          5)
-            echo "编译组5: 语言空值模块"
-            MODULES=(
-              "CS_Null/CxxNull.v"
-              "CS_Null/PythonNull.v"
-              "CS_Null/JavaNull.v"
-              "CS_Null/MathNull.v"
-              "CS_Null/RustNull.v"
-            )
-            FLAGS="-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null"
-            ;;
-          6)
-            echo "编译组6: 集成与测试模块"
-            MODULES=(
-              "theories/FRF_Comparative.v"
-              "Test/Test_Basic.v"
-              "Test/Test_FRF_MetaTheory.v"
-              "Test/Test_QuantumVacuum.v"
-              "Test/Test_BlockchainSystem.v"
-              "Test/SelfContainedVerification.v"
-            )
-            FLAGS="-Q SelfContainedLib SelfContainedLib -Q theories FRF.Theories -Q CS_Null FRF.CS_Null -Q Test FRF.Test"
+          test-only)
+            echo "仅测试模式"
+            make -j$PARALLEL_JOBS check-env test-only
             ;;
           *)
-            echo "未知编译组"
-            exit 0
+            echo "全量编译模式"
+            # 执行指定编译阶段
+            if [ "$COMPILE_STAGE" = "extensions" ]; then
+              # extensions阶段需要串行编译
+              echo "串行编译扩展模块..."
+              make -j1 check-env $COMPILE_STAGE
+            else
+              # 其他阶段并行编译
+              echo "并行编译阶段: $COMPILE_STAGE"
+              make -j$PARALLEL_JOBS check-env $COMPILE_STAGE
+            fi
             ;;
         esac
         
-        # 创建编译日志目录
-        mkdir -p compile-logs/group-${{ matrix.compile-group }}
-        
-        # 并行编译每个模块（使用xargs并行处理）
-        echo "开始并行编译..."
-        printf "%s\n" "${MODULES[@]}" | xargs -P 4 -I {} bash -c '
-          module="$1"
-          flags="$2"
-          group="$3"
-          
-          echo "开始编译: $module"
-          log_file="compile-logs/group-$group/$(basename "$module" .v).log"
-          
-          # 检查文件是否存在
-          if [ ! -f "$module" ]; then
-            echo "❌ 文件不存在: $module" | tee "$log_file"
-            exit 0  # 不退出，继续编译其他文件
-          fi
-          
-          # 编译文件
-          if timeout 600 coqc $flags "$module" 2>&1 | tee "$log_file"; then
-            echo "✅ 编译成功: $module"
-            # 检查是否生成了.vo文件
-            vo_file="${module%.v}.vo"
-            if [ -f "$vo_file" ]; then
-              size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
-              echo "   生成: $vo_file (${size} bytes)"
-            fi
-          else
-            echo "❌ 编译失败: $module"
-            # 检查是否是内存不足错误
-            if grep -q "out of memory\|Stack overflow" "$log_file"; then
-              echo "   错误类型: 内存不足/栈溢出"
-            elif grep -q "Syntax error" "$log_file"; then
-              echo "   错误类型: 语法错误"
-            elif grep -q "not found" "$log_file"; then
-              echo "   错误类型: 依赖未找到"
-            fi
-          fi
-        ' _ {} "$FLAGS" ${{ matrix.compile-group }}
-        
-        echo "=== 编译组 ${{ matrix.compile-group }} 完成 ==="
-
-    - name: 📊 编译结果汇总与验证
+    - name: 📈 编译统计
       if: always()
       run: |
-        echo "=== 编译结果汇总 ==="
+        echo "=== 编译统计: $COMPILE_STAGE ==="
         
-        # 统计各组的编译结果
-        for group in 1 2 3 4 5 6; do
-          echo ""
-          echo "编译组 $group 结果:"
-          if [ -d "compile-logs/group-$group" ]; then
-            success=$(grep -l "✅ 编译成功" compile-logs/group-$group/*.log 2>/dev/null | wc -l || echo 0)
-            fail=$(grep -l "❌ 编译失败" compile-logs/group-$group/*.log 2>/dev/null | wc -l || echo 0)
-            total=$((success + fail))
-            echo "  总计: $total, 成功: $success, 失败: $fail"
-            
-            # 显示失败的文件
-            if [ $fail -gt 0 ]; then
-              echo "  失败文件:"
-              grep -l "❌ 编译失败" compile-logs/group-$group/*.log 2>/dev/null | \
-                xargs -I {} basename {} .log | xargs echo "    "
-            fi
-          else
-            echo "  无编译日志"
-          fi
-        done
+        # 统计编译文件
+        VO_COUNT=$(find . -name "*.vo" -type f 2>/dev/null | wc -l)
+        GLOB_COUNT=$(find . -name "*.glob" -type f 2>/dev/null | wc -l)
         
-        # 统计所有.vo文件
-        echo ""
-        echo "所有生成的.vo文件:"
-        find . -name "*.vo" -type f | while read vo; do
-          size=$(stat -c%s "$vo" 2>/dev/null || echo 0)
-          dir=$(dirname "$vo")
-          base=$(basename "$vo")
-          echo "  📄 $dir/$base (${size} bytes)"
-        done | head -30
+        echo "生成 .vo 文件: $VO_COUNT"
+        echo "生成 .glob 文件: $GLOB_COUNT"
         
-        total_vo=$(find . -name "*.vo" -type f | wc -l)
-        echo "总计.vo文件数: $total_vo"
+        # 列出本阶段生成的文件
+        echo "编译输出文件:"
+        find . -name "*.vo" -newer /tmp/start_time 2>/dev/null | head -10 || true
         
-        # 生成编译摘要
-        echo ""
-        echo "📋 编译摘要:"
-        echo "总.v文件数: $(find . -name "*.v" | wc -l)"
-        echo "编译成功数: $total_vo"
+  full-verification:
+    name: ✅ 全量验证报告
+    runs-on: ubuntu-22.04
+    needs: 
+      - setup-environment
+      - parallel-compilation
+    timeout-minutes: 30
+    if: always()  # 即使部分编译失败也生成报告
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 🔧 恢复OPAM环境
+      uses: actions/cache@v3
+      with:
+        path: ~/.opam
+        key: opam-${{ runner.os }}-${{ hashFiles('Makefile') }}
         
-        # 检查核心模块
-        echo ""
-        echo "核心模块验证状态:"
-        core_modules=(
-          "SelfContainedLib/Algebra.vo"
-          "SelfContainedLib/Category.vo"
-          "SelfContainedLib/Geometry.vo"
-          "theories/FRF_MetaTheory.vo"
-          "theories/ChurchNumerals.vo"
-          "theories/ChurchZero.vo"
-          "theories/FRF_Comparative.vo"
-          "Test/Test_Basic.vo"
+    - name: 📊 收集编译结果
+      id: collect-results
+      run: |
+        eval $(opam env)
+        echo "=== 收集编译结果 ==="
+        
+        # 定义所有模块及其路径
+        declare -A modules=(
+          # 层级1: 基础库
+          ["Algebra"]="SelfContainedLib/Algebra.vo"
+          ["Geometry"]="SelfContainedLib/Geometry.vo"
+          ["Category"]="SelfContainedLib/Category.vo"
+          
+          # 层级2: FRF元理论
+          ["FRF_MetaTheory"]="theories/FRF_MetaTheory.vo"
+          ["ChurchZero"]="theories/ChurchZero.vo"
+          ["ChurchNumerals"]="theories/ChurchNumerals.vo"
+          
+          # 层级3: 数学场景
+          ["CaseA_SetTheory"]="theories/CaseA_SetTheory.vo"
+          ["CaseB_Algebra"]="theories/CaseB_Algebra.vo"
+          ["CaseC_TypeTheory"]="theories/CaseC_TypeTheory.vo"
+          ["CaseD_CategoryTheory"]="theories/CaseD_CategoryTheory.vo"
+          ["CaseE_QuantumVacuum"]="theories/CaseE_QuantumVacuum.vo"
+          
+          # 层级4: 扩展模块
+          ["QFT_FRF"]="Quantum/QFT_FRF.vo"
+          ["CurvedSpacetimeQFT"]="Quantum/CurvedSpacetimeQFT.vo"
+          ["FRF_CS_Null_Common"]="CS_Null/FRF_CS_Null_Common.vo"
+          ["FRF_CS_Null"]="CS_Null/FRF_CS_Null.vo"
+          ["CxxNull"]="CS_Null/CxxNull.vo"
+          ["PythonNull"]="CS_Null/PythonNull.vo"
+          ["JavaNull"]="CS_Null/JavaNull.vo"
+          ["MathNull"]="CS_Null/MathNull.vo"
+          ["RustNull"]="CS_Null/RustNull.vo"
+          
+          # 层级5: 集成模块
+          ["FRF_Comparative"]="theories/FRF_Comparative.vo"
+          
+          # 层级6: 测试套件
+          ["Test_Basic"]="Test/Test_Basic.vo"
+          ["Test_FRF_MetaTheory"]="Test/Test_FRF_MetaTheory.vo"
+          ["Test_QuantumVacuum"]="Test/Test_QuantumVacuum.vo"
+          ["Test_BlockchainSystem"]="Test/Test_BlockchainSystem.vo"
+          ["SelfContainedVerification"]="Test/SelfContainedVerification.vo"
         )
         
-        for module in "${core_modules[@]}"; do
-          if [ -f "$module" ]; then
-            echo "  ✅ $module"
+        # 统计结果
+        TOTAL_MODULES=${#modules[@]}
+        SUCCESS_COUNT=0
+        FAILED_MODULES=""
+        
+        echo "检查编译文件..."
+        for module in "${!modules[@]}"; do
+          file="${modules[$module]}"
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            if [ "$size" -gt 0 ]; then
+              echo "✅ $module: $size bytes"
+              SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+            else
+              echo "⚠️  $module: 文件大小为0"
+              FAILED_MODULES="$FAILED_MODULES $module(空文件)"
+            fi
           else
-            echo "  ❌ $module (缺失)"
+            echo "❌ $module: 文件缺失"
+            FAILED_MODULES="$FAILED_MODULES $module(缺失)"
           fi
         done
-
-    - name: 📈 生成详细验证报告
-      if: always()
-      run: |
-        echo "生成详细验证报告..."
         
-        # 创建报告目录
-        mkdir -p verification-reports/full
+        # 计算成功率
+        SUCCESS_RATE=$((SUCCESS_COUNT * 100 / TOTAL_MODULES))
+        
+        # 输出结果
+        echo "success_count=$SUCCESS_COUNT" >> $GITHUB_OUTPUT
+        echo "total_modules=$TOTAL_MODULES" >> $GITHUB_OUTPUT
+        echo "success_rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+        echo "failed_modules=$FAILED_MODULES" >> $GITHUB_OUTPUT
+        
+    - name: 📄 生成验证报告
+      run: |
+        eval $(opam env)
+        echo "生成验证报告..."
+        
+        mkdir -p verification-reports
         
         # 获取环境信息
         COQ_VERSION=$(coqc --version 2>/dev/null | head -1 || echo "未知版本")
-        OPAM_VERSION=$(opam --version 2>/dev/null || echo "未知")
-        SYSTEM_INFO=$(uname -a)
-        CPU_CORES=$(nproc)
-        MEMORY_INFO=$(free -m | awk '/^Mem:/{print "总量:" $2 "MB, 可用:" $7 "MB"}')
+        OPAM_VERSION=$(opam --version 2>/dev/null || echo "未知版本")
+        CURRENT_TIME=$(date "+%Y-%m-%d %H:%M:%S")
         
-        # 统计编译结果
-        TOTAL_V_FILES=$(find . -name "*.v" | wc -l)
-        TOTAL_VO_FILES=$(find . -name "*.vo" | wc -l)
-        
-        # 生成JSON格式的报告
-        cat > verification-reports/full/verification_summary.json << EOF
-        {
-  "verification": {
-    "timestamp": "$(date -Iseconds)",
-    "environment": {
-      "system": "$SYSTEM_INFO",
-      "cpu_cores": $CPU_CORES,
-      "memory": "$MEMORY_INFO",
-      "coq_version": "$COQ_VERSION",
-      "opam_version": "$OPAM_VERSION"
-    },
-    "statistics": {
-      "total_v_files": $TOTAL_V_FILES,
-      "total_vo_files": $TOTAL_VO_FILES,
-      "compilation_rate": "$((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))%"
-    },
-        "modules": {
-      "self_contained": {
-        "algebra": $(if [ -f "SelfContainedLib/Algebra.vo" ]; then echo "true"; else echo "false"; fi),
-        "category": $(if [ -f "SelfContainedLib/Category.vo" ]; then echo "true"; else echo "false"; fi),
-        "geometry": $(if [ -f "SelfContainedLib/Geometry.vo" ]; then echo "true"; else echo "false"; fi)
-      },
-      "frf_theory": {
-        "frf_metatheory": $(if [ -f "theories/FRF_MetaTheory.vo" ]; then echo "true"; else echo "false"; fi),
-        "church_numerals": $(if [ -f "theories/ChurchNumerals.vo" ]; then echo "true"; else echo "false"; fi),
-        "church_zero": $(if [ -f "theories/ChurchZero.vo" ]; then echo "true"; else echo "false"; fi)
-      },
-      "integration": {
-        "frf_comparative": $(if [ -f "theories/FRF_Comparative.vo" ]; then echo "true"; else echo "false"; fi)
-      },
-      "tests": {
-        "test_basic": $(if [ -f "Test/Test_Basic.vo" ]; then echo "true"; else echo "false"; fi)
-      }
-    }
-  }
-}
-EOF
-        
-        # 生成Markdown报告
-        cat > verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
-# FRF 2.0 全量形式化验证报告（并行版）
+        # 生成详细的Markdown报告
+        cat > verification-reports/FRF2_FULL_VERIFICATION.md << EOF
+# FRF 2.0 全量并行编译验证报告
 
 ## 验证概述
-- **验证时间**: $(date)
+- **验证时间**: $CURRENT_TIME
 - **运行环境**: GitHub Actions (Ubuntu 22.04)
 - **Coq版本**: $COQ_VERSION
 - **OPAM版本**: $OPAM_VERSION
-- **系统信息**: $SYSTEM_INFO
-- **CPU核心**: $CPU_CORES
-- **内存信息**: $MEMORY_INFO
+- **编译模式**: ${{ github.event.inputs.compile_mode || 'full' }}
+- **并行任务数**: ${{ github.event.inputs.parallel_jobs || '4' }}
 
-## 编译统计
-- **总.v文件数**: $TOTAL_V_FILES
-- **成功编译文件数**: $TOTAL_VO_FILES
-- **编译成功率**: $((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))%
+## 编译结果统计
+- **总模块数**: ${{ steps.collect-results.outputs.total_modules }}
+- **成功编译数**: ${{ steps.collect-results.outputs.success_count }}
+- **编译成功率**: ${{ steps.collect-results.outputs.success_rate }}%
 
-## 核心模块状态
+### 各层级编译结果
 
-### 一级基础层
-| 模块 | 状态 | 文件大小 |
-|------|------|----------|
-EOF
-        
-        # 添加基础层状态
-        for module in Algebra Category Geometry; do
-          vo_file="SelfContainedLib/$module.vo"
-          if [ -f "$vo_file" ]; then
-            size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
-            echo "| $module.v | ✅ 成功 | ${size} bytes |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          else
-            echo "| $module.v | ❌ 失败 | 未生成 |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          fi
-        done
-        
-        cat >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
+#### 层级1: 自包含基础库 (3个模块)
+$(check_module "Algebra" "SelfContainedLib/Algebra.vo")
+$(check_module "Geometry" "SelfContainedLib/Geometry.vo")
+$(check_module "Category" "SelfContainedLib/Category.vo")
 
-### 二级FRF元理论层
-| 模块 | 状态 | 文件大小 |
-|------|------|----------|
-EOF
-        
-        # 添加FRF元理论层状态
-        for module in FRF_MetaTheory ChurchNumerals ChurchZero; do
-          vo_file="theories/$module.vo"
-          if [ -f "$vo_file" ]; then
-            size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
-            echo "| $module.v | ✅ 成功 | ${size} bytes |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          else
-            echo "| $module.v | ❌ 失败 | 未生成 |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          fi
-        done
-        
-        cat >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
+#### 层级2: FRF元理论 (3个模块)
+$(check_module "FRF_MetaTheory" "theories/FRF_MetaTheory.vo")
+$(check_module "ChurchZero" "theories/ChurchZero.vo")
+$(check_module "ChurchNumerals" "theories/ChurchNumerals.vo")
 
-### 三级数学场景层
-| 模块 | 状态 | 文件大小 |
-|------|------|----------|
-EOF
-        
-        # 添加数学场景层状态
-        for module in CaseA_SetTheory CaseB_Algebra CaseC_TypeTheory CaseD_CategoryTheory CaseE_QuantumVacuum; do
-          vo_file="theories/$module.vo"
-          if [ -f "$vo_file" ]; then
-            size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
-            echo "| $module.v | ✅ 成功 | ${size} bytes |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          else
-            echo "| $module.v | ❌ 失败 | 未生成 |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          fi
-        done
-        
-        # 添加集成模块状态
-        cat >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
+#### 层级3: 数学场景 (5个模块)
+$(check_module "CaseA_SetTheory" "theories/CaseA_SetTheory.vo")
+$(check_module "CaseB_Algebra" "theories/CaseB_Algebra.vo")
+$(check_module "CaseC_TypeTheory" "theories/CaseC_TypeTheory.vo")
+$(check_module "CaseD_CategoryTheory" "theories/CaseD_CategoryTheory.vo")
+$(check_module "CaseE_QuantumVacuum" "theories/CaseE_QuantumVacuum.vo")
 
-### 集成模块
-| 模块 | 状态 | 文件大小 |
-|------|------|----------|
-EOF
-        
-        if [ -f "theories/FRF_Comparative.vo" ]; then
-          size=$(stat -c%s "theories/FRF_Comparative.vo" 2>/dev/null || echo 0)
-          echo "| FRF_Comparative.v | ✅ 成功 | ${size} bytes |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-        else
-          echo "| FRF_Comparative.v | ❌ 失败 | 未生成 |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-        fi
-        
-        # 添加测试模块状态
-        cat >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
+#### 层级4: 扩展模块 (10个模块)
+$(check_module "QFT_FRF" "Quantum/QFT_FRF.vo")
+$(check_module "CurvedSpacetimeQFT" "Quantum/CurvedSpacetimeQFT.vo")
+$(check_module "FRF_CS_Null_Common" "CS_Null/FRF_CS_Null_Common.vo")
+$(check_module "FRF_CS_Null" "CS_Null/FRF_CS_Null.vo")
+$(check_module "CxxNull" "CS_Null/CxxNull.vo")
+$(check_module "PythonNull" "CS_Null/PythonNull.vo")
+$(check_module "JavaNull" "CS_Null/JavaNull.vo")
+$(check_module "MathNull" "CS_Null/MathNull.vo")
+$(check_module "RustNull" "CS_Null/RustNull.vo")
 
-### 测试模块
-| 模块 | 状态 | 文件大小 |
-|------|------|----------|
-EOF
-        
-        for module in Test_Basic Test_FRF_MetaTheory Test_QuantumVacuum Test_BlockchainSystem SelfContainedVerification; do
-          vo_file="Test/$module.vo"
-          if [ -f "$vo_file" ]; then
-            size=$(stat -c%s "$vo_file" 2>/dev/null || echo 0)
-            echo "| $module.v | ✅ 成功 | ${size} bytes |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          else
-            echo "| $module.v | ❌ 失败 | 未生成 |" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          fi
-        done
-        
-        # 添加总结
-        cat >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
+#### 层级5: 集成模块 (1个模块)
+$(check_module "FRF_Comparative" "theories/FRF_Comparative.vo")
 
-## 验证结论
+#### 层级6: 测试套件 (5个模块)
+$(check_module "Test_Basic" "Test/Test_Basic.vo")
+$(check_module "Test_FRF_MetaTheory" "Test/Test_FRF_MetaTheory.vo")
+$(check_module "Test_QuantumVacuum" "Test/Test_QuantumVacuum.vo")
+$(check_module "Test_BlockchainSystem" "Test/Test_BlockchainSystem.vo")
+$(check_module "SelfContainedVerification" "Test/SelfContainedVerification.vo")
 
-EOF
-        
-        if [ $TOTAL_VO_FILES -ge 20 ]; then
-          echo "🎉 **FRF 2.0 全量形式化验证成功完成！**" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          echo "大部分核心模块已成功编译，验证通过。" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-        elif [ $TOTAL_VO_FILES -ge 10 ]; then
-          echo "⚠️ **FRF 2.0 验证部分完成**" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          echo "部分模块编译成功，但存在编译失败的情况。" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-        else
-          echo "❌ **验证未通过**" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-          echo "多数模块编译失败，需要检查依赖和语法。" >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md
-        fi
-        
-        cat >> verification-reports/full/FRF_FULL_VERIFICATION_REPORT.md << EOF
-
-## 后续步骤
-1. 检查失败模块的编译日志
-2. 修复语法错误或依赖问题
-3. 重新运行验证工作流
+## 失败模块详情
+$(if [ -n "${{ steps.collect-results.outputs.failed_modules }}" ]; then
+  echo "以下模块编译失败:"
+  echo "${{ steps.collect-results.outputs.failed_modules }}" | tr ' ' '\n'
+else
+  echo "所有模块编译成功！"
+fi)
 
 ## 环境依赖
 \`\`\`bash
 $(opam list --installed 2>/dev/null | grep -E "coq|mathcomp" || echo "依赖信息获取失败")
 \`\`\`
 
+## 生成文件列表
+\`\`\`
+$(find . -name "*.vo" -type f 2>/dev/null | sort | head -50)
+$(if [ $(find . -name "*.vo" -type f 2>/dev/null | wc -l) -gt 50 ]; then echo "... 更多文件省略"; fi)
+\`\`\`
+
 ---
-*报告生成时间: $(date)*
+
+**报告生成时间**: $CURRENT_TIME  
+**GitHub Actions Run**: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 EOF
         
-        echo "✅ 详细验证报告生成完成"
-
-    - name: 📤 上传验证报告和日志
+        # 辅助函数：检查模块状态
+        check_module() {
+          local module=$1
+          local file=$2
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || echo 0)
+            if [ "$size" -gt 0 ]; then
+              echo "- ✅ **$module**: $size bytes"
+            else
+              echo "- ⚠️  **$module**: 空文件 (0 bytes)"
+            fi
+          else
+            echo "- ❌ **$module**: 文件缺失"
+          fi
+        }
+        
+        echo "✅ 验证报告生成完成"
+        
+    - name: 📊 生成JSON报告
+      run: |
+        echo "生成JSON格式报告..."
+        
+        cat > verification-reports/verification_summary.json << EOF
+{
+  "project": "FRF2.0",
+  "timestamp": "$(date -Iseconds)",
+  "github_run_id": "${{ github.run_id }}",
+  "repository": "${{ github.repository }}",
+  "coq_version": "$(coqc --version 2>/dev/null | head -1 || echo 'unknown')",
+  "compile_mode": "${{ github.event.inputs.compile_mode || 'full' }}",
+  "parallel_jobs": "${{ github.event.inputs.parallel_jobs || '4' }}",
+  "statistics": {
+    "total_modules": ${{ steps.collect-results.outputs.total_modules }},
+    "successful": ${{ steps.collect-results.outputs.success_count }},
+    "failed": $((steps.collect-results.outputs.total_modules - steps.collect-results.outputs.success_count)),
+    "success_rate": ${{ steps.collect-results.outputs.success_rate }}
+  },
+  "failed_modules": [
+    $(if [ -n "${{ steps.collect-results.outputs.failed_modules }}" ]; then
+      echo "${{ steps.collect-results.outputs.failed_modules }}" | tr ' ' '\n' | grep -v '^$' | sed 's/.*/"&",/' | sed '$ s/,$//'
+    else
+      echo ""
+    fi)
+  ]
+}
+EOF
+        
+    - name: 📤 上传验证报告
       uses: actions/upload-artifact@v4
       with:
-        name: frf-2.0-full-verification-reports
-        path: |
-          verification-reports/
-          compile-logs/
+        name: frf2.0-full-verification-reports
+        path: verification-reports/
         retention-days: 30
-
-    - name: 🎉 验证完成通知
+        
+    - name: 📈 发布验证状态
       if: always()
       run: |
-        echo "=== FRF 2.0 全量验证完成 ==="
-        echo "📊 验证统计:"
-        echo "- 总模块数: $(find . -name "*.v" | wc -l)"
-        echo "- 成功编译: $(find . -name "*.vo" | wc -l)"
-        echo "- 编译日志: compile-logs/"
-        echo "- 详细报告: verification-reports/"
-        echo ""
-        echo "🕒 完成时间: $(date)"
-        echo "========================================="
+        echo "=== 验证状态 ==="
         
-        # 检查是否有编译失败
-        FAIL_COUNT=$(find compile-logs -name "*.log" -exec grep -l "❌ 编译失败" {} \; 2>/dev/null | wc -l || echo 0)
-        if [ $FAIL_COUNT -gt 0 ]; then
-          echo "⚠️  注意: 有 $FAIL_COUNT 个模块编译失败"
-          echo "请查看编译日志获取详细信息"
+        SUCCESS_COUNT=${{ steps.collect-results.outputs.success_count }}
+        TOTAL_MODULES=${{ steps.collect-results.outputs.total_modules }}
+        SUCCESS_RATE=${{ steps.collect-results.outputs.success_rate }}
+        
+        if [ "$SUCCESS_COUNT" -eq "$TOTAL_MODULES" ]; then
+          echo "🎉 FRF 2.0 全量验证完全成功!"
+          echo "✅ 所有 $TOTAL_MODULES 个模块编译通过"
+          echo "🚀 编译成功率: 100%"
+        elif [ "$SUCCESS_RATE" -ge 80 ]; then
+          echo "✅ FRF 2.0 验证基本成功"
+          echo "📊 $SUCCESS_COUNT/$TOTAL_MODULES 个模块编译通过"
+          echo "📈 编译成功率: $SUCCESS_RATE%"
         else
-          echo "✅ 所有模块编译成功或跳过"
+          echo "⚠️  FRF 2.0 验证部分失败"
+          echo "⚠️  $SUCCESS_COUNT/$TOTAL_MODULES 个模块编译通过"
+          echo "📉 编译成功率: $SUCCESS_RATE%"
+        fi
+        
+        # 如果有失败模块，列出详细信息
+        if [ -n "${{ steps.collect-results.outputs.failed_modules }}" ]; then
+          echo ""
+          echo "❌ 失败模块:"
+          echo "${{ steps.collect-results.outputs.failed_modules }}" | tr ' ' '\n' | grep -v '^$'
         fi
