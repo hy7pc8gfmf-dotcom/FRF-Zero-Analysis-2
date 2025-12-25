@@ -426,26 +426,25 @@ jobs:
           # 创建报告目录
           mkdir -p verification-report
           
-          # 生成Markdown报告
-          cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'END_OF_REPORT'
+          # 生成Markdown报告 - 使用不同的heredoc标记避免YAML解析问题
+          cat > verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF_REPORT'
 # FRF 2.0 形式化验证报告
 
-          ## 验证概览
-          - **验证时间**: $(date)
-          - **触发事件**: ${{ github.event_name }}
-          - **触发分支**: ${{ github.ref }}
-          - **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
-          
-          ## 构建环境
-          - **系统**: Ubuntu 22.04
-          - **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
-          - **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
-          - **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
-          - **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
-          
+## 验证概览
+- **验证时间**: $(date)
+- **触发事件**: ${{ github.event_name }}
+- **触发分支**: ${{ github.ref }}
+- **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
 
-          ## 模块编译状态
-          END_OF_REPORT
+## 构建环境
+- **系统**: Ubuntu 22.04
+- **Coq版本**: ${{ needs.setup-environment.outputs.coq_version }}
+- **CPU核心**: ${{ needs.setup-environment.outputs.core_count }}
+- **并行任务**: ${{ needs.setup-environment.outputs.parallel_jobs }}
+- **可用内存**: ${{ needs.setup-environment.outputs.available_memory }}MB
+
+## 模块编译状态
+EOF_REPORT
           
           # 检查各个目录的编译状态
           for dir in SelfContainedLib theories Quantum CS_Null Test; do
@@ -469,8 +468,8 @@ jobs:
             fi
           done
           
-          # 添加总结
-          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'END_OF_SUMMARY'
+          # 添加总结 - 使用另一个heredoc标记
+          cat >> verification-report/FRF2_VERIFICATION_REPORT.md << 'EOF_SUMMARY'
 
 ## 验证总结
 
@@ -497,7 +496,7 @@ jobs:
 
 ---
 *报告由FRF 2.0自动验证系统生成*
-END_OF_SUMMARY
+EOF_SUMMARY
           
           echo "✅ 验证报告生成完成"
           
