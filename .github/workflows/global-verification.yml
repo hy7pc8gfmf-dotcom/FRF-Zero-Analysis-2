@@ -1410,7 +1410,7 @@ jobs:
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概览
-EOF
+'EOF'
 
           # 写入动态数据
           echo "- **验证时间**: $(date)" >> verification-report/FRF2_FULL_VERIFICATION_REPORT.md
