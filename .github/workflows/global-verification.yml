@@ -217,7 +217,7 @@ jobs:
         opam list --tree --installed | head -50
 
   compile-phase-1:
-    name: 🏗️ 阶段1: 基础库编译
+    name: 阶段1: 基础库编译
     needs: [setup-environment, install-dependencies]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
