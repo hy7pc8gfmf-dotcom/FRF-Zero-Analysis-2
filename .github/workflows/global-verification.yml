@@ -1407,3 +1407,104 @@ jobs:
           
           # 生成Markdown报告
           cat > verification-report/FRF2_FULL_VERIFICATION_REPORT.md << 'EOF'
+
+      - name: 📊 生成验证报告
+        run: |
+          echo "生成全量验证报告..."
+          
+          # 统计编译结果
+          TOTAL_FILES=0
+          COMPILED_FILES=0
+          HUGE_FILES=0
+          HUGE_COMPILED=0
+          
+          # 扫描所有.v文件
+          for dir in SelfContainedLib theories Quantum CS_Null Test; do
+            if [ -d "$dir" ]; then
+              for file in $(find "$dir" -name "*.v" 2>/dev/null); do
+                TOTAL_FILES=$((TOTAL_FILES + 1))
+                base=$(basename "$file" .v)
+                vo_file="${file%.v}.vo"
+                
+                if [ -f "$vo_file" ]; then
+                  COMPILED_FILES=$((COMPILED_FILES + 1))
+                  
+                  # 检查是否是大文件
+                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                  if [ "$lines" -gt 3000 ]; then
+                    HUGE_FILES=$((HUGE_FILES + 1))
+                    HUGE_COMPILED=$((HUGE_COMPILED + 1))
+                  fi
+                else
+                  # 检查是否是大文件
+                  lines=$(wc -l < "$file" 2>/dev/null || echo 0)
+                  if [ "$lines" -gt 3000 ]; then
+                    HUGE_FILES=$((HUGE_FILES + 1))
+                  fi
+                fi
+              done
+            fi
+          done
+          
+          # 计算成功率
+          SUCCESS_RATE=0
+          if [ "$TOTAL_FILES" -gt 0 ]; then
+            SUCCESS_RATE=$((COMPILED_FILES * 100 / TOTAL_FILES))
+          fi
+          
+          # 获取环境变量
+          CORE_COUNT="${{ env.CORE_COUNT }}"
+          AVAIL_MEM="${{ env.AVAIL_MEM }}"
+          COQ_MEMORY="${{ env.COQ_MEMORY }}"
+          PARALLEL_JOBS="${{ env.PARALLEL_JOBS }}"
+          GITHUB_RUN_ID="${{ github.run_id }}"
+          
+          # 生成Markdown报告
+          REPORT_FILE="verification-report/FRF2_FULL_VERIFICATION_REPORT.md"
+          
+          # 创建目录
+          mkdir -p verification-report
+          
+          # 开始生成报告
+          cat > "$REPORT_FILE" << EOF
+# FRF 2.0 全量形式化验证报告
+
+## 验证概览
+EOF
+
+          # 写入动态数据
+          echo "- **验证时间**: $(date)" >> "$REPORT_FILE"
+          echo "- **环境**: Ubuntu 22.04" >> "$REPORT_FILE"
+          echo "- **总文件数**: $TOTAL_FILES" >> "$REPORT_FILE"
+          echo "- **编译成功**: $COMPILED_FILES" >> "$REPORT_FILE"
+          echo "- **编译成功率**: ${SUCCESS_RATE}%" >> "$REPORT_FILE"
+          echo "- **大文件(>3000行)**: $HUGE_FILES" >> "$REPORT_FILE"
+          echo "- **大文件编译成功**: $HUGE_COMPILED" >> "$REPORT_FILE"
+          
+          # 继续生成报告...
+          # [中间部分保持不变，直到1413行]
+          
+          # 在1413行及之后，使用已经获取的环境变量
+          cat >> "$REPORT_FILE" << EOF
+
+## 环境信息
+- **系统**: Ubuntu 22.04
+- **CPU核心**: $CORE_COUNT
+- **内存**: ${AVAIL_MEM}MB 可用，${COQ_MEMORY}MB 分配
+- **Coq版本**: 8.18.0
+- **mathcomp版本**: 完整安装
+- **验证时间**: $(date '+%Y-%m-%d %H:%M:%S')
+
+## 性能统计
+- **编译阶段**: 6个阶段
+- **总超时时间**: 约240分钟
+- **大文件处理**: ${HUGE_COMPILED}/${HUGE_FILES} 个大文件编译成功
+- **并行编译**: ${PARALLEL_JOBS} 个并行任务
+
+---
+*报告生成时间: $(date)*
+*验证流水线: ${GITHUB_RUN_ID}*
+EOF
+          
+          echo "✅ 验证报告生成完成"
+          echo "报告位置: $REPORT_FILE"
