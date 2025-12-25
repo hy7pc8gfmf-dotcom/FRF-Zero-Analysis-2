@@ -134,56 +134,51 @@ jobs:
           pandoc
         echo "✅ 系统依赖安装完成"
 
-    - name: 🔄 初始化OPAM环境（全量版）
-      timeout-minutes: 25
+    - name: 🔄 初始化OPAM环境（基于可执行版）
+      timeout-minutes: 20
       run: |
         echo "初始化OPAM环境..."
-        
-        # 检查是否已有合适的switch
-        if opam switch list 2>/dev/null | grep -q "frf2.0"; then
-          echo "使用现有frf2.0 switch..."
-          opam switch set frf2.0
-        else
-          echo "创建新的frf2.0 switch..."
-          opam init --disable-sandboxing -y --compiler=4.14.0
-          opam switch create frf2.0 ocaml-base-compiler.4.14.0
-        fi
-        
+        opam init --disable-sandboxing -y --compiler=4.14.0
         eval $(opam env)
         opam repo add coq-released https://coq.inria.fr/opam/released
         opam update
         echo "✅ OPAM环境初始化完成"
         echo "OPAM版本: $(opam --version)"
-        echo "当前switch: $(opam switch show)"
 
-    - name: 📚 安装Coq核心+扩展库（全量版）
-      timeout-minutes: 40
+    - name: 📚 安装Coq核心（固定版本）
+      timeout-minutes: 25
       run: |
         eval $(opam env)
-        echo "安装Coq 8.18.0及扩展库..."
+        echo "安装Coq 8.18.0..."
         
-        # 安装Coq核心
-        echo "1/4 安装Coq 8.18.0..."
-        opam install -y --no-depexts coq{>=8.18.0 & <9.0.0}
+        # 安装Coq核心（不安装推荐包）
+        opam install -y --no-depexts coq.8.18.0
         
-        # 安装mathcomp
-        echo "2/4 安装mathcomp-ssreflect 1.17.0..."
-        opam install -y --no-depexts coq-mathcomp-ssreflect=1.17.0
-        
-        # 安装coq-mathlib（可选，但部分模块需要）
-        echo "3/4 安装coq-mathlib（可选依赖）..."
-        opam install -y --no-depexts coq-mathlib || echo "coq-mathlib安装失败，继续..."
-        
-        # 安装其他可能需要的库
-        echo "4/4 安装其他Coq库..."
-        opam install -y --no-depexts coq-stdlib coq-flocq coq-bignums || echo "部分库安装失败，继续..."
-        
-        echo "验证安装..."
-        if coqc --version | grep -q "8.18.0 & <9.0.0"; then
+        echo "验证Coq安装..."
+        if coqc --version | grep -q "8.18.0"; then
           echo "✅ Coq 8.18.0 安装成功"
         else
           echo "❌ Coq版本不匹配"
-          exit 0
+          exit 1
+        fi
+
+    - name: 🧮 安装mathcomp-ssreflect（精确版本1.17.0）
+      timeout-minutes: 15
+      run: |
+        eval $(opam env)
+        echo "安装mathcomp-ssreflect 1.17.0..."
+        
+        # 精确安装指定版本，避免自动升级
+        opam install -y --no-depexts coq-mathcomp-ssreflect=1.17.0
+        
+        echo "验证mathcomp安装..."
+        if opam list --installed | grep -q "coq-mathcomp-ssreflect.1.17.0"; then
+          echo "✅ mathcomp-ssreflect 1.17.0 安装成功"
+        else
+          echo "❌ mathcomp安装失败"
+          echo "当前安装的mathcomp版本:"
+          opam list --installed | grep mathcomp
+          exit 1
         fi
         
         echo "已安装库:"
