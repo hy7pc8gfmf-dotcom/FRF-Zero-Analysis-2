@@ -1009,7 +1009,7 @@ jobs:
     needs: [compile-phase-1, compile-phase-2, compile-phase-3, compile-phase-4, compile-phase-5, compile-phase-6]
     if: always()
     runs-on: ubuntu-22.04
-    steps:
+       steps:
        - name: 📥 收集编译结果
         run: |
           echo "=== 收集各阶段编译结果 ==="
