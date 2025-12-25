@@ -431,10 +431,14 @@ jobs:
 # FRF 2.0 形式化验证报告
 
 ## 验证概览
-          **验证时间**: $(date)
-          **触发事件**: ${{ github.event_name }}
-          **触发分支**: ${{ github.ref }}
-          **验证模式**: ${{ github.event.inputs.verify_mode || 'full' }}
+- **验证时间**: $(date)
+- **环境**: Ubuntu 22.04
+- **总文件数**: $TOTAL_FILES
+- **编译成功**: $COMPILED_FILES
+- **编译成功率**: ${SUCCESS_RATE}%
+- **大文件(>3000行)**: $HUGE_FILES
+- **大文件编译成功**: $HUGE_COMPILED
+
 
 ## 构建环境
           **系统**: Ubuntu 22.04
