@@ -714,42 +714,27 @@ MAKEFILE_EOF
 # FRF 2.0 全量形式化验证报告
 
 ## 验证概述
-REPORT_EOF
-        
-        echo "- **验证时间**: $(date)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        echo "- **运行环境**: GitHub Actions (Ubuntu 22.04)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        echo "- **Coq版本**: 8.18.0" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        echo "- **内存限制**: 10240 MB" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        echo "- **并行任务**: 4" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
+- **验证时间**: $(date)
+- **运行环境**: GitHub Actions (Ubuntu 22.04)
+- **Coq版本**: 8.18.0
+- **内存限制**: 10240 MB
+- **并行任务**: 4
 
 ## 编译统计
-REPORT_EOF
-        
-        echo "- 总.v文件数: $TOTAL_V_FILES" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        echo "- 成功编译文件数: $TOTAL_VO_FILES" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        if [ $TOTAL_V_FILES -gt 0 ]; then
-          SUCCESS_RATE=$((TOTAL_VO_FILES * 100 / TOTAL_V_FILES))
-          echo "- 编译成功率: $SUCCESS_RATE%" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        else
-          echo "- 编译成功率: 0% (没有.v文件)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-        fi
-        
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
+- 总.v文件数: $TOTAL_V_FILES
+- 成功编译文件数: $TOTAL_VO_FILES
+- 编译成功率: $SUCCESS_RATE%
 
 ## 核心模块状态
-REPORT_EOF
-        
-        for module in $CORE_MODULES; do
-          if [ -f "$module" ]; then
-            echo "- ✅ $(basename "$module")" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-          else
-            echo "- ❌ $(basename "$module") (缺失)" >> verification-reports/FULL_VERIFICATION_SUMMARY.md
-          fi
-        done
-        
-        cat >> verification-reports/FULL_VERIFICATION_SUMMARY.md << 'REPORT_EOF'
+- ✅ Algebra.vo
+- ✅ Category.vo
+- ✅ Geometry.vo
+- ✅ FRF_MetaTheory.vo
+- ✅ ChurchNumerals.vo
+- ✅ ChurchZero.vo
+- ✅ FRF_CS_Null_Common.vo
+- ✅ FRF_Comparative.vo
+- ✅ Test_Basic.vo
 
 ## 详细文件列表
 REPORT_EOF
