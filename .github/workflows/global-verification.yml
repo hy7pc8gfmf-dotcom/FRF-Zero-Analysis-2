@@ -171,9 +171,6 @@ jobs:
         if [ ! -f "Makefile" ]; then
           echo "创建最小Makefile版本..."
           cat > Makefile << 'MAKEFILE_EOF'
-# 最小Makefile用于GitHub Actions
-COQC:=coqc
-COQDEP:=coqdep
 
 # 基础路径
 SELF_CONTAINED := SelfContainedLib
