@@ -2327,8 +2327,6 @@ Proof.
   exact nat_transitive_simple.  (* 直接使用已证明的定理 *)
 Qed.
   
-Section ZFC_HereditarilyFinite.
-  
 (* 子集的符号表示 *)
 Notation "A '⊆' B" := (ZFC_subset A B) (at level 60).
 Notation "x '∈' A" := (ZFC_in x A) (at level 50).
