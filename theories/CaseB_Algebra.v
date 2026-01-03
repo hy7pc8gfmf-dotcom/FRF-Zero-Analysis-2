@@ -2,6 +2,14 @@
 (* 模块定位：FRF 2.0 代数场景核心（二级核心层），验证"0"的唯一性、功能角色及跨系统等价性
    修复方案：完全自包含，避免外部依赖，建立清晰扩展路径 *)
   
+  
+(* ===== 优化导入策略 ===== *)
+(* 基础库 *)
+From Coq Require Import ZArith.
+From Coq Require Import List.
+From Coq Require Import Morphisms.
+From Coq Require Import Setoid.
+
 From Coq Require Import Logic.FunctionalExtensionality.
 From Coq Require Import Arith.
 From Coq Require Import Reals.Reals.
@@ -1906,7 +1914,6 @@ Module RationalFieldFixed.
   Qed.
   
   (* 定义Setoid幺半群实例 - 使用正确的记录构建 *)
-(* 定义Setoid幺半群实例 - 使用正确的记录构建 *)
 Definition Q_SetoidMonoid_fixed : @UnifiedAlgebra.SetoidMonoid Q Q_eq Q_Equiv_fixed.
 Proof.
   (* 需要先证明结合律引理 *)
@@ -2353,6 +2360,7 @@ Qed.
   End QRationalSetoids.
   
 (* 导出QRationalSetoids模块，这样外部可以使用QRationalSetoids.SetoidAlgebra等 *)
+  
 Export QRationalSetoids.
   
   (* 导出特定定义 *)
@@ -5599,6 +5607,12 @@ End 测试用例.
   
 End 有理数约分工具箱_RationalReductionToolbox.
   
+  
+  
+  
+  
+  
+  
   (* ======================== 第三部分：有理数的类型类实例 ======================== *)
   
   (* 有理数约分谓词 *)
@@ -5708,12 +5722,10 @@ End 有理数约分工具箱_RationalReductionToolbox.
         is_reduced := Rational_is_reduced;
         reduce_is_reduced := Rational_reduce_func_reduced;
       |}.
-    
+      (* 导出实例 *)
   End RationalReducibleInstance.
   
-  (* 导出实例 *)
   Import RationalReducibleInstance.
-  
   (* 约分性质实例 *)
   Global Instance Rational_ReductionProperties : ReductionProperties Rational Rational_eq.
   Proof.
@@ -5772,7 +5784,41 @@ End 有理数约分工具箱_RationalReductionToolbox.
   Definition rr_mul (rr1 rr2 : ReducedRational) : ReducedRational :=
     to_reduced (Rational_mul (from_reduced rr1) (from_reduced rr2)).
   
-  (* ======================== 第六部分：自动化策略 ======================== *)
+(* 为约分视图添加等价关系实例 *)
+Instance ReducedRational_equiv : Equivalence (fun rr1 rr2 : ReducedRational => 
+  Rational_eq (rr_value rr1) (rr_value rr2)).
+Proof.
+  split.
+  - intro rr. apply Rational_eq_refl.
+  - intros rr1 rr2 H. apply Rational_eq_sym. exact H.
+  - intros rr1 rr2 rr3 H12 H23. 
+    (* 使用 transitivity 策略，它会在当前目标中自动应用等价关系的传递性 *)
+    transitivity (rr_value rr2).
+    + exact H12.
+    + exact H23.
+Qed.
+  
+(* Setoid幺半群定义 *)
+Definition Q_SetoidMonoid := RationalFieldFixed.Q_SetoidMonoid_fixed.
+  
+(* 常用有理数构造函数 *)
+Definition Q_zero : Rational := 
+  {| rat_num := 0%Z; rat_den := 1%Z; rat_den_pos := ltac:(compute;reflexivity) |}.
+  
+Definition Q_one : Rational := 
+  {| rat_num := 1%Z; rat_den := 1%Z; rat_den_pos := ltac:(compute;reflexivity) |}.
+  
+(* 从整数构造有理数 *)
+Definition Q_of_Z (z : Z) : Rational :=
+  {| rat_num := z; rat_den := 1%Z; rat_den_pos := ltac:(compute;reflexivity) |}.
+  
+(* 便捷运算符 *)
+Notation "0" := Q_zero : rational_scope.
+Notation "1" := Q_one : rational_scope.
+Notation "n / d" := (make_reduced n d (ltac:(compute;reflexivity))) : rational_scope.
+Open Scope rational_scope.
+  
+  (* ======================== 第五部分：自动化策略 ======================== *)
   
   Ltac normalize_rational :=
     repeat (rewrite self_reduce_idempotent).
@@ -5832,38 +5878,144 @@ Qed.
     reflexivity.
   Qed.
   
-  (* 编译完整性测试 - 使用显式函数调用 *)
-  Definition IntegrationTestPassed : Prop :=
-    (forall z : Z, 
-      @monoid_op Z (group_base IntAddGroup) z (@group_inv Z IntAddGroup z) = 
-      @monoid_id Z (group_base IntAddGroup)) ∧
-    (forall a : Z,
-      @monoid_op Z (ring_mul_monoid IntRing) 
-          (@monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) 
-          a
-      = @monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) ∧
-    (forall a : Z,
-      @monoid_op Z (ring_mul_monoid IntRing) a
-          (@monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) 
-      = @monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) ∧
-    True.
-  
-  Lemma integration_test_proof : IntegrationTestPassed.
+  (* 新增：有理数约分测试 *)
+  Example test_normalize_idempotent : forall q : Rational,
+    Rational_eq (normalize (normalize q)) (normalize q).
   Proof.
-    repeat split.
-    - apply test_group_inverse.
-    - apply test_ring_mul_zero.
+    intros q.
+    apply self_reduce_idempotent.
   Qed.
+  
+  Import 有理数约分工具箱_RationalReductionToolbox.
+(* 有理数运算与约分直接测试 *)
+Example test_rational_add_and_reduce_direct : 
+  (* 构造原始有理数 *)
+  let q1 := {| rat_num := 1%Z; rat_den := 2%Z; rat_den_pos := ltac:(lia) |} in
+  let q2 := {| rat_num := 1%Z; rat_den := 3%Z; rat_den_pos := ltac:(lia) |} in
+  
+  (* 计算加法结果 *)
+  let sum := Rational_add q1 q2 in
+  
+  (* 约分加法结果 *)
+  let reduced_sum := Rational_reduce sum in
+  
+  (* 预期结果 *)
+  let expected := {| rat_num := 5%Z; rat_den := 6%Z; rat_den_pos := ltac:(lia) |} in
+  
+  (* 验证约分后的加法结果与预期相等 *)
+  Rational_eq reduced_sum expected.
+Proof.
+  vm_compute.
+  reflexivity.
+Qed.
+  
+(* 测试约分函数的幂等性 - 直接版本 *)
+Example test_reduce_idempotent_direct : forall (q : Rational),
+  Rational_eq (Rational_reduce (Rational_reduce q)) (Rational_reduce q).
+Proof.
+  (* 对于任意有理数 q，我们可以直接应用已有的引理 *)
+  apply Rational_reduce_idempotent.
+Qed.
+  
+(* 测试约分后互质性 - 直接版本 *)
+Example test_reduce_coprime_direct : forall (q : Rational),
+  let q' := Rational_reduce q in
+  Z.gcd (rat_num q') (rat_den q') = 1%Z.
+Proof.
+  intros q.
+  apply Rational_reduce_coprime_final.
+Qed.
+  
+  (* 直积类型类实例测试 *)
+  Example test_product_monoid_typeclass : 
+    let M := ProductMonoid NatAddMonoid BoolOrMonoid in
+    @monoid_op (nat * bool) M (3, true) (5, false) = (8, true).
+  Proof.
+    simpl.
+    reflexivity.
+  Qed.
+  
+  (* 编译完整性测试增强 *)
+Definition IntegrationTestPassed : Prop :=
+  (* 原有测试 *)
+  (forall z : Z, @monoid_op Z (group_base IntAddGroup) z (@group_inv Z IntAddGroup z) =
+   @monoid_id Z (group_base IntAddGroup)) ∧
+  (forall a : Z, @monoid_op Z (ring_mul_monoid IntRing)
+    (@monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) a =
+   @monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) ∧
+  (forall a : Z, @monoid_op Z (ring_mul_monoid IntRing) a
+    (@monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) =
+   @monoid_id Z (group_base (abelian_base (ring_add_group IntRing)))) ∧
+  (* 修改为 Rational_eq *)
+  (forall q : Rational, Rational_eq (normalize (normalize q)) (normalize q)) ∧
+  (* 直积结构测试 *)
+  (let M := ProductMonoid NatAddMonoid BoolOrMonoid in
+   monoid_op M (3, true) (5, false) = (8, true)) ∧
+  True.
+    
+(* integration_test_proof 证明 *)
+Lemma integration_test_proof : IntegrationTestPassed.
+Proof.
+  (* 明确地分解合取命题 *)
+  split.
+  { (* 群逆元性质 *)
+    apply test_group_inverse. }
+  split.
+  { (* 环右零乘性质 *)
+    apply test_ring_zero_mul. }
+  split.
+  { (* 环左零乘性质 *)
+    apply test_ring_mul_zero. }
+  split.
+  { (* 有理数约分幂等性 - 直接使用 self_reduce_idempotent *)
+    intros q.
+    apply self_reduce_idempotent. }
+  split.
+  { (* 直积结构测试 *)
+    unfold ProductMonoid.
+    simpl.
+    reflexivity. }
+  { (* True *)
+    exact I. }
+Qed.
   
 End IntegrationTests.
   
+(* ======================== 键接口文档 ======================== *)
+(** 
+    [normalize q] 规范化有理数 q 为最简形式。
+    通过约分分子分母并确保分母为正，此函数保证：
+    - [self_is_reduced (normalize q)] 始终成立
+    - [normalize q = normalize (normalize q)] (幂等性)
+*)
+Definition normalize (q : Rational) : Rational := self_reduce q.
+
+(** 
+    [rr_add rr1 rr2] 在约分视图上执行加法。
+    此函数保证返回结果仍然是约分形式，适合在计算密集型场景使用，
+    避免中间结果膨胀。
+*)
+Definition rr_add (rr1 rr2 : ReducedRational) : ReducedRational :=
+  to_reduced (Rational_add (from_reduced rr1) (from_reduced rr2)).
+  
 (* ======================== 最终导出 ======================== *)
   
+(* 现在安全地导出所有模块 *)
+Export UnifiedAlgebra.
+Export ProjectiveSetoidDomain.
+Export TypeClasses.
+Export ConcreteInstances.
+Export AdvancedTheory.
+Export FRFIntegration.
+Export LinearAlgebra.
 Export FutureProofDesign.
 Export GroupProofsPatch.
 Export RingProofsPatch.
+Export Verification.
 Export AlgebraConstructors.
+Export RationalReductionTypeClasses.
 Export IntegrationTests.
+Export Notations.
   
 (* 编译成功验证 *)
 Theorem LibraryCompilationSuccessful : True.
